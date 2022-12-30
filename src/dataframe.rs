@@ -232,16 +232,10 @@ impl DataSlide {
 
 
 // Code for managing parallel computation of many configurable runs
-pub enum Simulator {
-    None,
-    CHP(QuantumCHPState),
-    Graph(QuantumGraphState),
-    Vector(QuantumVectorState),
-}
 
 pub trait RunConfig {
-    fn init_state(&self) -> Simulator;
-    fn gen_dataslide(&self, sim: Simulator) -> DataSlide;
+    fn init_state(&self);
+    fn gen_dataslide(&self) -> DataSlide;
 }
 
 pub struct ParallelCompute<C: RunConfig + std::marker::Sync> {
@@ -271,8 +265,8 @@ impl<C: RunConfig + std::marker::Sync> ParallelCompute<C> {
         }
 
         let slides: Vec<DataSlide> = (0..self.configs.len()).into_par_iter().map(|i| {
-            let mut state: Simulator = self.configs[i].init_state();
-            self.configs[i].gen_dataslide(state)
+			self.configs[i].init_state();
+            self.configs[i].gen_dataslide()
         }).collect();
 
 
