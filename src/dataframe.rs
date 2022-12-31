@@ -234,8 +234,8 @@ impl DataSlide {
 // Code for managing parallel computation of many configurable runs
 
 pub trait RunConfig {
-    fn init_state(&self);
-    fn gen_dataslide(&self) -> DataSlide;
+    fn init_state(&mut self);
+    fn gen_dataslide(&mut self) -> DataSlide;
 }
 
 pub struct ParallelCompute<C: RunConfig + std::marker::Sync> {
