@@ -238,7 +238,7 @@ pub trait RunConfig {
     fn gen_dataslide(&mut self) -> DataSlide;
 }
 
-pub struct ParallelCompute<C: RunConfig + std::marker::Sync> {
+pub struct ParallelCompute<C> {
     num_threads: usize,
     configs: Vec<C>,
 	params: HashMap<String, DataField>,
@@ -246,7 +246,7 @@ pub struct ParallelCompute<C: RunConfig + std::marker::Sync> {
     initialized: bool,
 }
 
-impl<C: RunConfig + std::marker::Sync> ParallelCompute<C> {
+impl<C: RunConfig + std::marker::Sync + std::marker::Send + Clone> ParallelCompute<C> {
     pub fn new(num_threads: usize, configs: Vec<C>) -> Self {
         Self { num_threads: num_threads, configs: configs, params: HashMap::new(), initialized: false }
     }
@@ -259,14 +259,16 @@ impl<C: RunConfig + std::marker::Sync> ParallelCompute<C> {
 		self.params.insert(String::from(key), DataField::Float(val));
 	}
 
-    pub fn compute(&self) -> DataFrame {
+    pub fn compute(&mut self) -> DataFrame {
         if !self.initialized {
             rayon::ThreadPoolBuilder::new().num_threads(self.num_threads).build_global().unwrap();
         }
 
         let slides: Vec<DataSlide> = (0..self.configs.len()).into_par_iter().map(|i| {
-			self.configs[i].init_state();
-            self.configs[i].gen_dataslide()
+			// TODO avoid cloning configs
+			let mut config = self.configs[i].clone();
+			config.init_state();
+        	config.gen_dataslide()
         }).collect();
 
 
