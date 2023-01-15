@@ -65,6 +65,7 @@ impl Serialize for Sample {
 pub enum DataField {
 	Int(i32),
 	Float(f32),
+	DString(String),
 	Data(Vec<Sample>),
 }
 
@@ -80,6 +81,12 @@ impl DataField {
 			DataField::Float(x) => {
 				match other {
 					DataField::Float(y) => return (x - y).abs()/x < 0.001,
+					_ => return false
+				}
+			},
+			DataField::DString(x) => {
+				match other {
+					DataField::DString(y) => return x == y,
 					_ => return false
 				}
 			},
@@ -141,6 +148,10 @@ impl DataSlide {
 		self.data.insert(String::from(key), DataField::Float(val));
 	}
 
+	pub fn add_string_param(&mut self, key: &str, val: String) {
+		self.data.insert(String::from(key), DataField::DString(val));
+	}
+
 	pub fn push_data(&mut self, key: &str, val: Sample) {
 		match self.data.get_mut(key).unwrap() {
 			DataField::Data(v) => v.push(val),
@@ -192,6 +203,13 @@ impl DataSlide {
 		}
 	}
 
+	pub fn unwrap_string(&self, key: &str) -> String {
+		match self.data[key] {
+			DataField::DString(x) => x,
+			_ => panic!()
+		}
+	}
+
 	pub fn unwrap_data(&self, key: &str) -> &Vec<Sample> {
 		match &self.data[key] {
 			DataField::Data(x) => x,
@@ -207,6 +225,7 @@ impl DataSlide {
 			match datafield {
 				DataField::Int(x) => dataslide.add_int_param(&key, *x),
 				DataField::Float(x) => dataslide.add_float_param(&key, *x),
+				DataField::DString(x) => dataslide.add_string_param(&key, *x),
 				DataField::Data(x) => {
 					match &other.data[key] {
 						DataField::Data(y) => {
@@ -232,7 +251,6 @@ impl DataSlide {
 
 
 // Code for managing parallel computation of many configurable runs
-
 pub trait RunConfig {
     fn init_state(&mut self);
     fn gen_dataslide(&mut self) -> DataSlide;
@@ -257,6 +275,10 @@ impl<C: RunConfig + std::marker::Sync + std::marker::Send + Clone> ParallelCompu
 
 	pub fn add_float_param(&mut self, key: &str, val: f32) {
 		self.params.insert(String::from(key), DataField::Float(val));
+	}
+
+	pub fn add_string_param(&mut self, key: &str, val: String) {
+		self.params.insert(String::from(key), DataField::DString(val));
 	}
 
     pub fn compute(&mut self) -> DataFrame {
