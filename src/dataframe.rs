@@ -204,8 +204,8 @@ impl DataSlide {
 	}
 
 	pub fn unwrap_string(&self, key: &str) -> String {
-		match self.data[key] {
-			DataField::DString(x) => x,
+		match &self.data[key] {
+			DataField::DString(x) => x.clone(),
 			_ => panic!()
 		}
 	}
@@ -225,7 +225,7 @@ impl DataSlide {
 			match datafield {
 				DataField::Int(x) => dataslide.add_int_param(&key, *x),
 				DataField::Float(x) => dataslide.add_float_param(&key, *x),
-				DataField::DString(x) => dataslide.add_string_param(&key, *x),
+				DataField::DString(x) => dataslide.add_string_param(&key, x.clone()),
 				DataField::Data(x) => {
 					match &other.data[key] {
 						DataField::Data(y) => {
