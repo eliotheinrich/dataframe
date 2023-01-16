@@ -35,6 +35,12 @@ impl Sample {
 		return Sample { mean: mean, std: std, num_samples: num_samples }
 	}
 
+	pub fn collapse(samples: Vec<Sample>) -> Sample {
+		let sample: Sample = samples.iter().fold(Sample { mean: 0., std: 0., num_samples: 0 }, |sum, val| sum.combine(val));
+		
+		sample
+	}
+
 	pub fn combine(&self, other: &Sample) -> Sample {
 		let combined_samples: usize = self.num_samples + other.num_samples;
 		let combined_mean: f32 = ((self.num_samples as f32)*self.mean
