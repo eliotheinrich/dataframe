@@ -36,9 +36,7 @@ impl Sample {
 	}
 
 	pub fn collapse(samples: Vec<Sample>) -> Sample {
-		let sample: Sample = samples.iter().fold(Sample { mean: 0., std: 0., num_samples: 0 }, |sum, val| sum.combine(val));
-		
-		sample
+		samples.iter().fold(Sample { mean: 0., std: 0., num_samples: 0 }, |sum, val| sum.combine(val))
 	}
 
 	pub fn combine(&self, other: &Sample) -> Sample {
@@ -71,7 +69,7 @@ impl Serialize for Sample {
 pub enum DataField {
 	Int(i32),
 	Float(f32),
-	DString(String),
+	String(String),
 	Data(Vec<Sample>),
 }
 
@@ -90,9 +88,9 @@ impl DataField {
 					_ => return false
 				}
 			},
-			DataField::DString(x) => {
+			DataField::String(x) => {
 				match other {
-					DataField::DString(y) => return x == y,
+					DataField::String(y) => return x == y,
 					_ => return false
 				}
 			},
@@ -155,7 +153,7 @@ impl DataSlide {
 	}
 
 	pub fn add_string_param(&mut self, key: &str, val: String) {
-		self.data.insert(String::from(key), DataField::DString(val));
+		self.data.insert(String::from(key), DataField::String(val));
 	}
 
 	pub fn push_data(&mut self, key: &str, val: Sample) {
@@ -211,7 +209,7 @@ impl DataSlide {
 
 	pub fn unwrap_string(&self, key: &str) -> String {
 		match &self.data[key] {
-			DataField::DString(x) => x.clone(),
+			DataField::String(x) => x.clone(),
 			_ => panic!()
 		}
 	}
@@ -231,7 +229,7 @@ impl DataSlide {
 			match datafield {
 				DataField::Int(x) => dataslide.add_int_param(&key, *x),
 				DataField::Float(x) => dataslide.add_float_param(&key, *x),
-				DataField::DString(x) => dataslide.add_string_param(&key, x.clone()),
+				DataField::String(x) => dataslide.add_string_param(&key, x.clone()),
 				DataField::Data(x) => {
 					match &other.data[key] {
 						DataField::Data(y) => {
@@ -284,7 +282,7 @@ impl<C: RunConfig + std::marker::Sync + std::marker::Send + Clone> ParallelCompu
 	}
 
 	pub fn add_string_param(&mut self, key: &str, val: String) {
-		self.params.insert(String::from(key), DataField::DString(val));
+		self.params.insert(String::from(key), DataField::String(val));
 	}
 
     pub fn compute(&mut self) -> DataFrame {
