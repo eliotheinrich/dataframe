@@ -16,6 +16,10 @@ impl Sample {
 		return Sample { mean: s, std: 0., num_samples: 1 };
 	}
 
+	pub fn empty() -> Sample {
+		Sample { mean: 0., std: 0., num_samples: 0 }
+	}
+
 	pub fn from(vec: &Vec<f32>) -> Sample {
 		let num_samples: usize = vec.len();
 		let mut s: f32 = 0.;
