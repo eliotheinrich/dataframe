@@ -88,7 +88,8 @@ impl DataField {
 			},
 			DataField::Float(x) => {
 				match other {
-					DataField::Float(y) => return (x - y).abs()/x < 0.001,
+					// Note: will be buggy for small Floats
+					DataField::Float(y) => return (x - y).abs() < 0.001,
 					_ => return false
 				}
 			},
