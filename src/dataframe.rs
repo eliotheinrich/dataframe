@@ -128,6 +128,19 @@ impl DataFrame {
 		return df;
 	}
 
+	pub fn add_int_param(&mut self, key: &str, val: i32) {
+		self.params.insert(String::from(key), DataField::Int(val));
+	}
+
+	pub fn add_float_param(&mut self, key: &str, val: f32) {
+		self.params.insert(String::from(key), DataField::Float(val));
+	}
+
+	pub fn add_string_param(&mut self, key: &str, val: String) {
+		self.params.insert(String::from(key), DataField::String(val));
+	}
+
+
 	pub fn add_slide(&mut self, slide: DataSlide) {
 		self.slides.push(slide);
 	}
