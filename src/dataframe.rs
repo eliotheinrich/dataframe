@@ -146,7 +146,7 @@ impl DataFrame {
 	}
 
 	pub fn save_json(&self, filename: String) {
-		let json = serde_json::to_string(&self).unwrap();
+		let json = serde_json::to_string_pretty(&self).unwrap();
 		fs::write(filename, json);
 	}
 }
