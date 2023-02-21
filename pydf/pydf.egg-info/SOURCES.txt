@@ -1,0 +1,7 @@
+pydf.py
+setup.py
+pydf.egg-info/PKG-INFO
+pydf.egg-info/SOURCES.txt
+pydf.egg-info/dependency_links.txt
+pydf.egg-info/requires.txt
+pydf.egg-info/top_level.txt
