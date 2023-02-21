@@ -107,3 +107,8 @@ def load_data(filename):
 			data.add_dataslide(DataSlide(keys, vals))
 	
 	return data
+
+def sort_data_by(sorter, *args):
+	idxs = np.argsort(sorter)
+	return (sorter[idxs], *[arg[idxs] for arg in args])
+
