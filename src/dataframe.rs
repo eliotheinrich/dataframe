@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use serde::{Serialize, Deserialize, Serializer, ser::SerializeTuple};
+use serde::{Serialize, Deserialize, Serializer, ser::{SerializeTuple, SerializeMap}};
 
 use rayon::prelude::*;
 
@@ -151,9 +151,23 @@ impl DataFrame {
 	}
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct DataSlide {
 	data: HashMap<String, DataField>,
+}
+
+impl Serialize for DataSlide {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_map(Option::Some(self.data.len()))?;
+		for (key, val) in &self.data {
+			seq.serialize_entry(key, val);
+		}
+
+		seq.end()
+    }
 }
 
 impl DataSlide {
