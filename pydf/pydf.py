@@ -101,8 +101,13 @@ def load_data(filename):
 		for param_key in json_contents['params']:
 			data.params[param_key] = parse_datafield(json_contents['params'][param_key])[0]
 		for slide in json_contents['slides']:
-			keys = list(slide['data'].keys())
-			vals = [parse_datafield(slide['data'][key]) for key in keys]
+			try:
+				slide_dict = slide['data']
+			except KeyError:
+				slide_dict = slide
+
+			keys = list(slide_dict.keys())
+			vals = [parse_datafield(slide_dict[key]) for key in keys]
 				
 			data.add_dataslide(DataSlide(keys, vals))
 	
