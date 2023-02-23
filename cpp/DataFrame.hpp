@@ -237,6 +237,16 @@ class DataFrame {
 };
 
 class Config {
+	private:
+		template<typename T>
+		std::string params_to_string(std::map<std::string, T> &params) const {
+			std::vector<std::string> keyvals(0);
+			for (auto const &[key, val] : params) {
+				keyvals.push_back(key + ": " + std::to_string(val));
+			}
+			return join(keyvals, ", ");
+		}
+
 	public:
 		virtual std::map<std::string, int> get_iparams() const {
 			return std::map<std::string, int>();
@@ -245,16 +255,31 @@ class Config {
 			return std::map<std::string, float>();
 		}
 
+		std::string to_string() const {
+			std::string s = "{";
+			std::map<std::string, int>   iparams = get_iparams();
+			std::map<std::string, float> fparams = get_fparams();
+
+			s += params_to_string(iparams);
+			if (!iparams.empty() && !fparams.empty()) {
+				s += ", ";
+			}
+			s += params_to_string(fparams);
+
+			s += "}";
+			return s;
+		}
+
 		virtual void compute(DataSlide *slide)=0;
 };
 
 template <typename ConfigType>
 class ParallelCompute {
 	private:
-		std::vector<ConfigType> configs;
+		std::vector<ConfigType*> configs;
 
 	public:
-		ParallelCompute(std::vector<ConfigType> configs) : configs(configs) {}
+		ParallelCompute(std::vector<ConfigType*> configs) : configs(configs) {}
 
 		DataFrame compute(uint num_threads) {
 			uint num_configs = configs.size();
