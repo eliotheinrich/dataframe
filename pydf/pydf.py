@@ -2,26 +2,21 @@ import json
 import numpy as np
 
 class DataSlide:
-	def __init__(self, keys, vals):
-		self.data = dict(zip(keys, vals))
+	def __init__(self, params, data):
+		self.params = params
+		self.data = data
 
 	def get(self, key):
-		if self.data[key].ndim == 1:
-			return self.data[key][0]
+		if key in self.params:
+			return self.params[key]
 		else:
 			return self.data[key][:,0]
 	
 	def get_err(self, key):
-		if self.data[key].ndim == 1:
-			raise KeyError("Data not found")
-		else:
-			return self.data[key][:,1]
+		return self.data[key][:,1]
 
 	def get_nruns(self, key):
-		if self.data[key].ndim == 1:
-			raise KeyError("Data not found")
-		else:
-			return self.data[key][:,2]
+		return self.data[key][:,2]
 
 class DataFrame:
 	def __init__(self):
@@ -49,10 +44,15 @@ class DataFrame:
 		return self.params[key]
 
 	def get(self, key):
-		val = []
-		for slide in self.slides:
-			val.append(slide.get(key))
-		return np.array(val)
+		if key in self.params:
+			return self.params[key]
+		
+		else:
+			vals = []
+			for slide in self.slides:
+				vals.append(slide.get(key))
+
+		return np.array(vals).flatten()
 	
 	def get_err(self, key):
 		val = []
@@ -95,25 +95,34 @@ def parse_datafield(s):
 		return np.array([s[list(s.keys())[0]]])
 
 def load_data(filename):
-	data = DataFrame()
+	dataframe = DataFrame()
 	with open(filename, 'r') as f:
 		json_contents = json.load(f)
-		for param_key in json_contents['params']:
-			data.params[param_key] = parse_datafield(json_contents['params'][param_key])[0]
+		for param_key, param in json_contents['params'].items():
+			try:
+				dataframe.params = parse_datafield(param)[0]
+			except:
+				dataframe.params[param_key] = param
 		for slide in json_contents['slides']:
 			try:
 				slide_dict = slide['data']
+				vals = {key: parse_datafield(slide_dict[key]) for key in slide_dict.keys()}
 			except KeyError:
 				slide_dict = slide
+				vals = {key: slide_dict[key] for key in slide_dict.keys()}
 
-			keys = list(slide_dict.keys())
-			vals = [parse_datafield(slide_dict[key]) for key in keys]
+			params = {}
+			data = {}
+			for key in slide_dict.keys():
+				if isinstance(vals[key], list):
+					data[key] = np.array(vals[key])
+				else:
+					params[key] = vals[key] 
 				
-			data.add_dataslide(DataSlide(keys, vals))
+			dataframe.add_dataslide(DataSlide(params, data))
 	
-	return data
+	return dataframe
 
 def sort_data_by(sorter, *args):
 	idxs = np.argsort(sorter)
 	return (sorter[idxs], *[arg[idxs] for arg in args])
-
