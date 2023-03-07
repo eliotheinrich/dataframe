@@ -70,8 +70,12 @@ class DataFrame:
 		new_df = DataFrame()
 		new_df.params = self.params.copy()
 		for slide in self.slides:
-			if np.isclose(slide.get(key), val):
-				new_df.add_dataslide(slide)
+			if isinstance(val, str):
+				if val == slide.get(key):
+					new_df.add_dataslide(slide)
+			else:
+				if np.isclose(slide.get(key), val):
+					new_df.add_dataslide(slide)
 		
 		return new_df
 	
