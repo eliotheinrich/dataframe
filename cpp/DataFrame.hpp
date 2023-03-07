@@ -69,7 +69,6 @@ struct datafield {
 				case datafield_t::df_float : return datafield(fdata);
 				case datafield_t::df_string : return datafield(sdata);
 			}
-			if (type() == datafield_t::df_string) return datafield(sdata);
 		}
 
 		bool operator==(const datafield &df) {
@@ -78,6 +77,7 @@ struct datafield {
 			if (type() == datafield_t::df_int) return idata == df.idata;
 			if (type() == datafield_t::df_float) return std::abs(fdata - df.fdata) < EPS;
 			if (type() == datafield_t::df_string) return sdata == df.sdata;
+
 			return false;
 		}
 
@@ -113,7 +113,13 @@ class Params {
 			return s;
 		}
 
-		datafield get(std::string s) const { return fields.at(s); }
+		datafield get(std::string s) const { 
+			if (fields.count(s)) {
+				return fields.at(s);
+			} else {
+				std::cout << "Key \"" + s + "\" not found.\n"; assert(false);
+			}
+		}
 		int geti(std::string s) const { return get(s).unwrapi(); }
 		int geti(std::string s, int defaulti) const { 
 			if (fields.count(s) && fields.at(s).type() == datafield_t::df_int) return get(s).unwrapi();
@@ -160,7 +166,11 @@ class Params {
 			return !((*this) == p);
 		}
 
-		static std::vector<Params> load_json(nlohmann::json data, Params p) {
+		static std::vector<Params> load_json(nlohmann::json data, Params p, bool debug) {
+			if (debug) {
+				std::cout << "Loaded: \n";
+				std::cout << data.dump() << "\n";
+			}
 			std::vector<Params> params;
 
 			// Dealing with model parameters
@@ -193,21 +203,21 @@ class Params {
 				for (uint i = 0; i < num_iparams; i++) {
 					for (auto const &[k, v] : iparams[i]) p.add(k, v);
 					for (auto const &[k, v] : fparams[i]) p.add(k, v);
-					std::vector<Params> new_params = load_json(data, Params(&p));
+					std::vector<Params> new_params = load_json(data, Params(&p), false);
 					params.insert(params.end(), new_params.begin(), new_params.end());
 				}
 				return params;
 			} else if (contains_model_fparams) {
 				for (uint i = 0; i < num_fparams; i++) {
 					for (auto const &[k, v] : fparams[i]) p.add(k, v);
-					std::vector<Params> new_params = load_json(data, Params(&p));
+					std::vector<Params> new_params = load_json(data, Params(&p), false);
 					params.insert(params.end(), new_params.begin(), new_params.end());
 				}
 				return params;
 			} else if (contains_model_iparams) {
 				for (uint i = 0; i < num_iparams; i++) {
 					for (auto const &[k, v] : iparams[i]) p.add(k, v);
-					std::vector<Params> new_params = load_json(data, Params(&p));
+					std::vector<Params> new_params = load_json(data, Params(&p), false);
 					params.insert(params.end(), new_params.begin(), new_params.end());
 				}
 				return params;
@@ -241,11 +251,14 @@ class Params {
 			if (!contains_vector) {
 				params.push_back(p);
 			} else {
-				std::vector<int> vals = data[vector_key];
+				auto vals = data[vector_key];
 				data.erase(vector_key);
 				for (auto v : vals) {
-					p.add(vector_key, v);
-					std::vector<Params> new_params = load_json(data, &p);
+					if (v.type() == nlohmann::json::value_t::number_integer) p.add(vector_key, (int) v);
+					else if (v.type() == nlohmann::json::value_t::number_unsigned) p.add(vector_key, (int) v);
+					else if (v.type() == nlohmann::json::value_t::number_float) p.add(vector_key, (float) v);
+					else if (v.type() == nlohmann::json::value_t::string) p.add(vector_key, std::string(v));
+					std::vector<Params> new_params = load_json(data, &p, false);
 					params.insert(params.end(), new_params.begin(), new_params.end());
 				}
 			}
@@ -253,8 +266,8 @@ class Params {
 			return params;
 		}
 
-		static std::vector<Params> load_json(nlohmann::json data) {
-			return load_json(data, Params());
+		static std::vector<Params> load_json(nlohmann::json data, bool debug=false) {
+			return load_json(data, Params(), debug);
 		}
 
 };
@@ -297,9 +310,9 @@ class Sample {
 			double combined_samplesf = combined_samples;
 
 			double combined_mean = (samples1f*this->get_mean() + samples2f*other.get_mean())/combined_samplesf;
-			double combined_std = std::pow(((samples1f*std::pow(this->get_std(), 2) + std::pow(this->get_mean() - combined_mean, 2))
-								+ (samples2f*std::pow(other.get_std(), 2) + std::pow(other.get_mean() - combined_mean, 2))
-								)/combined_samplesf, 0.5);
+			double combined_std = std::pow((samples1f*(std::pow(this->get_std(), 2) + std::pow(this->get_mean() - combined_mean, 2))
+								          + samples2f*(std::pow(other.get_std(), 2) + std::pow(other.get_mean() - combined_mean, 2))
+								           )/combined_samplesf, 0.5);
 
 			return Sample(combined_mean, combined_std, combined_samples);
 		}
