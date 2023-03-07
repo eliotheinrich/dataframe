@@ -306,6 +306,8 @@ class Sample {
 
         Sample combine(const Sample &other) const {
 			uint combined_samples = this->num_samples + other.get_num_samples();
+			if (combined_samples == 0) return Sample();
+			
 			double samples1f = get_num_samples(); double samples2f = other.get_num_samples();
 			double combined_samplesf = combined_samples;
 
