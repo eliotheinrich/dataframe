@@ -18,6 +18,13 @@ class DataSlide:
 	def get_nruns(self, key):
 		return self.data[key][:,2]
 
+def _remove_flat_axes(A):
+	shape = np.array(A.shape)
+	nonflat_axes = np.where(shape != 1)
+
+	return A.reshape(shape[nonflat_axes])
+
+
 class DataFrame:
 	def __init__(self):
 		self.params = {}
@@ -52,7 +59,9 @@ class DataFrame:
 			for slide in self.slides:
 				vals.append(slide.get(key))
 
-		return np.array(vals).flatten()
+		vals = np.array(vals)
+
+		return _remove_flat_axes(vals)
 	
 	def get_err(self, key):
 		val = []
