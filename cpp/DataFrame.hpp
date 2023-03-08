@@ -257,6 +257,7 @@ class Params {
 					if (v.type() == nlohmann::json::value_t::number_integer) p.add(vector_key, (int) v);
 					else if (v.type() == nlohmann::json::value_t::number_unsigned) p.add(vector_key, (int) v);
 					else if (v.type() == nlohmann::json::value_t::number_float) p.add(vector_key, (float) v);
+					else if (v.type() == nlohmann::json::value_t::boolean) p.add(vector_key, (int) v);
 					else if (v.type() == nlohmann::json::value_t::string) p.add(vector_key, std::string(v));
 					std::vector<Params> new_params = load_json(data, &p, false);
 					params.insert(params.end(), new_params.begin(), new_params.end());
