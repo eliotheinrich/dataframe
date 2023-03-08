@@ -257,6 +257,7 @@ class Params {
 					if (v.type() == nlohmann::json::value_t::number_integer) p.add(vector_key, (int) v);
 					else if (v.type() == nlohmann::json::value_t::number_unsigned) p.add(vector_key, (int) v);
 					else if (v.type() == nlohmann::json::value_t::number_float) p.add(vector_key, (float) v);
+					else if (v.type() == nlohmann::json::value_t::boolean) p.add(vector_key, (int) v);
 					else if (v.type() == nlohmann::json::value_t::string) p.add(vector_key, std::string(v));
 					std::vector<Params> new_params = load_json(data, &p, false);
 					params.insert(params.end(), new_params.begin(), new_params.end());
@@ -306,6 +307,8 @@ class Sample {
 
         Sample combine(const Sample &other) const {
 			uint combined_samples = this->num_samples + other.get_num_samples();
+			if (combined_samples == 0) return Sample();
+			
 			double samples1f = get_num_samples(); double samples2f = other.get_num_samples();
 			double combined_samplesf = combined_samples;
 
