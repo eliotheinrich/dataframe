@@ -60,20 +60,23 @@ class DataFrame:
 				vals.append(slide.get(key))
 
 		vals = np.array(vals)
-
 		return _remove_flat_axes(vals)
 	
 	def get_err(self, key):
-		val = []
+		vals = []
 		for slide in self.slides:
-			val.append(slide.get_err(key))
-		return np.array(val)
+			vals.append(slide.get_err(key))
+		
+		vals = np.array(vals)
+		return _remove_flat_axes(vals)
 
 	def get_nruns(self, key):
-		val = []
+		vals = []
 		for slide in self.slides:
-			val.append(slide.get_nruns(key))
-		return np.array(val)
+			vals.append(slide.get_nruns(key))
+		
+		vals = np.array(vals)
+		return _remove_flat_axes(vals)
 	
 	def filter(self, key, val, invert=False):
 		if key in self.params:
