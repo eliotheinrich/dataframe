@@ -75,16 +75,25 @@ class DataFrame:
 			val.append(slide.get_nruns(key))
 		return np.array(val)
 	
-	def filter(self, key, val):
+	def filter(self, key, val, invert=False):
+		if key in self.params:
+			if val == self.params[key]:
+				return self
+			else:
+				return DataFrame()
+				
 		new_df = DataFrame()
 		new_df.params = self.params.copy()
 		for slide in self.slides:
 			if isinstance(val, str):
-				if val == slide.get(key):
-					new_df.add_dataslide(slide)
+				keep = val == slide.get(key)
 			else:
-				if np.isclose(slide.get(key), val):
-					new_df.add_dataslide(slide)
+				keep = np.isclose(slide.get(key), val)
+
+			if invert:
+				keep = not keep
+			if keep:
+				new_df.add_dataslide(slide)
 		
 		return new_df
 	
