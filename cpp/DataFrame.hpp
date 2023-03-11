@@ -61,6 +61,9 @@ struct datafield {
 				case datafield_t::df_float : return std::to_string(fdata);
 				case datafield_t::df_string : return "\"" + sdata + "\"";
 			}
+			std::cout << "Printed datafield is invalid.\n";
+			assert(false);
+			return "";
 		}
 
 		datafield clone() {
@@ -69,6 +72,9 @@ struct datafield {
 				case datafield_t::df_float : return datafield(fdata);
 				case datafield_t::df_string : return datafield(sdata);
 			}
+			std::cout << "Cloned datafield is invalid.\n";
+			assert(false);
+			return datafield(idata);
 		}
 
 		bool operator==(const datafield &df) {
@@ -121,19 +127,28 @@ class Params {
 			}
 		}
 		int geti(std::string s) const { return get(s).unwrapi(); }
-		int geti(std::string s, int defaulti) const { 
+		int geti(std::string s, int defaulti) { 
 			if (fields.count(s) && fields.at(s).type() == datafield_t::df_int) return get(s).unwrapi();
-			else return defaulti;
+			else {
+				add(s, defaulti);
+				return defaulti;
+			}
 		}
 		float getf(std::string s) const { return fields.at(s).unwrapf(); }
-		float getf(std::string s, float defaultf) const { 
+		float getf(std::string s, float defaultf) { 
 			if (fields.count(s) && fields.at(s).type() == datafield_t::df_float) return get(s).unwrapf();
-			else return defaultf;
+			else {
+				add(s, defaultf);
+				return defaultf;
+			}
 		}
 		std::string gets(std::string s) const { return fields.at(s).unwraps(); }
-		std::string gets(std::string s, std::string defaults) const { 
+		std::string gets(std::string s, std::string defaults) { 
 			if (fields.count(s) && fields.at(s).type() == datafield_t::df_string) return get(s).unwraps();
-			else return defaults;
+			else {
+				add(s, defaults);
+				return defaults;
+			};
 		}
 
 		void add(std::string s, datafield df) { fields[s] = df; }
@@ -602,6 +617,10 @@ class ParallelCompute {
 			std::vector<DataSlide> slides(total_runs);
 			uint idx = 0;
 			for (uint i = 0; i < num_configs; i++) {
+				// Cloning and discarding calls constructors which emplace default values into params of configs[i]
+				// This is a gross hack
+				// TODO fix
+				configs[i]->clone();
 				uint nruns = configs[i]->get_nruns();
 				for (uint j = 0; j < nruns; j++) {
 					results[idx] = threads.push(compute, configs[i]->clone(), &slides[idx]);
