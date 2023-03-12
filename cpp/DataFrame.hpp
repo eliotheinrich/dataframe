@@ -211,9 +211,14 @@ class Params {
 				for (uint i = 0; i < data["zparams"].size(); i++) {
 					zparams.push_back(std::map<std::string, datafield>());
 					for (auto const &[key, val] : data["zparams"][i].items()) {
+						if (data.contains(key)) {
+							std::cout << "Key " << key << " passed as a zipped parameter and an unzipped parameter; aborting.\n";
+							assert(false);
+						}
 						zparams[i][key] = parse_json_type(val);
 					}
 				}
+
 				data.erase("zparams");
 			}
 
@@ -223,6 +228,8 @@ class Params {
 					std::vector<Params> new_params = load_json(data, Params(&p), false);
 					params.insert(params.end(), new_params.begin(), new_params.end());
 				}
+
+				return params;
 			}
 
 			// Dealing with config parameters
