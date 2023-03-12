@@ -577,7 +577,7 @@ class ParallelCompute {
 	public:
 		ParallelCompute(std::vector<Config*> configs) : configs(configs) {}
 
-		DataFrame compute(uint num_threads) {
+		DataFrame compute(uint num_threads, bool display_progress=false) {
 			auto start = std::chrono::high_resolution_clock::now();
 
 			uint num_configs = configs.size();
@@ -586,7 +586,7 @@ class ParallelCompute {
 
 			std::cout << "num_configs: " << num_configs << std::endl;
 			std::cout << "total_runs: " << total_runs << std::endl;
-			print_progress(0.);	
+			if (display_progress) print_progress(0.);	
 
 			ctpl::thread_pool threads(num_threads);
 			std::vector<std::future<void>> results(total_runs);
@@ -613,11 +613,13 @@ class ParallelCompute {
 
 			for (uint i = 0; i < total_runs; i++) {
 				results[i].get();
-				print_progress(float(i)/total_runs);	
+				if (display_progress) print_progress(float(i)/total_runs);	
 			}
 
-			print_progress(1.);	
-			std::cout << std::endl;
+			if (display_progress) {
+				print_progress(1.);	
+				std::cout << std::endl;
+			}
 
 			DataFrame df;
 
