@@ -181,6 +181,23 @@ class Params {
 			return !((*this) == p);
 		}
 
+		template <typename json_object>
+		static datafield parse_json_type(json_object p) {
+			if ((p.type() == nlohmann::json::value_t::number_integer) || 
+				(p.type() == nlohmann::json::value_t::number_unsigned) ||
+				(p.type() == nlohmann::json::value_t::boolean)) {
+				return datafield((int) p);
+			}  else if (p.type() == nlohmann::json::value_t::number_float) {
+				return datafield((float) p);
+			} else if (p.type() == nlohmann::json::value_t::string) {
+				return datafield(std::string(p));
+			} else {
+				std::cout << "Invalid json item type; aborting.\n";
+				assert(false);
+				return datafield();
+			}
+		}
+
 		static std::vector<Params> load_json(nlohmann::json data, Params p, bool debug) {
 			if (debug) {
 				std::cout << "Loaded: \n";
@@ -189,53 +206,23 @@ class Params {
 			std::vector<Params> params;
 
 			// Dealing with model parameters
-			std::vector<std::map<std::string, int>> iparams;
-			std::vector<std::map<std::string, float>> fparams;
-			if (data.contains("iparams")) {
-				for (uint i = 0; i < data["iparams"].size(); i++) {
-					iparams.push_back(std::map<std::string, int>());
-					for (auto const &[key, val] : data["iparams"][i].items()) iparams[i][key] = val;
+			std::vector<std::map<std::string, datafield>> zparams;
+			if (data.contains("zparams")) {
+				for (uint i = 0; i < data["zparams"].size(); i++) {
+					zparams.push_back(std::map<std::string, datafield>());
+					for (auto const &[key, val] : data["zparams"][i].items()) {
+						zparams[i][key] = parse_json_type(val);
+					}
 				}
-				data.erase("iparams");
+				data.erase("zparams");
 			}
 
-			if (data.contains("fparams")) {
-				for (uint i = 0; i < data["fparams"].size(); i++) {
-					fparams.push_back(std::map<std::string, float>());
-					for (auto const &[key, val] : data["fparams"][i].items()) fparams[i][key] = val;
-				}
-				data.erase("fparams");
-			}
-
-			uint num_iparams = iparams.size();
-			uint num_fparams = fparams.size();
-
-			bool contains_model_iparams = num_iparams != 0;
-			bool contains_model_fparams = num_fparams != 0;
-
-			if (contains_model_iparams && contains_model_fparams) {
-				assert(num_iparams == num_fparams);
-				for (uint i = 0; i < num_iparams; i++) {
-					for (auto const &[k, v] : iparams[i]) p.add(k, v);
-					for (auto const &[k, v] : fparams[i]) p.add(k, v);
+			if (zparams.size() > 0) {
+				for (uint i = 0; i < zparams.size(); i++) {
+					for (auto const &[k, v] : zparams[i]) p.add(k, v);
 					std::vector<Params> new_params = load_json(data, Params(&p), false);
 					params.insert(params.end(), new_params.begin(), new_params.end());
 				}
-				return params;
-			} else if (contains_model_fparams) {
-				for (uint i = 0; i < num_fparams; i++) {
-					for (auto const &[k, v] : fparams[i]) p.add(k, v);
-					std::vector<Params> new_params = load_json(data, Params(&p), false);
-					params.insert(params.end(), new_params.begin(), new_params.end());
-				}
-				return params;
-			} else if (contains_model_iparams) {
-				for (uint i = 0; i < num_iparams; i++) {
-					for (auto const &[k, v] : iparams[i]) p.add(k, v);
-					std::vector<Params> new_params = load_json(data, Params(&p), false);
-					params.insert(params.end(), new_params.begin(), new_params.end());
-				}
-				return params;
 			}
 
 			// Dealing with config parameters
@@ -244,20 +231,12 @@ class Params {
 			bool contains_vector = false;
 			for (auto const &[key, val] : data.items()) {
 				auto type = val.type();
-				if ((type == nlohmann::json::value_t::number_integer) 
-				|| (type == nlohmann::json::value_t::number_unsigned)
-				|| (type == nlohmann::json::value_t::boolean)) {
-					p.add(key, (int) val);
-					scalars.push_back(key);
-				} else if (type == nlohmann::json::value_t::number_float) {
-					p.add(key, (float) val);
-					scalars.push_back(key);
-				} else if (type == nlohmann::json::value_t::string) {
-					p.add(key, std::string(val));
-					scalars.push_back(key);
-				} else if (type == nlohmann::json::value_t::array) {
+				if (val.type() == nlohmann::json::value_t::array) {
 					vector_key = key;
 					contains_vector = true;
+				} else {
+					p.add(key, parse_json_type(val));
+					scalars.push_back(key);
 				}
 			}
 
@@ -269,11 +248,8 @@ class Params {
 				auto vals = data[vector_key];
 				data.erase(vector_key);
 				for (auto v : vals) {
-					if (v.type() == nlohmann::json::value_t::number_integer) p.add(vector_key, (int) v);
-					else if (v.type() == nlohmann::json::value_t::number_unsigned) p.add(vector_key, (int) v);
-					else if (v.type() == nlohmann::json::value_t::number_float) p.add(vector_key, (float) v);
-					else if (v.type() == nlohmann::json::value_t::boolean) p.add(vector_key, (int) v);
-					else if (v.type() == nlohmann::json::value_t::string) p.add(vector_key, std::string(v));
+					p.add(vector_key, parse_json_type(v));
+
 					std::vector<Params> new_params = load_json(data, &p, false);
 					params.insert(params.end(), new_params.begin(), new_params.end());
 				}
