@@ -9,9 +9,6 @@ class DataSlide:
 	def contains(self, key):
 		return key in self.params or key in self.data
 
-	def copy(self):
-		return DataSlide(self.params.copy(), self.data.copy())
-
 	def get(self, key):
 		if key in self.params:
 			return self.params[key]
@@ -135,9 +132,8 @@ class DataFrame:
 			if invert:
 				keep = not keep
 			if keep:
-				new_df.add_dataslide(slide.copy())
+				new_df.add_dataslide(slide)
 		
-		new_df.promote_params()
 		return new_df
 	
 	def get_filtered(self, key, filter_key, val):

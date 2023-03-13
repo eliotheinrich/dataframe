@@ -192,7 +192,7 @@ class Params {
 			} else if (p.type() == nlohmann::json::value_t::string) {
 				return datafield(std::string(p));
 			} else {
-				std::cout << "Invalid json item type; aborting.\n";
+				std::cout << "Invalid json item type on " << p << "; aborting.\n";
 				assert(false);
 				return datafield();
 			}
@@ -615,6 +615,7 @@ class ParallelCompute {
 			uint prev_percent_finished = percent_finished;
 			for (uint i = 0; i < total_runs; i++) {
 				results[i].get();
+				results[i].~future();
 				
 				if (display_progress) {
 					percent_finished = std::round(float(i)/total_runs * 100);
