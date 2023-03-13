@@ -611,9 +611,18 @@ class ParallelCompute {
 				}
 			}
 
+			uint percent_finished = 0;
+			uint prev_percent_finished = percent_finished;
 			for (uint i = 0; i < total_runs; i++) {
 				results[i].get();
-				if (display_progress) print_progress(float(i)/total_runs);	
+				
+				if (display_progress) {
+					percent_finished = std::round(float(i)/total_runs * 100);
+					if (percent_finished != prev_percent_finished) {
+						prev_percent_finished = percent_finished;
+						print_progress(percent_finished/100.);
+					}
+				}
 			}
 
 			if (display_progress) {

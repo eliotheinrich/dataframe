@@ -6,6 +6,12 @@ class DataSlide:
 		self.params = params
 		self.data = data
 
+	def contains(self, key):
+		return key in self.params or key in self.data
+
+	def copy(self):
+		return DataSlide(self.params.copy(), self.data.copy())
+
 	def get(self, key):
 		if key in self.params:
 			return self.params[key]
@@ -40,6 +46,36 @@ class DataFrame:
 			new.add_dataslide(slide)
 
 		return new
+	
+	def param_congruent(self, key):
+		if not self.slides[0].contains(key):
+			return False
+
+		val = self.slides[0].get(key)
+		for slide in self.slides:
+			if not slide.contains(key):
+				return False
+
+			if isinstance(val, str):
+				if val != slide.get(key):
+					return False
+			else:
+				if not np.isclose(slide.get(key), val):
+					return False
+		
+		return True
+
+	def promote(self, key):
+		val = self.slides[0].get(key)
+		self.params[key] = val
+		for slide in self.slides:
+			del slide.params[key]
+
+	def promote_params(self):
+		keys = list(self.slides[0].params.keys())
+		for key in keys:
+			if self.param_congruent(key):
+				self.promote(key)
 
 	def add_dataslide(self, slide):
 		self.slides.append(slide)
@@ -61,6 +97,9 @@ class DataFrame:
 
 		vals = np.array(vals)
 		return _remove_flat_axes(vals)
+	
+	def get_unique(self, key):
+		return np.array(list(set(self.get(key))))
 	
 	def get_err(self, key):
 		vals = []
@@ -96,8 +135,9 @@ class DataFrame:
 			if invert:
 				keep = not keep
 			if keep:
-				new_df.add_dataslide(slide)
+				new_df.add_dataslide(slide.copy())
 		
+		new_df.promote_params()
 		return new_df
 	
 	def get_filtered(self, key, filter_key, val):
