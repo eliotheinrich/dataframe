@@ -33,6 +33,9 @@ class DataFrame:
 		self.params = {}
 		self.slides = []
 	
+	def __len__(self):
+		return len(self.slides)
+	
 	def __add__(self, other):
 		new = DataFrame()
 		new.params = {**self.params, **other.params}
