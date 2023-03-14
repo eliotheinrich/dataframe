@@ -20,7 +20,6 @@ class Params;
 class ParallelCompute;
 
 static std::string join(const std::vector<std::string> &v, const std::string &delim);
-static std::map<std::string, Sample> to_sample(std::map<std::string, double> *s);
 
 enum datafield_t { df_float, df_int, df_string };
 struct datafield {
@@ -96,7 +95,8 @@ class Params {
 	public:
 		std::map<std::string, datafield> fields;
 
-		Params() {};
+		Params() {}
+		~Params() {}
 
 		Params(Params *p) {
 			for (auto &[key, val] : p->fields) fields.emplace(key, val.clone());
@@ -237,7 +237,6 @@ class Params {
 			std::string vector_key; // Only need one for next recursive call
 			bool contains_vector = false;
 			for (auto const &[key, val] : data.items()) {
-				auto type = val.type();
 				if (val.type() == nlohmann::json::value_t::array) {
 					vector_key = key;
 					contains_vector = true;
@@ -320,7 +319,7 @@ class Sample {
 
 		static Sample collapse(std::vector<Sample> samples) {
 			Sample s = samples[0];
-			for (int i = 1; i < samples.size(); i++) {
+			for (uint i = 1; i < samples.size(); i++) {
 				s = s.combine(samples[i]);
 			}
 
@@ -447,7 +446,7 @@ class DataFrame {
 		DataFrame() {}
 
 		DataFrame(std::vector<DataSlide> slides) {
-			for (int i = 0; i < slides.size(); i++) add_slide(slides[i]); 
+			for (uint i = 0; i < slides.size(); i++) add_slide(slides[i]); 
 		}
 
 		void add_slide(DataSlide ds) {
@@ -500,11 +499,11 @@ class DataFrame {
 		bool field_congruent(std::string s) {
 			if (slides.size() == 0) return true;
 
-			DataSlide *first_slide = &*slides.begin();
+			DataSlide first_slide = slides[0];
 
-			if (!first_slide->contains(s)) return false;
+			if (!first_slide.contains(s)) return false;
 
-			datafield first_slide_val = first_slide->get(s);
+			datafield first_slide_val = first_slide.get(s);
 
 			for (auto slide : slides) {
 				if (!slide.contains(s)) return false;
@@ -524,10 +523,10 @@ class DataFrame {
 		void promote_params() {
 			if (slides.size() == 0) return;
 
-			DataSlide *first_slide = &*slides.begin();
+			DataSlide first_slide = slides[0];
 
 			std::vector<std::string> keys;
-			for (auto const &[key, _] : first_slide->params.fields) keys.push_back(key);
+			for (auto const &[key, _] : first_slide.params.fields) keys.push_back(key);
 			for (auto key : keys) {
 				if (field_congruent(key)) promote_field(key);
 			}
@@ -543,6 +542,7 @@ class Config {
 
 		Config(Params &params) : params(params) {}
 		Config(Config &c) : params(c.params) {}
+		virtual ~Config() {}
 
 		std::string to_string() const {
 			return "{" + params.to_string() + "}";
@@ -550,8 +550,8 @@ class Config {
 
 		// To implement
 		virtual uint get_nruns() const { return 1; }
-		virtual void compute(DataSlide *slide)=0;
-		virtual Config* clone()=0;
+		virtual DataSlide compute()=0;
+		virtual std::unique_ptr<Config> clone()=0;
 };
 
 static void print_progress(float progress) {
@@ -572,31 +572,31 @@ static void print_progress(float progress) {
 
 class ParallelCompute {
 	private:
-		std::vector<Config*> configs;
+		std::vector<std::unique_ptr<Config>> configs;
+
+		static DataSlide thread_compute(int id, std::shared_ptr<Config> config) {
+			DataSlide slide = config->compute();
+			slide.add(config->params);
+			return slide;
+		}
 
 	public:
-		ParallelCompute(std::vector<Config*> configs) : configs(configs) {}
+		ParallelCompute(std::vector<std::unique_ptr<Config>> configs) : configs(std::move(configs)) {}
 
 		DataFrame compute(uint num_threads, bool display_progress=false) {
 			auto start = std::chrono::high_resolution_clock::now();
 
 			uint num_configs = configs.size();
 			uint total_runs = 0;
-			for (auto config : configs) total_runs += config->get_nruns();
+			for (auto &config : configs) total_runs += config->get_nruns();
 
 			std::cout << "num_configs: " << num_configs << std::endl;
 			std::cout << "total_runs: " << total_runs << std::endl;
 			if (display_progress) print_progress(0.);	
 
 			ctpl::thread_pool threads(num_threads);
-			std::vector<std::future<void>> results(total_runs);
 
-			// Workhorse lambda functions runs compute on configs
-			auto compute = [](int id, Config *config, DataSlide *slide) {
-				config->compute(slide);
-				slide->add(config->params);
-			};
-
+			std::vector<std::future<DataSlide>> results(total_runs);
 			std::vector<DataSlide> slides(total_runs);
 			uint idx = 0;
 			for (uint i = 0; i < num_configs; i++) {
@@ -606,7 +606,8 @@ class ParallelCompute {
 				configs[i]->clone();
 				uint nruns = configs[i]->get_nruns();
 				for (uint j = 0; j < nruns; j++) {
-					results[idx] = threads.push(compute, configs[i]->clone(), &slides[idx]);
+					std::shared_ptr<Config> config(configs[i]->clone());
+					results[idx] = threads.push(thread_compute, config);
 					idx++;
 				}
 			}
@@ -614,8 +615,7 @@ class ParallelCompute {
 			uint percent_finished = 0;
 			uint prev_percent_finished = percent_finished;
 			for (uint i = 0; i < total_runs; i++) {
-				results[i].get();
-				results[i].~future();
+				slides[i] = results[i].get();
 				
 				if (display_progress) {
 					percent_finished = std::round(float(i)/total_runs * 100);
@@ -636,7 +636,6 @@ class ParallelCompute {
 			idx = 0;
 			for (uint i = 0; i < num_configs; i++) {
 				DataSlide ds = slides[idx];
-				uint p = idx;
 				uint nruns = configs[i]->get_nruns();
 				for (uint j = 1; j < nruns; j++) {
 					idx++;
@@ -668,14 +667,6 @@ static std::string join(const std::vector<std::string> &v, const std::string &de
         s += i;
     }
     return s;
-}
-
-static std::map<std::string, Sample> to_sample(std::map<std::string, double> *s) {
-    std::map<std::string, Sample> new_s;
-    for (std::map<std::string, double>::iterator it = s->begin(); it != s->end(); ++it) {
-        new_s.emplace(it->first, Sample(it->second));
-    }
-    return new_s;
 }
 
 #endif

@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <numeric>
 #include <math.h>
+#include <memory>
+#include <random>
 
 #define DEFAULT_NUM_RUNS 1u
 #define DEFAULT_EQUILIBRATION_STEPS 0u
@@ -13,11 +15,30 @@
 #define DEFAULT_MEASUREMENT_FREQ 1u
 #define DEFAULT_SPACING 1u
 #define DEFAULT_TEMPORAL_AVG true
+#define DEFAULT_RANDOM_SEED -1
 
 class Simulator {
+    private:
+        std::minstd_rand rng;
+        int seed;
+
     public:
-        virtual Simulator* clone(Params &params)=0;
+        int rand() { return rng(); }
+        float randf() { return float(rng())/float(RAND_MAX); }
+
+        Simulator(Params &params) {
+            seed = params.geti("random_seed", DEFAULT_RANDOM_SEED);
+            if (seed == -1) rng = std::minstd_rand(std::rand());
+            else rng = std::minstd_rand(seed);
+        }
+
+        virtual ~Simulator() {}
+
+        virtual std::unique_ptr<Simulator> clone(Params &params)=0;
         virtual void timesteps(uint num_steps)=0;
+
+        // By default, do nothing special during equilibration timesteps
+        // May want to include, i.e., annealing 
         virtual void equilibration_timesteps(uint num_steps) {
             timesteps(num_steps);
         }
@@ -27,7 +48,7 @@ class Simulator {
 
 class TimeConfig : public Config {
     private:
-        Simulator *simulator;
+        std::unique_ptr<Simulator> simulator;
         uint nruns;
 
     public:
@@ -36,8 +57,8 @@ class TimeConfig : public Config {
         uint measurement_freq;
         bool temporal_avg;
 
-        void init_simulator(Simulator *sim) {
-            simulator = sim;
+        void init_simulator(std::unique_ptr<Simulator> sim) {
+            simulator = std::move(sim);
         }
 
         TimeConfig(Params &params) : Config(params) {
@@ -50,7 +71,9 @@ class TimeConfig : public Config {
 
         virtual uint get_nruns() const { return nruns; }
 
-        void compute(DataSlide *slide) {
+        virtual DataSlide compute() {
+            DataSlide slide;
+
             simulator->init_state();
 
             simulator->equilibration_timesteps(equilibration_timesteps);
@@ -75,20 +98,23 @@ class TimeConfig : public Config {
             }
 
             for (auto const &[key, ksamples] : samples) {
-                slide->add_data(key);
+                slide.add_data(key);
                 if (temporal_avg) {
-                    slide->push_data(key, Sample::collapse(ksamples));
+                    slide.push_data(key, Sample::collapse(ksamples));
                 } else {
                     for (auto s : ksamples) {
-                        slide->push_data(key, s);
+                        slide.push_data(key, s);
                     }
                 }
             }
+
+            return slide;
         }
 
-        virtual Config* clone() {
-            TimeConfig* config = new TimeConfig(params);
-            config->simulator = simulator->clone(params);
+        virtual std::unique_ptr<Config> clone() {
+            std::unique_ptr<TimeConfig> config(new TimeConfig(params));
+            std::unique_ptr<Simulator> sim = simulator.get()->clone(params);
+            config->init_simulator(std::move(sim));
             return config;
         }
 };
