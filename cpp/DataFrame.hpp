@@ -574,9 +574,10 @@ class ParallelCompute {
 	private:
 		std::vector<std::unique_ptr<Config>> configs;
 
-		static DataSlide thread_compute(int id, std::shared_ptr<Config> config) {
+		static DataSlide thread_compute(int id, std::unique_ptr<Config> &config) {
 			DataSlide slide = config->compute();
 			slide.add(config->params);
+			config.release();
 			return slide;
 		}
 
@@ -606,8 +607,7 @@ class ParallelCompute {
 				configs[i]->clone();
 				uint nruns = configs[i]->get_nruns();
 				for (uint j = 0; j < nruns; j++) {
-					std::shared_ptr<Config> config(configs[i]->clone());
-					results[idx] = threads.push(thread_compute, config);
+					results[idx] = threads.push(thread_compute, configs[i]->clone());
 					idx++;
 				}
 			}

@@ -17,6 +17,8 @@
 #define DEFAULT_TEMPORAL_AVG true
 #define DEFAULT_RANDOM_SEED -1
 
+#define CLONE(A, B) virtual std::unique_ptr<A> clone(Params &params) { return std::unique_ptr<A>(new B(params)); }
+
 class Simulator {
     private:
         std::minstd_rand rng;
