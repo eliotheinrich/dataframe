@@ -44,7 +44,14 @@ class Simulator {
         virtual void equilibration_timesteps(uint num_steps) {
             timesteps(num_steps);
         }
-        virtual std::map<std::string, Sample> take_samples()=0;
+        
+        virtual std::map<std::string, Sample> take_samples() {
+            return std::map<std::string, Sample>();
+        }
+        virtual std::map<std::string, std::vector<Sample>> take_vector_samples() {
+            return std::map<std::string, std::vector<Sample>>();
+        }
+
         virtual void init_state()=0;
 };
 
@@ -97,6 +104,12 @@ class TimeConfig : public Config {
                 for (auto const &[key, val] : sample) {
                     samples[key].push_back(val);
                 }
+
+                std::map<std::string, std::vector<Sample>> vector_sample = simulator->take_vector_samples();
+                for (auto const &[key, vec] : vector_sample) {
+                    slide.add_data(key);
+                    for (auto const v : vec) slide.push_data(key, v);
+                }
             }
 
             for (auto const &[key, ksamples] : samples) {
@@ -104,9 +117,7 @@ class TimeConfig : public Config {
                 if (temporal_avg) {
                     slide.push_data(key, Sample::collapse(ksamples));
                 } else {
-                    for (auto s : ksamples) {
-                        slide.push_data(key, s);
-                    }
+                    for (auto s : ksamples) slide.push_data(key, s);
                 }
             }
 

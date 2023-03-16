@@ -2,6 +2,7 @@
 #define DATAFRAME_H
 
 #include <string>
+#include <sstream>
 #include <fstream>
 #include <map>
 #include <vector>
@@ -554,7 +555,7 @@ class Config {
 		virtual std::unique_ptr<Config> clone()=0;
 };
 
-static void print_progress(float progress) {
+static void print_progress(float progress, int expected_time = -1) {
 	int bar_width = 70;
 
 	std::cout << "[";
@@ -564,7 +565,19 @@ static void print_progress(float progress) {
 		else if (i == pos) std::cout << ">";
 		else std::cout << " ";
 	}
-	std::cout << "] " << int(progress * 100.0) << " %\r";
+	std::stringstream time;
+	if (expected_time == -1) time << "";
+	else {
+		time << " [ ETA: ";
+		uint num_seconds = expected_time % 60;
+		uint num_minutes = expected_time/60;
+		uint num_hours = num_minutes/60;
+		num_minutes -= num_hours*60;
+		time << std::setfill('0') << std::setw(2) << num_hours << ":" 
+		     << std::setfill('0') << std::setw(2) << num_minutes << ":" 
+		     << std::setfill('0') << std::setw(2) << num_seconds << " ] ";
+	}
+	std::cout << "] " << int(progress * 100.0) << " %" << time.str()  << "\r";
 	std::cout.flush();
 
 }
@@ -612,6 +625,7 @@ class ParallelCompute {
 				}
 			}
 
+			auto run_start = std::chrono::high_resolution_clock::now();
 			uint percent_finished = 0;
 			uint prev_percent_finished = percent_finished;
 			for (uint i = 0; i < total_runs; i++) {
@@ -621,13 +635,18 @@ class ParallelCompute {
 					percent_finished = std::round(float(i)/total_runs * 100);
 					if (percent_finished != prev_percent_finished) {
 						prev_percent_finished = percent_finished;
-						print_progress(percent_finished/100.);
+						auto elapsed = std::chrono::high_resolution_clock::now();
+						int duration = std::chrono::duration_cast<std::chrono::seconds>(elapsed - run_start).count();
+						float seconds_per_job = duration/float(i);
+						int remaining_time = seconds_per_job * (total_runs - i);
+
+						print_progress(percent_finished/100., remaining_time);
 					}
 				}
 			}
 
 			if (display_progress) {
-				print_progress(1.);	
+				print_progress(1., 0);	
 				std::cout << std::endl;
 			}
 
