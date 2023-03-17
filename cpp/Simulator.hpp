@@ -121,6 +121,8 @@ class TimeConfig : public Config {
                 }
             }
 
+            slide.add("num_samples", (int) num_intervals);
+
             return slide;
         }
 
