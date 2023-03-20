@@ -61,6 +61,12 @@ def _add(list, val):
 		
 	list.append(val)
 class DataFrame:
+	def head(self):
+		if "description" in self.params:
+			return self.params["description"]
+		else:
+			return "No description."
+		
 	def __init__(self):
 		self._qtable_initialized = False
 		self._qtable = {}
