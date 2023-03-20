@@ -1,6 +1,19 @@
 import json
 import numpy as np
 
+def param_equal(s1, s2):
+	if isinstance(s1, str) and isinstance(s2, str):
+		return s1 == s2
+	else:
+		return np.isclose(s1, s2)
+		
+def constraints_stronger(c1, c2):
+	for key,val in c1.items():
+		if not (key in c2 and param_equal(val, c2[key])):
+			return False
+	
+	return True
+
 class DataSlide:
 	def __init__(self, params, data):
 		self.params = params
@@ -9,30 +22,72 @@ class DataSlide:
 	def contains(self, key):
 		return key in self.params or key in self.data
 
-	def get(self, key):
+	def _get(self, key):
 		if key in self.params:
 			return self.params[key]
 		else:
 			return self.data[key][:,0]
 	
-	def get_err(self, key):
+	def _get_err(self, key):
 		return self.data[key][:,1]
 
-	def get_nruns(self, key):
+	def _get_nruns(self, key):
 		return self.data[key][:,2]
+
+	def compatible(self, constraints):
+		for key, val in constraints.items():
+			if not self.contains(key):
+				return False
+
+			if not param_equal(val, self.params[key]):
+				return False
+		
+		return True
+			
 
 def _remove_flat_axes(A):
 	shape = np.array(A.shape)
+	if len(shape) == 1 and shape[0] == 1:
+		return A
+
 	nonflat_axes = np.where(shape != 1)
 
 	return A.reshape(shape[nonflat_axes])
 
-
+def _add(list, val):
+	for i in list:
+		if param_equal(i, val):
+			return
+		
+	list.append(val)
 class DataFrame:
 	def __init__(self):
+		self._qtable_initialized = False
+		self._qtable = {}
+
 		self.params = {}
 		self.slides = []
 	
+	def _init_qtable(self):
+		key_vals = {}
+		for slide in self.slides:
+			for key, val in slide.params.items():
+				if key not in key_vals:
+					key_vals[key] = []
+
+				_add(key_vals[key], val)
+		
+		for key, vals in key_vals.items():
+			self._qtable[key] = {}
+			for v in vals:
+				self._qtable[key][v] = set()
+
+		for n,slide in enumerate(self.slides):
+			for key, val in slide.params.items():
+				self._qtable[key][val].add(n)
+
+		self._qtable_initialized = True
+
 	def __len__(self):
 		return len(self.slides)
 	
@@ -47,26 +102,80 @@ class DataFrame:
 
 		return new
 	
+	def query(self, keys, constraints={}, query_error=False):
+		if not self._qtable_initialized:
+			self._init_qtable()
+
+		# First check if passed key is a Frame level parameter and return if so
+		if isinstance(keys, str):
+			if keys in self.params:
+				return self.params[keys]
+			else:
+				keys = [keys]
+		
+		for k,v in constraints.items():
+			# stored Frame level param is not equal to param specified by constraint, so return nothing
+			if k in self.params and not param_equal(v, self.params[k]):
+				return np.array([])
+
+		if constraints == {}:
+			ind = range(0, len(self))
+		else:
+			ind = set.intersection(*[self._qtable[k][v] for (k,v) in constraints.items()])
+
+		vals = {key: [] for key in keys}
+		for i in ind:
+			for key in keys:
+				if query_error:
+					vals[key].append(self.slides[i]._get_err(key))
+				else:
+					vals[key].append(self.slides[i]._get(key))
+
+		if len(keys) == 1:
+			key = keys[0]
+
+			v = _remove_flat_axes(np.array(vals[key]))
+			inds = np.argsort(v)
+			return _remove_flat_axes(np.array(vals[key]))
+
+
+		for key in keys:
+			vals[key] = np.array(vals[key])
+		
+		key = keys[0]
+		if vals[key].ndim == 1 and not isinstance(vals[key][0], str):
+			inds = np.argsort(vals[key])
+			return [_remove_flat_axes(vals[k][inds]) for k in keys]
+		else:
+			return [_remove_flat_axes(vals[k]) for k in keys]
+
+	
+	def query_unique(self, keys, constraints={}):
+		if not self._qtable_initialized:
+			self._init_qtable()
+			
+		if isinstance(keys, str):
+			keys = [keys]
+		
+		v = _remove_flat_axes(np.array([list(self._qtable[key].keys()) for key in keys]))
+		return v
+
 	def param_congruent(self, key):
 		if not self.slides[0].contains(key):
 			return False
 
-		val = self.slides[0].get(key)
+		val = self.slides[0]._get(key)
 		for slide in self.slides:
 			if not slide.contains(key):
 				return False
 
-			if isinstance(val, str):
-				if val != slide.get(key):
-					return False
-			else:
-				if not np.isclose(slide.get(key), val):
-					return False
+			if not param_equal(val, slide._get(key)):
+				return False
 		
 		return True
 
 	def promote(self, key):
-		val = self.slides[0].get(key)
+		val = self.slides[0]._get(key)
 		self.params[key] = val
 		for slide in self.slides:
 			del slide.params[key]
@@ -78,44 +187,33 @@ class DataFrame:
 				self.promote(key)
 
 	def add_dataslide(self, slide):
+		self._qtable_initialized = False
 		self.slides.append(slide)
 
-	def get_property_with_id(self, key, id):
-		return self.slides[id][key]
-
-	def get_param(self, key):
-		return self.params[key]
-
-	def get(self, key):
+	def _get(self, key):
 		if key in self.params:
 			return self.params[key]
 		
 		else:
 			vals = []
 			for slide in self.slides:
-				vals.append(slide.get(key))
+				vals.append(slide._get(key))
 
-		vals = np.array(vals)
-		return _remove_flat_axes(vals)
+		return _remove_flat_axes(np.array(vals))
 	
-	def get_unique(self, key):
-		return np.array(list(set(self.get(key))))
-	
-	def get_err(self, key):
+	def _get_err(self, key):
 		vals = []
 		for slide in self.slides:
-			vals.append(slide.get_err(key))
+			vals.append(slide._get_err(key))
 		
-		vals = np.array(vals)
-		return _remove_flat_axes(vals)
+		return _remove_flat_axes(np.array(vals))
 
-	def get_nruns(self, key):
+	def _get_nruns(self, key):
 		vals = []
 		for slide in self.slides:
-			vals.append(slide.get_nruns(key))
+			vals.append(slide._get_nruns(key))
 		
-		vals = np.array(vals)
-		return _remove_flat_axes(vals)
+		return _remove_flat_axes(np.array(vals))
 	
 	def filter(self, key, val, invert=False):
 		if key in self.params:
@@ -128,9 +226,9 @@ class DataFrame:
 		new_df.params = self.params.copy()
 		for slide in self.slides:
 			if isinstance(val, str):
-				keep = val == slide.get(key)
+				keep = val == slide._get(key)
 			else:
-				keep = np.isclose(slide.get(key), val)
+				keep = np.isclose(slide._get(key), val)
 
 			if invert:
 				keep = not keep
@@ -139,18 +237,6 @@ class DataFrame:
 		
 		return new_df
 	
-	def get_filtered(self, key, filter_key, val):
-		filtered_df = self.filter(filter_key, val)
-		return filtered_df.get(key)
-
-	def get_err_filtered(self, key, filter_key, val):
-		filtered_df = self.filter(filter_key, val)
-		return filtered_df.get_err(key)
-
-	def get_nruns_filtered(self, key, filter_key, val):
-		filtered_df = self.filter(filter_key, val)
-		return filtered_df.get_nruns(key)
-
 def parse_datafield(s):
 	if list(s.keys())[0] == 'Data':
 		sample = s[list(s.keys())[0]]
@@ -190,3 +276,8 @@ def load_data(filename):
 def sort_data_by(sorter, *args):
 	idxs = np.argsort(sorter)
 	return (sorter[idxs], *[arg[idxs] for arg in args])
+
+
+if __name__ == "__main__":
+	data = load_data('test.json')
+	print(data.query('num_runs'))
