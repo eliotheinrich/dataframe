@@ -124,10 +124,12 @@ class DataFrame:
 			if k in self.params and not param_equal(v, self.params[k]):
 				return np.array([])
 
+		relevant_constraints = {k: v for k,v in constraints.items() if k not in self.params}
+
 		if constraints == {}:
 			ind = range(0, len(self))
 		else:
-			ind = set.intersection(*[self._qtable[k][v] for (k,v) in constraints.items()])
+			ind = set.intersection(*[self._qtable[k][v] for (k,v) in relevant_constraints.items()])
 
 		vals = {key: [] for key in keys}
 		for i in ind:
@@ -156,7 +158,7 @@ class DataFrame:
 			return [_remove_flat_axes(vals[k]) for k in keys]
 
 	
-	def query_unique(self, keys, constraints={}):
+	def query_unique(self, keys): # TODO allow constraints
 		if not self._qtable_initialized:
 			self._init_qtable()
 			
