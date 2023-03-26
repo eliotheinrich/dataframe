@@ -8,9 +8,10 @@
 #include <vector>
 #include <cmath>
 #include <chrono>
-#include <ctpl.h>
 #include <assert.h>
 #include <iostream>
+#include <variant>
+#include <ctpl.h>
 #include <nlohmann/json.hpp>
 
 class Sample;
@@ -22,85 +23,44 @@ class ParallelCompute;
 
 static std::string join(const std::vector<std::string> &v, const std::string &delim);
 
-enum datafield_t { df_float, df_int, df_string };
-struct datafield {
-	private:
-		datafield_t _type;
-		float fdata;
-		int idata;
-		std::string sdata;
+using var_t=std::variant<int, float, std::string>;
 
-		constexpr static const float EPS = 0.0001;
-
-	public:
-		datafield_t type() const { return _type; }
-
-		datafield() {};
-		datafield(int i) {
-			_type = datafield_t::df_int;
-			idata = i;
-		}
-
-		datafield(float f) {
-			_type = datafield_t::df_float;
-			fdata = f;
-		}
-
-		datafield(std::string s) {
-			_type = datafield_t::df_string;
-			sdata = s;
-		}
-
-		int unwrapi() const { return idata; }
-		float unwrapf() const { return fdata; }
-		std::string unwraps() const { return sdata; }
-
-		std::string to_string() const {
-			switch(type()) {
-				case datafield_t::df_int : return std::to_string(idata);
-				case datafield_t::df_float : return std::to_string(fdata);
-				case datafield_t::df_string : return "\"" + sdata + "\"";
-			}
-			std::cout << "Printed datafield is invalid.\n";
-			assert(false);
-			return "";
-		}
-
-		datafield clone() {
-			switch(type()) {
-				case datafield_t::df_int : return datafield(idata);
-				case datafield_t::df_float : return datafield(fdata);
-				case datafield_t::df_string : return datafield(sdata);
-			}
-			std::cout << "Cloned datafield is invalid.\n";
-			assert(false);
-			return datafield(idata);
-		}
-
-		bool operator==(const datafield &df) {
-			if (type() != df.type()) return false;
-			
-			if (type() == datafield_t::df_int) return idata == df.idata;
-			if (type() == datafield_t::df_float) return std::abs(fdata - df.fdata) < EPS;
-			if (type() == datafield_t::df_string) return sdata == df.sdata;
-
-			return false;
-		}
-
-		bool operator!=(const datafield &df) {
-			return !((*this) == df);
-		}
+struct var_to_string {
+	std::string operator()(const int& i) { return std::to_string(i); }
+	std::string operator()(const float& f) { return std::to_string(f); }
+	std::string operator()(const std::string& s) { return "\"" + s + "\""; }
 };
+
+struct get_var {
+	int operator()(const int& i) { return i; }
+	float operator()(const float& f) { return f; }
+	std::string operator()(const std::string& s) { return s; }
+};
+
+#define EPS 0.00001
+
+static bool operator==(const var_t& v, const var_t& t) {
+	if (v.index() != t.index()) return false;
+
+	// float
+	if (v.index() == 0) return std::get<int>(v) == std::get<int>(t);
+	else if (v.index() == 1) return std::abs(std::get<float>(v) - std::get<float>(t)) < EPS;
+	else return std::get<std::string>(v) == std::get<std::string>(t);
+}
+
+static bool operator!=(const var_t& v, const var_t& t) {
+	return !(v == t);
+}
 
 class Params {		
 	public:
-		std::map<std::string, datafield> fields;
+		std::map<std::string, var_t> fields;
 
 		Params() {}
 		~Params() {}
 
 		Params(Params *p) {
-			for (auto &[key, val] : p->fields) fields.emplace(key, val.clone());
+			for (auto &[key, val] : p->fields) fields.emplace(key, val); // TODO CHECK COPY SEMANTICS
 		}
 
 		std::string to_string(uint indentation=0) const {
@@ -110,7 +70,7 @@ class Params {
 			
 
 			for (auto const &[key, field] : fields) {
-				buffer.push_back("\"" + key + "\": " + field.to_string());
+				buffer.push_back("\"" + key + "\": " + std::visit(var_to_string(), field));
 			}
 
 			std::string delim = ",\n";
@@ -120,42 +80,27 @@ class Params {
 			return s;
 		}
 
-		datafield get(std::string s) const { 
-			if (fields.count(s)) {
-				return fields.at(s);
-			} else {
+		template <typename T>
+		T get(std::string s) const {
+			if (!contains(s)) {
 				std::cout << "Key \"" + s + "\" not found.\n"; assert(false);
 			}
-		}
-		int geti(std::string s) const { return get(s).unwrapi(); }
-		int geti(std::string s, int defaulti) { 
-			if (fields.count(s) && fields.at(s).type() == datafield_t::df_int) return get(s).unwrapi();
-			else {
-				add(s, defaulti);
-				return defaulti;
-			}
-		}
-		float getf(std::string s) const { return fields.at(s).unwrapf(); }
-		float getf(std::string s, float defaultf) { 
-			if (fields.count(s) && fields.at(s).type() == datafield_t::df_float) return get(s).unwrapf();
-			else {
-				add(s, defaultf);
-				return defaultf;
-			}
-		}
-		std::string gets(std::string s) const { return fields.at(s).unwraps(); }
-		std::string gets(std::string s, std::string defaults) { 
-			if (fields.count(s) && fields.at(s).type() == datafield_t::df_string) return get(s).unwraps();
-			else {
-				add(s, defaults);
-				return defaults;
-			};
+
+			return std::get<T>(fields.at(s));
 		}
 
-		void add(std::string s, datafield df) { fields[s] = df; }
-		void add(std::string s, int i) { fields[s] = datafield(i); }
-		void add(std::string s, float f) { fields[s] = datafield(f); }
-		void add(std::string s, std::string r) { fields[s] = datafield(r); }
+		template <typename T>
+		T get(std::string s, T defaultv) {
+			if (!contains(s)) {
+				add(s, defaultv);
+				return defaultv;
+			}
+
+			return std::get<T>(fields.at(s));
+		}
+
+		template <typename T>
+		void add(std::string s, T const& val) { fields[s] = var_t{val}; }
 
 		bool contains(std::string s) const { return fields.count(s); }
 		bool remove(std::string s) {
@@ -169,7 +114,7 @@ class Params {
 		bool operator==(const Params &p) {
 			for (auto const &[key, field] : fields) {
 				if (!p.contains(key)) return false;
-				if (p.get(key) != field) return false;
+				if (p.fields.at(key) != field) return false;
 			}
 			for (auto const &[key, field] : p.fields) {
 				if (!contains(key)) return false;
@@ -183,19 +128,18 @@ class Params {
 		}
 
 		template <typename json_object>
-		static datafield parse_json_type(json_object p) {
+		static var_t parse_json_type(json_object p) {
 			if ((p.type() == nlohmann::json::value_t::number_integer) || 
 				(p.type() == nlohmann::json::value_t::number_unsigned) ||
 				(p.type() == nlohmann::json::value_t::boolean)) {
-				return datafield((int) p);
+				return var_t{(int) p};
 			}  else if (p.type() == nlohmann::json::value_t::number_float) {
-				return datafield((float) p);
+				return var_t{(float) p};
 			} else if (p.type() == nlohmann::json::value_t::string) {
-				return datafield(std::string(p));
+				return var_t{std::string(p)};
 			} else {
 				std::cout << "Invalid json item type on " << p << "; aborting.\n";
 				assert(false);
-				return datafield();
 			}
 		}
 
@@ -207,10 +151,10 @@ class Params {
 			std::vector<Params> params;
 
 			// Dealing with model parameters
-			std::vector<std::map<std::string, datafield>> zparams;
+			std::vector<std::map<std::string, var_t>> zparams;
 			if (data.contains("zparams")) {
 				for (uint i = 0; i < data["zparams"].size(); i++) {
-					zparams.push_back(std::map<std::string, datafield>());
+					zparams.push_back(std::map<std::string, var_t>());
 					for (auto const &[key, val] : data["zparams"][i].items()) {
 						if (data.contains(key)) {
 							std::cout << "Key " << key << " passed as a zipped parameter and an unzipped parameter; aborting.\n";
@@ -346,15 +290,16 @@ class DataSlide {
 			return params.contains(s) || data.count(s);
 		}
 
-		datafield get(std::string s) { return params.get(s); }
-		int geti(std::string s) { return params.geti(s); }
-		double getf(std::string s) { return params.getf(s); }
-		std::string gets(std::string s) { return params.gets(s); }
+		var_t get(std::string s) const {
+			if (contains(s)) return params.fields.at(s);
 
-		void add(std::string s, datafield df) { params.add(s, df); }
-		void add(std::string s, int i) { params.add(s, datafield(i)); }
-		void add(std::string s, float f) { params.add(s, datafield(f)); };
-		void add(std::string s, std::string r) { params.add(s, datafield(r)); }
+			std::cout << "Key not found: " << s << std::endl;
+			assert(false);
+		}
+
+		template <typename T>
+		void add(std::string s, T const& t) { params.add(s, t); }
+
 		void add(Params &params) {
 			for (auto const &[key, field] : params.fields) {
 				add(key, field);
@@ -365,6 +310,7 @@ class DataSlide {
 		void push_data(std::string s, Sample sample) {
 			data[s].push_back(sample);
 		}
+
 		bool remove(std::string s) {
 			if (params.contains(s)) { 
 				return params.remove(s);
@@ -453,14 +399,9 @@ class DataFrame {
 		void add_slide(DataSlide ds) {
 			slides.push_back(ds);
 		}
-		int geti(std::string s) { return params.geti(s); }
-		double getf(std::string s) { return params.getf(s); }
-		std::string gets(std::string s) { return params.gets(s); }
 
-		void add(std::string s, datafield df) { params.add(s, df); }
-		void add(std::string s, int i) { params.add(s, datafield(i)); }
-		void add(std::string s, float f) { params.add(s, datafield(f)); };
-		void add(std::string s, std::string r) { params.add(s, datafield(r)); }
+		template <typename T>
+		void add(std::string s, T const& t) { params.add(s, t); }
 		void add(Params &params) {
 			for (auto const &[key, field] : params.fields) {
 				add(key, field);
@@ -504,7 +445,7 @@ class DataFrame {
 
 			if (!first_slide.contains(s)) return false;
 
-			datafield first_slide_val = first_slide.get(s);
+			var_t first_slide_val = first_slide.get(s);
 
 			for (auto slide : slides) {
 				if (!slide.contains(s)) return false;

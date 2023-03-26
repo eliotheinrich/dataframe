@@ -29,7 +29,7 @@ class Simulator {
         float randf() { return float(rng())/float(RAND_MAX); }
 
         Simulator(Params &params) {
-            seed = params.geti("random_seed", DEFAULT_RANDOM_SEED);
+            seed = params.get<int>("random_seed", DEFAULT_RANDOM_SEED);
             if (seed == -1) rng = std::minstd_rand(std::rand());
             else rng = std::minstd_rand(seed);
         }
@@ -71,11 +71,11 @@ class TimeConfig : public Config {
         }
 
         TimeConfig(Params &params) : Config(params) {
-            nruns = params.geti("num_runs", DEFAULT_NUM_RUNS);
-            equilibration_timesteps = params.geti("equilibration_timesteps", DEFAULT_EQUILIBRATION_STEPS);
-            sampling_timesteps = params.geti("sampling_timesteps", DEFAULT_SAMPLING_TIMESTEPS);
-            measurement_freq = params.geti("measurement_freq", DEFAULT_MEASUREMENT_FREQ);
-            temporal_avg = (bool) params.geti("temporal_avg", DEFAULT_TEMPORAL_AVG);
+            nruns = params.get<int>("num_runs", DEFAULT_NUM_RUNS);
+            equilibration_timesteps = params.get<int>("equilibration_timesteps", DEFAULT_EQUILIBRATION_STEPS);
+            sampling_timesteps = params.get<int>("sampling_timesteps", DEFAULT_SAMPLING_TIMESTEPS);
+            measurement_freq = params.get<int>("measurement_freq", DEFAULT_MEASUREMENT_FREQ);
+            temporal_avg = (bool) params.get<int>("temporal_avg", DEFAULT_TEMPORAL_AVG);
         }
 
         virtual uint get_nruns() const { return nruns; }
