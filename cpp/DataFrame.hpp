@@ -9,6 +9,7 @@
 #include <cmath>
 #include <chrono>
 #include <assert.h>
+#include <stdio.h>
 #include <iostream>
 #include <variant>
 #include <ctpl.h>
@@ -42,7 +43,6 @@ struct get_var {
 static bool operator==(const var_t& v, const var_t& t) {
 	if (v.index() != t.index()) return false;
 
-	// float
 	if (v.index() == 0) return std::get<int>(v) == std::get<int>(t);
 	else if (v.index() == 1) return std::abs(std::get<float>(v) - std::get<float>(t)) < EPS;
 	else return std::get<std::string>(v) == std::get<std::string>(t);
@@ -433,6 +433,8 @@ class DataFrame {
 			s += "\n\t]\n}\n";
 
 			// Save to file
+			if (std::remove(filename.c_str())) std::cout << "Deleting old data\n";
+
 			std::ofstream output_file(filename);
 			output_file << s;
 			output_file.close();
