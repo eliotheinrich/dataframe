@@ -92,6 +92,9 @@ class DataFrame:
 			for key, val in slide.params.items():
 				self._qtable[key][val].add(n)
 
+		for k,v in self.params.items():
+			self._qtable[k] = v
+
 		self._qtable_initialized = True
 
 	def __len__(self):
@@ -126,7 +129,7 @@ class DataFrame:
 
 		relevant_constraints = {k: v for k,v in constraints.items() if k not in self.params}
 
-		if constraints == {}:
+		if relevant_constraints == {}:
 			ind = range(0, len(self))
 		else:
 			ind = set.intersection(*[self._qtable[k][v] for (k,v) in relevant_constraints.items()])
