@@ -161,15 +161,12 @@ class DataFrame:
 			return [_remove_flat_axes(vals[k]) for k in keys]
 
 	
-	def query_unique(self, keys): # TODO allow constraints
-		if not self._qtable_initialized:
-			self._init_qtable()
-			
-		if isinstance(keys, str):
-			keys = [keys]
-		
-		v = _remove_flat_axes(np.array([list(self._qtable[key].keys()) for key in keys]))
-		return v
+	def query_unique(self, keys, constraints = {}): # TODO allow constraints
+		query_result = self.query(keys, constraints)
+		if not isinstance(query_result, list):
+			query_result = [query_result]
+
+		return sorted(list(set(query_result)))
 
 	def param_congruent(self, key):
 		if not self.slides[0].contains(key):
