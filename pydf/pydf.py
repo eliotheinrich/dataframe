@@ -163,7 +163,7 @@ class DataFrame:
 	
 	def query_unique(self, keys, constraints = {}): # TODO allow constraints
 		query_result = self.query(keys, constraints)
-		if not isinstance(query_result, list):
+		if not isinstance(query_result, np.ndarray):
 			query_result = [query_result]
 
 		return sorted(list(set(query_result)))
