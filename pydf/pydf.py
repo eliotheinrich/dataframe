@@ -29,7 +29,10 @@ class DataSlide:
 			return self.data[key][:,0]
 	
 	def _get_err(self, key):
-		return self.data[key][:,1]
+		if key in self.params:
+			return self.params[key]
+		else:
+			return self.data[key][:,1]
 
 	def _get_nruns(self, key):
 		return self.data[key][:,2]
