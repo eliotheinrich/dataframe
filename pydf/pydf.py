@@ -29,7 +29,10 @@ class DataSlide:
 			return self.data[key][:,0]
 	
 	def _get_err(self, key):
-		return self.data[key][:,1]
+		if key in self.params:
+			return self.params[key]
+		else:
+			return self.data[key][:,1]
 
 	def _get_nruns(self, key):
 		return self.data[key][:,2]
@@ -92,6 +95,9 @@ class DataFrame:
 			for key, val in slide.params.items():
 				self._qtable[key][val].add(n)
 
+		for k,v in self.params.items():
+			self._qtable[k] = v
+
 		self._qtable_initialized = True
 
 	def __len__(self):
@@ -126,7 +132,7 @@ class DataFrame:
 
 		relevant_constraints = {k: v for k,v in constraints.items() if k not in self.params}
 
-		if constraints == {}:
+		if relevant_constraints == {}:
 			ind = range(0, len(self))
 		else:
 			ind = set.intersection(*[self._qtable[k][v] for (k,v) in relevant_constraints.items()])
@@ -158,15 +164,12 @@ class DataFrame:
 			return [_remove_flat_axes(vals[k]) for k in keys]
 
 	
-	def query_unique(self, keys): # TODO allow constraints
-		if not self._qtable_initialized:
-			self._init_qtable()
-			
-		if isinstance(keys, str):
-			keys = [keys]
-		
-		v = _remove_flat_axes(np.array([list(self._qtable[key].keys()) for key in keys]))
-		return v
+	def query_unique(self, keys, constraints = {}): # TODO allow constraints
+		query_result = self.query(keys, constraints)
+		if not isinstance(query_result, np.ndarray):
+			query_result = [query_result]
+
+		return sorted(list(set(query_result)))
 
 	def param_congruent(self, key):
 		if not self.slides[0].contains(key):
