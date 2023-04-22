@@ -15,6 +15,12 @@
 #include <ctpl.h>
 #include <nlohmann/json.hpp>
 
+#ifdef DEBUG
+#define LOG(x) std::cout << x
+#else
+#define LOG(x)
+#endif
+
 class Sample;
 class DataSlide;
 class DataFrame;
@@ -83,7 +89,8 @@ class Params {
 		template <typename T>
 		T get(std::string s) const {
 			if (!contains(s)) {
-				std::cout << "Key \"" + s + "\" not found.\n"; assert(false);
+				std::cout << "Key \"" + s + "\" not found.\n"; 
+                assert(false);
 			}
 
 			return std::get<T>(fields.at(s));
