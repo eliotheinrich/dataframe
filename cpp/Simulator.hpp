@@ -78,9 +78,9 @@ class TimeConfig : public Config {
             temporal_avg = (bool) params.get<int>("temporal_avg", DEFAULT_TEMPORAL_AVG);
         }
 
-        virtual uint get_nruns() const { return nruns; }
+        virtual uint get_nruns() const override { return nruns; }
 
-        virtual DataSlide compute() {
+        virtual DataSlide compute() override {
             DataSlide slide;
 
             simulator->init_state();
@@ -126,7 +126,7 @@ class TimeConfig : public Config {
             return slide;
         }
 
-        virtual std::unique_ptr<Config> clone() {
+        virtual std::unique_ptr<Config> clone() override {
             std::unique_ptr<TimeConfig> config(new TimeConfig(params));
             std::unique_ptr<Simulator> sim = simulator.get()->clone(params);
             config->init_simulator(std::move(sim));
