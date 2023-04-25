@@ -130,6 +130,7 @@ class DataFrame:
 			if k in self.params and not param_equal(v, self.params[k]):
 				return np.array([])
 
+
 		relevant_constraints = {k: v for k,v in constraints.items() if k not in self.params}
 
 		if relevant_constraints == {}:

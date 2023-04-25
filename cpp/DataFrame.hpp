@@ -30,7 +30,7 @@ class ParallelCompute;
 
 static std::string join(const std::vector<std::string> &v, const std::string &delim);
 
-using var_t=std::variant<int, float, std::string>;
+typedef std::variant<int, float, std::string> var_t;
 
 struct var_to_string {
 	std::string operator()(const int& i) { return std::to_string(i); }
@@ -278,10 +278,14 @@ class Sample {
 			return s;
 		}
 
-		std::string to_string() const {
-			std::string s = "[";
-			s += std::to_string(this->mean) + ", " + std::to_string(this->std) + ", " + std::to_string(this->num_samples) + "]";
-			return s;
+		std::string to_string(bool err = false) const {
+			if (err) {
+				std::string s = "[";
+				s += std::to_string(this->mean) + ", " + std::to_string(this->std) + ", " + std::to_string(this->num_samples) + "]";
+				return s;
+			} else {
+				return std::string(this->mean);
+			}
 		}
 };
 
@@ -328,7 +332,7 @@ class DataSlide {
 			return false;
 		}
 
-		std::string to_string(uint indentation=0) const {
+		std::string to_string(uint indentation=0, bool err = false) const {
 			std::string s = "";
 
 			std::string tabs = "";
@@ -344,7 +348,7 @@ class DataSlide {
 			for (auto const &[key, samples] : data) {
 				std::vector<std::string> sample_buffer;
 				for (auto sample : samples) {
-					sample_buffer.push_back(sample.to_string());
+					sample_buffer.push_back(sample.to_string(err));
 				}
 
 				buffer.push_back("\"" + key + "\": [" + join(sample_buffer, ", ") + "]");
@@ -420,7 +424,7 @@ class DataFrame {
 		}
 
 		// TODO use nlohmann?
-		void write_json(std::string filename) {
+		void write_json(std::string filename, bool err = false) {
 			std::string s = "";
 
 			s += "{\n\t\"params\": {\n";
@@ -432,7 +436,7 @@ class DataFrame {
 			int num_slides = slides.size();
 			std::vector<std::string> buffer;
 			for (int i = 0; i < num_slides; i++) {
-				buffer.push_back("\t\t{\n" + slides[i].to_string(3) + "\n\t\t}");
+				buffer.push_back("\t\t{\n" + slides[i].to_string(3, err) + "\n\t\t}");
 			}
 
 			s += join(buffer, ",\n");
