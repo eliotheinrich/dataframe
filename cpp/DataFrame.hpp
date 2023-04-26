@@ -33,15 +33,15 @@ static std::string join(const std::vector<std::string> &v, const std::string &de
 typedef std::variant<int, float, std::string> var_t;
 
 struct var_to_string {
-	std::string operator()(const int& i) { return std::to_string(i); }
-	std::string operator()(const float& f) { return std::to_string(f); }
-	std::string operator()(const std::string& s) { return "\"" + s + "\""; }
+	std::string operator()(const int& i) const { return std::to_string(i); }
+	std::string operator()(const float& f) const { return std::to_string(f); }
+	std::string operator()(const std::string& s) const { return "\"" + s + "\""; }
 };
 
 struct get_var {
-	int operator()(const int& i) { return i; }
-	float operator()(const float& f) { return f; }
-	std::string operator()(const std::string& s) { return s; }
+	int operator()(const int& i) const { return i; }
+	float operator()(const float& f) const { return f; }
+	std::string operator()(const std::string& s) const { return s; }
 };
 
 #define EPS 0.00001
@@ -118,7 +118,7 @@ class Params {
 			return false;
 		}
 
-		bool operator==(const Params &p) {
+		bool operator==(const Params &p) const {
 			for (auto const &[key, field] : fields) {
 				if (!p.contains(key)) return false;
 				if (p.fields.at(key) != field) return false;
@@ -130,7 +130,7 @@ class Params {
 			return true;
 		}
 
-		bool operator!=(const Params &p) {
+		bool operator!=(const Params &p) const {
 			return !((*this) == p);
 		}
 
@@ -284,7 +284,7 @@ class Sample {
 				s += std::to_string(this->mean) + ", " + std::to_string(this->std) + ", " + std::to_string(this->num_samples) + "]";
 				return s;
 			} else {
-				return std::string(this->mean);
+				return std::to_string(this->mean);
 			}
 		}
 };
