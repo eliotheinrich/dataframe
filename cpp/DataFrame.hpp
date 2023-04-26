@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <variant>
-#include <ctpl.h>
+#include <BS_thread_pool.hpp>
 #include <nlohmann/json.hpp>
 
 #ifdef DEBUG
@@ -536,17 +536,16 @@ static void print_progress(float progress, int expected_time = -1) {
 
 }
 
-
 class ParallelCompute {
 	private:
 		std::vector<std::unique_ptr<Config>> configs;
-
-		static DataSlide thread_compute(int id, std::unique_ptr<Config> &config) {
+		static DataSlide thread_compute(std::shared_ptr<Config> config) {
 			DataSlide slide = config->compute();
 			slide.add(config->params);
-			config.release();
 			return slide;
 		}
+
+
 
 	public:
 		ParallelCompute(std::vector<std::unique_ptr<Config>> configs) : configs(std::move(configs)) {}
@@ -556,13 +555,13 @@ class ParallelCompute {
 
 			uint num_configs = configs.size();
 			uint total_runs = 0;
-			for (auto &config : configs) total_runs += config->get_nruns();
+			for (auto const &config : configs) total_runs += config->get_nruns();
 
 			std::cout << "num_configs: " << num_configs << std::endl;
 			std::cout << "total_runs: " << total_runs << std::endl;
 			if (display_progress) print_progress(0.);	
 
-			ctpl::thread_pool threads(num_threads);
+			BS::thread_pool threads(num_threads);
 
 			std::vector<std::future<DataSlide>> results(total_runs);
 			std::vector<DataSlide> slides(total_runs);
@@ -574,7 +573,8 @@ class ParallelCompute {
 				configs[i]->clone();
 				uint nruns = configs[i]->get_nruns();
 				for (uint j = 0; j < nruns; j++) {
-					results[idx] = threads.push(thread_compute, configs[i]->clone());
+					std::shared_ptr<Config> cfg = configs[i]->clone();
+					results[idx] = threads.submit(ParallelCompute::thread_compute, cfg);
 					idx++;
 				}
 			}
