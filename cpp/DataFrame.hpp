@@ -31,6 +31,7 @@ class ParallelCompute;
 static std::string join(const std::vector<std::string> &v, const std::string &delim);
 
 typedef std::variant<int, float, std::string> var_t;
+typedef std::map<std::string, Sample> data_t;
 
 struct var_to_string {
 	std::string operator()(const int& i) const { return std::to_string(i); }
@@ -332,7 +333,7 @@ class DataSlide {
 			return false;
 		}
 
-		std::string to_string(uint indentation=0, bool err = false) const {
+		std::string to_string(uint indentation=0) const {
 			std::string s = "";
 
 			std::string tabs = "";
@@ -348,7 +349,7 @@ class DataSlide {
 			for (auto const &[key, samples] : data) {
 				std::vector<std::string> sample_buffer;
 				for (auto sample : samples) {
-					sample_buffer.push_back(sample.to_string(err));
+					sample_buffer.push_back(sample.to_string());
 				}
 
 				buffer.push_back("\"" + key + "\": [" + join(sample_buffer, ", ") + "]");
@@ -424,7 +425,7 @@ class DataFrame {
 		}
 
 		// TODO use nlohmann?
-		void write_json(std::string filename, bool err = false) {
+		void write_json(std::string filename) {
 			std::string s = "";
 
 			s += "{\n\t\"params\": {\n";
@@ -436,7 +437,7 @@ class DataFrame {
 			int num_slides = slides.size();
 			std::vector<std::string> buffer;
 			for (int i = 0; i < num_slides; i++) {
-				buffer.push_back("\t\t{\n" + slides[i].to_string(3, err) + "\n\t\t}");
+				buffer.push_back("\t\t{\n" + slides[i].to_string(3) + "\n\t\t}");
 			}
 
 			s += join(buffer, ",\n");
