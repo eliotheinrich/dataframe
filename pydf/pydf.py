@@ -25,9 +25,18 @@ def _add(list, val):
 
 
 class DataSlide:
-	def __init__(self, params, data):
-		self.params = params
-		self.data = data
+	def __init__(self, params = None, data = None):
+		self.params = params or {}
+		self.data = {key: np.array(vals, dtype=float) for key, vals in data.items()} if data is not None else {}
+	
+	def add_param(self, key: str, val):
+		self.params[key] = float(val)
+	
+	def add_data(self, key: str):
+		self.data[key] = np.array([], dtype=float)
+  
+	def push_data(self, key: str, val):
+		self.data[key] = np.append(self.data[key], float(val))
 
 	def contains(self, key: str):
 		return key in self.params or key in self.data
@@ -49,7 +58,7 @@ class DataSlide:
 		return True	
 
 	def as_dict(self):
-		return {**self.params, **{key: list(val) for key, val in self.data.items()}}
+		return {**self.params, **{key: list(vals.astype(float)) for key, vals in self.data.items()}}
 
 class DataFrame:
 	def head(self):
@@ -96,9 +105,9 @@ class DataFrame:
 		new.params = {**self.params, **other.params}
 
 		for slide in self.slides:
-			new.add_dataslide(slide)
+			new.add_slide(slide)
 		for slide in other.slides:
-			new.add_dataslide(slide)
+			new.add_slide(slide)
 
 		return new
 	
@@ -180,9 +189,14 @@ class DataFrame:
 			if self.param_congruent(key):
 				self.promote(key)
 
-	def add_dataslide(self, slide: DataSlide):
+	def add_slide(self, slide: DataSlide):
 		self._qtable_initialized = False
 		self.slides.append(slide)
+
+	def add_param(self, key: str, val):
+		self._qtable_initialized = False
+		self.params[key] = val
+	
 
 	def _get(self, key: str):
 		if key in self.params:
@@ -213,14 +227,18 @@ class DataFrame:
 			if invert:
 				keep = not keep
 			if keep:
-				new_df.add_dataslide(slide)
+				new_df.add_slide(slide)
 		
 		return new_df
 
 	def write_json(self, filename: str):
 		fields = {'params': self.params, 'slides': self.slides}
+
 		with open(filename, 'w') as f:
-			json.dump(fields, f, default=lambda o: o.as_dict(), allow_nan=False, indent=4)
+			json.dump(fields, f, 
+             		  default=lambda o: o.as_dict(), 
+                 	  allow_nan=False, indent=4)
+
 
 def parse_datafield(s):
 	if list(s.keys())[0] == 'Data':
@@ -254,7 +272,7 @@ def load_data(filename):
 				else:
 					params[key] = vals[key] 
 				
-			dataframe.add_dataslide(DataSlide(params, data))
+			dataframe.add_slide(DataSlide(params, data))
 	
 	return dataframe
 
