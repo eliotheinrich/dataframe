@@ -17,6 +17,10 @@
 #define DEFAULT_TEMPORAL_AVG true
 #define DEFAULT_RANDOM_SEED -1
 
+
+#define DEFAULT_AUTOCONVERGE false
+#define DEFAULT_CONVERGENCE_THRESHOLD 0.1
+
 #define CLONE(A, B) virtual std::unique_ptr<A> clone(Params &params) override { return std::unique_ptr<A>(new B(params)); }
 
 class Simulator {
@@ -66,6 +70,10 @@ class TimeConfig : public Config {
         uint measurement_freq;
         bool temporal_avg;
 
+
+        bool autoconverge;
+        float convergence_threshold;
+
         void init_simulator(std::unique_ptr<Simulator> sim) {
             simulator = std::move(sim);
         }
@@ -76,16 +84,41 @@ class TimeConfig : public Config {
             sampling_timesteps = params.get<int>("sampling_timesteps", DEFAULT_SAMPLING_TIMESTEPS);
             measurement_freq = params.get<int>("measurement_freq", DEFAULT_MEASUREMENT_FREQ);
             temporal_avg = (bool) params.get<int>("temporal_avg", DEFAULT_TEMPORAL_AVG);
+
+            autoconverge = (bool) params.get<int>("autoconverge", DEFAULT_AUTOCONVERGE);
+            if (autoconverge) {
+                convergence_threshold = params.get<float>("convergence_threshold", DEFAULT_CONVERGENCE_THRESHOLD);
+            }
         }
 
         virtual uint get_nruns() const override { return nruns; }
+
+        bool samples_converged(const std::map<std::string, std::vector<Sample>> &samples) const {  
+            for (auto const &[key, ksamples]: samples) {
+                Sample s = Sample::collapse(ksamples);
+                float mean = s.get_mean();
+                float err = s.get_std();
+
+                float bounded = 0.;
+                for (auto const &k : ksamples) {
+                    if ((k < mean - 2*err) || (k > mean + 2*err))
+                        bounded++;
+                }
+
+                if (bounded/samples.size() > convergence_threshold)
+                    return false;
+            }
+
+            return true;
+        }
 
         virtual DataSlide compute() override {
             DataSlide slide;
 
             simulator->init_state();
 
-            simulator->equilibration_timesteps(equilibration_timesteps);
+            if (!autoconverge)
+                simulator->equilibration_timesteps(equilibration_timesteps);
 
             int num_timesteps, num_intervals;
             if (sampling_timesteps == 0) {
@@ -100,7 +133,7 @@ class TimeConfig : public Config {
 
             for (int t = 0; t < num_intervals; t++) {
                 simulator->timesteps(num_timesteps);
-                std::map<std::string, Sample> sample = simulator->take_samples();
+                data_t sample = simulator->take_samples();
                 for (auto const &[key, val] : sample) {
                     samples[key].push_back(val);
                 }
@@ -108,7 +141,18 @@ class TimeConfig : public Config {
                 std::map<std::string, std::vector<Sample>> vector_sample = simulator->take_vector_samples();
                 for (auto const &[key, vec] : vector_sample) {
                     slide.add_data(key);
-                    for (auto const v : vec) slide.push_data(key, v);
+                    for (auto const &v : vec) slide.push_data(key, v);
+                }
+            }
+
+            if (autoconverge) {
+                while (!samples_converged(samples)) {
+                    simulator->timesteps(num_timesteps);
+                    data_t sample = simulator->take_samples();
+                    for (auto const &[key, val] : sample) {
+                        samples[key].push_back(val);
+                        samples[key].erase(samples[key].begin());
+                    }
                 }
             }
 
