@@ -102,11 +102,29 @@ class DataFrame:
 	
 	def __add__(self, other):
 		new = DataFrame()
-		new.params = {**self.params, **other.params}
+  
+		self_df_params = set(self.params.keys())
+		other_df_params = set(other.params.keys())
+
+		self_ds_params = {}
+		other_ds_params = {}
+  
+		for key in self_df_params.intersection(other_df_params):
+			if param_equal(self.params[key], other.params[key]):
+				new.add_param(key, self.params[key])
+			else:
+				self_ds_params[key] = self.params[key]
+				other_ds_params[key] = other.params[key]
+		
 
 		for slide in self.slides:
+			for key, val in self_ds_params.items():
+				slide.add_param(key, val)
 			new.add_slide(slide)
+				
 		for slide in other.slides:
+			for key, val in other_ds_params.items():
+				slide.add_param(key, val)
 			new.add_slide(slide)
 
 		return new
@@ -231,13 +249,22 @@ class DataFrame:
 		
 		return new_df
 
+	def __str__(self):
+		fields = {'params': self.params, 'slides': self.slides}
+		return json.dumps(fields, 
+                    	  default=lambda o: o.as_dict(),
+                          allow_nan=False, 
+                          indent=4
+                        )
+
 	def write_json(self, filename: str):
 		fields = {'params': self.params, 'slides': self.slides}
 
 		with open(filename, 'w') as f:
 			json.dump(fields, f, 
              		  default=lambda o: o.as_dict(), 
-                 	  allow_nan=False, indent=4)
+                 	  allow_nan=False, indent=4
+                    )
 
 
 def parse_datafield(s):
@@ -279,3 +306,5 @@ def load_data(filename):
 def sort_data_by(sorter, *args):
 	idxs = np.argsort(sorter)
 	return (sorter[idxs], *[arg[idxs] for arg in args])
+
+
