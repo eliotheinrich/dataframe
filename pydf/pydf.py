@@ -30,7 +30,7 @@ class DataSlide:
 		self.data = {key: np.array(vals, dtype=float) for key, vals in data.items()} if data is not None else {}
 	
 	def add_param(self, key: str, val):
-		self.params[key] = float(val)
+		self.params[key] = val
 	
 	def add_data(self, key: str):
 		self.data[key] = np.array([], dtype=float)
@@ -100,7 +100,15 @@ class DataFrame:
 	def __len__(self):
 		return len(self.slides)
 	
-	def __add__(self, other):
+	def __bool__(self):
+		return not (len(self.params) == 0 and len(self.slides) == 0)
+ 
+	def __add__(self, other): 
+		if not self:
+			return other
+		if not other:
+			return self
+
 		new = DataFrame()
   
 		self_df_params = set(self.params.keys())
@@ -110,11 +118,19 @@ class DataFrame:
 		other_ds_params = {}
   
 		for key in self_df_params.intersection(other_df_params):
+			# If both DataFrames have a param with equal value, add it to new DataFrame
 			if param_equal(self.params[key], other.params[key]):
 				new.add_param(key, self.params[key])
+			# If values are different, add values to child slides
 			else:
 				self_ds_params[key] = self.params[key]
 				other_ds_params[key] = other.params[key]
+		
+		# Add params unique to each DataFrame to child slides
+		for key in self_df_params.difference(other_df_params):
+			self_ds_params[key] = self.params[key]
+		for key in other_df_params.difference(self_df_params):
+			other_ds_params[key] = other.params[key]
 		
 
 		for slide in self.slides:
@@ -306,5 +322,4 @@ def load_data(filename):
 def sort_data_by(sorter, *args):
 	idxs = np.argsort(sorter)
 	return (sorter[idxs], *[arg[idxs] for arg in args])
-
 

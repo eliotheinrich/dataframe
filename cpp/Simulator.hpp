@@ -64,6 +64,44 @@ class TimeConfig : public Config {
         std::unique_ptr<Simulator> simulator;
         uint nruns;
 
+        static float correlation_coefficient(const std::vector<Sample> &samples) {
+            uint n = samples.size();
+
+            double varx = std::sqrt(n*(n*n - 1.)/(n-1.)*12.);
+            double my = 0.;
+            for (uint i = 0; i < n; i++)
+                my += samples[i].get_mean();
+            my /= n;
+
+            double vary = 0.;
+            for (uint i = 0; i < n; i++)
+                vary += std::pow(samples[i].get_mean() - my, 2);
+            vary = std::sqrt(vary/(n - 1.));
+
+            // For numerical stability
+            if (vary < 1e-5) return 0;
+
+            double sumxy = 0.;
+            for (uint i = 0; i < n; i++)
+                sumxy += i*samples[i].get_mean();
+            
+            float r = (sumxy - n*my*(n-1.)/2.)/((n-1.)*varx*vary);
+
+            assert(std::abs(r) < 1.);
+            return r;
+        }
+
+        bool samples_converged(const std::map<std::string, std::vector<Sample>> &samples) const {  
+            for (auto const &[key, ksamples]: samples) {
+                float r = correlation_coefficient(ksamples);
+                if (std::abs(r) > convergence_threshold)
+                    return false;
+            }
+
+            return true;
+        }
+
+
     public:
         uint sampling_timesteps;
         uint equilibration_timesteps;
@@ -93,32 +131,12 @@ class TimeConfig : public Config {
 
         virtual uint get_nruns() const override { return nruns; }
 
-        bool samples_converged(const std::map<std::string, std::vector<Sample>> &samples) const {  
-            for (auto const &[key, ksamples]: samples) {
-                Sample s = Sample::collapse(ksamples);
-                float mean = s.get_mean();
-                float err = s.get_std();
-
-                float bounded = 0.;
-                for (auto const &k : ksamples) {
-                    if ((k < mean - 2*err) || (k > mean + 2*err))
-                        bounded++;
-                }
-
-                if (bounded/samples.size() > convergence_threshold)
-                    return false;
-            }
-
-            return true;
-        }
-
         virtual DataSlide compute() override {
             DataSlide slide;
 
             simulator->init_state();
 
-            if (!autoconverge)
-                simulator->equilibration_timesteps(equilibration_timesteps);
+            simulator->equilibration_timesteps(equilibration_timesteps);
 
             int num_timesteps, num_intervals;
             if (sampling_timesteps == 0) {
@@ -145,6 +163,8 @@ class TimeConfig : public Config {
                 }
             }
 
+            int convergence_timesteps = sampling_timesteps;
+
             if (autoconverge) {
                 while (!samples_converged(samples)) {
                     simulator->timesteps(num_timesteps);
@@ -153,7 +173,12 @@ class TimeConfig : public Config {
                         samples[key].push_back(val);
                         samples[key].erase(samples[key].begin());
                     }
+
+                    convergence_timesteps += num_timesteps;
                 }
+                
+                slide.add_data("convergence_timesteps");
+                slide.push_data("convergence_timesteps", convergence_timesteps);
             }
 
             for (auto const &[key, ksamples] : samples) {
@@ -165,7 +190,7 @@ class TimeConfig : public Config {
                 }
             }
 
-            slide.add("num_samples", (int) num_intervals);
+            slide.add_param("num_samples", (int) num_intervals);
 
             return slide;
         }

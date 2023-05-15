@@ -234,6 +234,18 @@ class Sample {
         Sample(double mean) : mean(mean), std(0.), num_samples(1) {}
 		Sample(double mean, double std, uint num_samples) : mean(mean), std(std), num_samples(num_samples) {}
 
+		template<class T>
+		Sample(std::vector<T> &v) {
+			num_samples = v.size();
+			mean = std::accumulate(v.begin(), v.end(), 0.0);
+			float sum = 0.0;
+			for (auto const t : v) {
+				sum += std::pow(t - mean, 2.0);
+			}
+
+			std = std::sqrt(sum/(num_samples - 1.));
+		}
+
         double get_mean() const {
 			return this->mean;
 		}
@@ -270,7 +282,7 @@ class Sample {
 			return Sample(combined_mean, combined_std, combined_samples);
 		}
 
-		static Sample collapse(std::vector<Sample> samples) {
+		static Sample collapse(const std::vector<Sample> &samples) {
 			Sample s = samples[0];
 			for (uint i = 1; i < samples.size(); i++) {
 				s = s.combine(samples[i]);
@@ -310,11 +322,11 @@ class DataSlide {
 		}
 
 		template <typename T>
-		void add(std::string s, T const& t) { params.add(s, t); }
+		void add_param(std::string s, T const& t) { params.add(s, t); }
 
-		void add(Params &params) {
+		void add_param(Params &params) {
 			for (auto const &[key, field] : params.fields) {
-				add(key, field);
+				add_param(key, field);
 			}
 		}
 
@@ -413,10 +425,10 @@ class DataFrame {
 		}
 
 		template <typename T>
-		void add(std::string s, T const& t) { params.add(s, t); }
-		void add(Params &params) {
+		void add_param(std::string s, T const& t) { params.add(s, t); }
+		void add_param(Params &params) {
 			for (auto const &[key, field] : params.fields) {
-				add(key, field);
+				add_param(key, field);
 			}
 		}
 
@@ -470,7 +482,7 @@ class DataFrame {
 		}
 
 		void promote_field(std::string s) {
-			add(s, slides.begin()->get(s));
+			add_param(s, slides.begin()->get(s));
 			for (auto &slide : slides) {
 				slide.remove(s);
 			}
@@ -542,7 +554,7 @@ class ParallelCompute {
 		std::vector<std::unique_ptr<Config>> configs;
 		static DataSlide thread_compute(std::shared_ptr<Config> config) {
 			DataSlide slide = config->compute();
-			slide.add(config->params);
+			slide.add_param(config->params);
 			return slide;
 		}
 
@@ -623,9 +635,9 @@ class ParallelCompute {
 			auto stop = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
 
-			df.add("num_threads", (int) num_threads);
-			df.add("num_jobs", (int) total_runs);
-			df.add("time", (int) duration.count());
+			df.add_param("num_threads", (int) num_threads);
+			df.add_param("num_jobs", (int) total_runs);
+			df.add_param("time", (int) duration.count());
 			df.promote_params();
 
 			return df;
