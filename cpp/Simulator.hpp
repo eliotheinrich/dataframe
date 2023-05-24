@@ -19,7 +19,7 @@
 
 
 #define DEFAULT_AUTOCONVERGE false
-#define DEFAULT_CONVERGENCE_THRESHOLD 0.1
+#define DEFAULT_CONVERGENCE_THRESHOLD 0.75
 
 #define CLONE(A, B) virtual std::unique_ptr<A> clone(Params &params) override { return std::unique_ptr<A>(new B(params)); }
 
@@ -64,18 +64,18 @@ class TimeConfig : public Config {
         std::unique_ptr<Simulator> simulator;
         uint nruns;
 
-        static float correlation_coefficient(const std::vector<Sample> &samples) {
-            uint n = samples.size();
+        static float correlation_coefficient(const std::vector<double> &y) {
+            uint n = y.size();
 
-            double varx = std::sqrt(n*(n*n - 1.)/(n-1.)*12.);
+            double varx = std::sqrt(n*(n*n - 1.)/((n-1.)*12.));
             double my = 0.;
             for (uint i = 0; i < n; i++)
-                my += samples[i].get_mean();
+                my += y[i];
             my /= n;
 
             double vary = 0.;
             for (uint i = 0; i < n; i++)
-                vary += std::pow(samples[i].get_mean() - my, 2);
+                vary += std::pow(y[i] - my, 2);
             vary = std::sqrt(vary/(n - 1.));
 
             // For numerical stability
@@ -83,7 +83,7 @@ class TimeConfig : public Config {
 
             double sumxy = 0.;
             for (uint i = 0; i < n; i++)
-                sumxy += i*samples[i].get_mean();
+                sumxy += i*y[i];
             
             float r = (sumxy - n*my*(n-1.)/2.)/((n-1.)*varx*vary);
 
@@ -93,10 +93,50 @@ class TimeConfig : public Config {
 
         bool samples_converged(const std::map<std::string, std::vector<Sample>> &samples) const {  
             for (auto const &[key, ksamples]: samples) {
-                float r = correlation_coefficient(ksamples);
-                if (std::abs(r) > convergence_threshold)
+                float r = correlation_coefficient(Sample::get_means(ksamples));
+                if (r*r > convergence_threshold)
                     return false;
             }
+
+                /*
+                uint n = ksamples.size();
+                double sx = n*(n-1.)/2.;
+                double sxx = n*(n-1.)*(2.*n - 1.)/6.;
+                double sy = 0.;
+                double sxy;
+
+                auto means = Sample::get_means(ksamples);
+                for (uint i = 0; i < n; i++) {
+                    sy += means[i];
+                    sxy += i*means[i];
+                }
+
+                double slope = (n*sxy - sx*sy)/(n*sxx - sx*sx);
+                double intercept = (sy*sxx - sx*sxy)/(n*sxx - sx*sx);
+
+                std::vector<double> noise;
+                for (uint i = 0; i < n; i++)
+                    noise.push_back(means[i] - (slope*i + intercept));
+                
+                double m = 0.;
+                double m2 = 0.;
+                for (uint i = 0; i < n; i++) {
+                    m += noise[i];
+                    m2 += noise[i]*noise[i];
+                }
+
+                double s = std::sqrt(std::abs(m2 - m*m));
+
+                float bounded = 0.;
+                for (uint i = 0; i < n; i++) {
+                    if (noise[i] > m + 2*s || noise[i] < m - 2*s)
+                        bounded++;
+                }
+
+                if (bounded/n > convergence_threshold)
+                    return false;
+            }
+            */
 
             return true;
         }

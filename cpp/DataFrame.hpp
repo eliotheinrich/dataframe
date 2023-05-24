@@ -45,13 +45,13 @@ struct get_var {
 	std::string operator()(const std::string& s) const { return s; }
 };
 
-#define EPS 0.00001
+#define DF_EPS 0.00001
 
 static bool operator==(const var_t& v, const var_t& t) {
 	if (v.index() != t.index()) return false;
 
 	if (v.index() == 0) return std::get<int>(v) == std::get<int>(t);
-	else if (v.index() == 1) return std::abs(std::get<float>(v) - std::get<float>(t)) < EPS;
+	else if (v.index() == 1) return std::abs(std::get<float>(v) - std::get<float>(t)) < DF_EPS;
 	else return std::get<std::string>(v) == std::get<std::string>(t);
 }
 
@@ -289,6 +289,13 @@ class Sample {
 			}
 
 			return s;
+		}
+
+		static std::vector<double> get_means(const std::vector<Sample> &samples) {
+			std::vector<double> v;
+			for (auto const &s : samples)
+				v.push_back(s.get_mean());
+			return v;
 		}
 
 		std::string to_string(bool err = false) const {
