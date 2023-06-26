@@ -176,7 +176,7 @@ class DataFrame:
 
 			v = _remove_flat_axes(np.array(vals[key]))
 			inds = np.argsort(v)
-			return _remove_flat_axes(np.array(vals[key]))
+			return [_remove_flat_axes(np.array(vals[key]))]
 
 
 		for key in keys:
