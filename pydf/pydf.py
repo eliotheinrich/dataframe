@@ -146,11 +146,12 @@ class DataFrame:
 		return new
 	
 	def query(self, keys, constraints={}):
+		keys_is_list = isinstance(keys, list) or isinstance(keys, np.ndarray)
 		if not self._qtable_initialized:
 			self._init_qtable()
 
 		# First check if passed key is a Frame level parameter and return if so
-		if isinstance(keys, str):
+		if not keys_is_list:
 			if keys in self.params:
 				return self.params[keys]
 			else:
@@ -176,7 +177,11 @@ class DataFrame:
 
 			v = _remove_flat_axes(np.array(vals[key]))
 			inds = np.argsort(v)
-			return [_remove_flat_axes(np.array(vals[key]))]
+			if keys_is_list:
+				return [_remove_flat_axes(np.array(vals[key]))]
+			else:
+				return _remove_flat_axes(np.array(vals[key]))
+       
 
 
 		for key in keys:
@@ -190,9 +195,9 @@ class DataFrame:
 			return [_remove_flat_axes(vals[k]) for k in keys]
 
 	
-	def query_unique(self, keys, constraints = {}):
-		query_result = self.query(keys, constraints)
-		if not isinstance(query_result, np.ndarray):
+	def query_unique(self, key, constraints = {}):
+		query_result = self.query(key, constraints)
+		if not isinstance(query_result, list) and not isinstance(query_result, np.ndarray):
 			query_result = [query_result]
 
 		return sorted(list(set(query_result)))
