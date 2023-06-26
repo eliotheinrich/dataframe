@@ -1,5 +1,4 @@
-#ifndef DATAFRAME_H
-#define DATAFRAME_H
+#pragma once
 
 #include <string>
 #include <sstream>
@@ -12,7 +11,6 @@
 #include <stdio.h>
 #include <iostream>
 #include <variant>
-#include <BS_thread_pool.hpp>
 #include <nlohmann/json.hpp>
 
 #ifdef DEBUG
@@ -20,6 +18,31 @@
 #else
 #define LOG(x)
 #endif
+
+#ifdef OMPI // OMPI definitions and requirements
+
+#include <mpi.h>
+
+#define MASTER 0
+#define TERMINATE 0
+#define CONTINUE 1
+
+#define DO_IF_MASTER(x) {								\
+	int __rank;											\
+	MPI_Comm_rank(MPI_COMM_WORLD, &__rank);				\
+	if (__rank == MASTER) {								\
+		x												\
+	}													\
+}
+
+#else // Otherwise, just use threadpool
+
+#include <BS_thread_pool.hpp>
+
+#define DO_IF_MASTER(x) x
+
+#endif
+
 
 class Sample;
 class DataSlide;
@@ -153,9 +176,9 @@ class Params {
 
 		static std::vector<Params> load_json(nlohmann::json data, Params p, bool debug) {
 			if (debug) {
-				std::cout << "Loaded: \n";
-				std::cout << data.dump() << "\n";
+				DO_IF_MASTER(std::cout << "Loaded: \n" << data.dump() << "\n";)
 			}
+
 			std::vector<Params> params;
 
 			// Dealing with model parameters
@@ -235,7 +258,7 @@ class Sample {
 		Sample(double mean, double std, uint num_samples) : mean(mean), std(std), num_samples(num_samples) {}
 
 		template<class T>
-		Sample(std::vector<T> &v) {
+		Sample(const std::vector<T> &v) {
 			num_samples = v.size();
 			mean = std::accumulate(v.begin(), v.end(), 0.0);
 			float sum = 0.0;
@@ -244,6 +267,27 @@ class Sample {
 			}
 
 			std = std::sqrt(sum/(num_samples - 1.));
+		}
+
+		Sample(const std::string &s) {
+			if (s.front() == '[' && s.back() == ']') {
+				std::string trimmed = s.substr(1, s.length() - 2);
+				std::vector<uint> pos;
+				for (uint i = 0; i < trimmed.length(); i++) {
+					if (trimmed[i] == ',')
+						pos.push_back(i);
+				}
+
+				assert(pos.size() == 2);
+
+				mean = std::stof(trimmed.substr(0, pos[0]));
+				std = std::stof(trimmed.substr(pos[0]+1, pos[1]));
+				num_samples = std::stoi(trimmed.substr(pos[1]+1, trimmed.length()-1));
+			} else {
+				mean = std::stof(s);
+				std = 0.;
+				num_samples = 1;
+			}
 		}
 
         double get_mean() const {
@@ -298,8 +342,8 @@ class Sample {
 			return v;
 		}
 
-		std::string to_string(bool err = false) const {
-			if (err) {
+		std::string to_string(bool full_sample = false) const {
+			if (full_sample) {
 				std::string s = "[";
 				s += std::to_string(this->mean) + ", " + std::to_string(this->std) + ", " + std::to_string(this->num_samples) + "]";
 				return s;
@@ -352,23 +396,23 @@ class DataSlide {
 			return false;
 		}
 
-		std::string to_string(uint indentation=0) const {
-			std::string s = "";
-
+		std::string to_string(uint indentation=0, bool pretty=true, bool save_full_sample=false) const {
+			std::string tab = pretty ? "\t" : "";
+			std::string nline = pretty ? "\n" : "";
 			std::string tabs = "";
-			for (uint i = 0; i < indentation; i++) tabs += "\t";
+			for (uint i = 0; i < indentation; i++) tabs += tab;
 			
-			s += params.to_string(indentation);
+			std::string s = params.to_string(indentation);
 
-			if ((params.fields.size() != 0) && (data.size() != 0)) s += ",\n" + tabs;
+			if ((params.fields.size() != 0) && (data.size() != 0)) s += "," + nline + tabs;
 
-			std::string delim = ",\n" + tabs;
+			std::string delim = "," + nline + tabs;
 			std::vector<std::string> buffer;
 
 			for (auto const &[key, samples] : data) {
 				std::vector<std::string> sample_buffer;
 				for (auto sample : samples) {
-					sample_buffer.push_back(sample.to_string());
+					sample_buffer.push_back(sample.to_string(save_full_sample));
 				}
 
 				buffer.push_back("\"" + key + "\": [" + join(sample_buffer, ", ") + "]");
@@ -376,6 +420,23 @@ class DataSlide {
 
 			s += join(buffer, delim);
 			return s;
+		}
+
+		static DataSlide from_string(std::string ds_str) {
+			nlohmann::json ds_json = nlohmann::json::parse("{" + ds_str + "}");
+
+			DataSlide ds;
+
+			for (auto const &[k, val] : ds_json.items()) {
+				if (val.type() == nlohmann::json::value_t::array) {
+					ds.add_data(k);
+					for (auto const &v : val)
+						ds.push_data(k, Sample(v.dump()));
+				} else
+					ds.add_param(k, Params::parse_json_type(val));
+			}
+
+			return ds;
 		}
 
 		bool congruent(DataSlide &ds) {
@@ -444,7 +505,7 @@ class DataFrame {
 		}
 
 		// TODO use nlohmann?
-		void write_json(std::string filename) {
+		void write_json(std::string filename) const {
 			std::string s = "";
 
 			s += "{\n\t\"params\": {\n";
@@ -530,30 +591,30 @@ class Config {
 };
 
 static void print_progress(float progress, int expected_time = -1) {
-	int bar_width = 70;
-
-	std::cout << "[";
-	int pos = bar_width * progress;
-	for (int i = 0; i < bar_width; ++i) {
-		if (i < pos) std::cout << "=";
-		else if (i == pos) std::cout << ">";
-		else std::cout << " ";
-	}
-	std::stringstream time;
-	if (expected_time == -1) time << "";
-	else {
-		time << " [ ETA: ";
-		uint num_seconds = expected_time % 60;
-		uint num_minutes = expected_time/60;
-		uint num_hours = num_minutes/60;
-		num_minutes -= num_hours*60;
-		time << std::setfill('0') << std::setw(2) << num_hours << ":" 
-		     << std::setfill('0') << std::setw(2) << num_minutes << ":" 
-		     << std::setfill('0') << std::setw(2) << num_seconds << " ] ";
-	}
-	std::cout << "] " << int(progress * 100.0) << " %" << time.str()  << "\r";
-	std::cout.flush();
-
+	DO_IF_MASTER(
+		int bar_width = 70;
+		std::cout << "[";
+		int pos = bar_width * progress;
+		for (int i = 0; i < bar_width; ++i) {
+			if (i < pos) std::cout << "=";
+			else if (i == pos) std::cout << ">";
+			else std::cout << " ";
+		}
+		std::stringstream time;
+		if (expected_time == -1) time << "";
+		else {
+			time << " [ ETA: ";
+			uint num_seconds = expected_time % 60;
+			uint num_minutes = expected_time/60;
+			uint num_hours = num_minutes/60;
+			num_minutes -= num_hours*60;
+			time << std::setfill('0') << std::setw(2) << num_hours << ":" 
+				<< std::setfill('0') << std::setw(2) << num_minutes << ":" 
+				<< std::setfill('0') << std::setw(2) << num_seconds << " ] ";
+		}
+		std::cout << "] " << int(progress * 100.0) << " %" << time.str()  << "\r";
+		std::cout.flush();
+	)
 }
 
 class ParallelCompute {
@@ -565,26 +626,192 @@ class ParallelCompute {
 			return slide;
 		}
 
-
-
-	public:
-		ParallelCompute(std::vector<std::unique_ptr<Config>> configs) : configs(std::move(configs)) {}
-
-		DataFrame compute(uint num_threads, bool display_progress=false) {
+		void compute_ompi(bool display_progress) {
+#ifdef OMPI
 			auto start = std::chrono::high_resolution_clock::now();
 
 			uint num_configs = configs.size();
+
+			std::vector<std::unique_ptr<Config>> total_configs;
 			uint total_runs = 0;
-			for (auto const &config : configs) total_runs += config->get_nruns();
+			for (uint i = 0; i < num_configs; i++) {
+				configs[i]->clone();
+				uint nruns = configs[i]->get_nruns();
+				total_runs += nruns;
+				for (uint j = 0; j < nruns; j++)
+					total_configs.push_back(std::move(configs[i]->clone()));
+			}
+
+			DO_IF_MASTER(
+				std::cout << "num_configs: " << num_configs << std::endl;
+				std::cout << "total_runs: " << total_runs << std::endl;
+			)
+			if (display_progress) 
+				print_progress(0.);	
+
+			std::vector<DataSlide> slides(total_runs);
+
+			int world_size, rank;
+			int index_buffer;
+			int control_buffer;
+
+			MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+			if (rank == MASTER) {
+				uint num_workers = world_size - 1;
+				std::vector<bool> free_processes(num_workers, true);
+				bool terminate = false;
+
+				auto run_start = std::chrono::high_resolution_clock::now();
+				uint percent_finished = 0;
+				uint prev_percent_finished = percent_finished;
+
+				uint completed = 0;
+
+				uint head = 0;
+				while (completed < total_runs) {
+					// Assign work to all free processes
+					for (uint j = 0; j < num_workers; j++) {
+						if (head >= total_runs)
+							terminate = true;
+
+						if (free_processes[j]) {
+							free_processes[j] = false;
+
+							if (terminate) {
+								control_buffer = TERMINATE;
+							} else {
+								control_buffer = CONTINUE;
+								index_buffer = head;
+							}
+
+							MPI_Send(&index_buffer, 1, MPI_INT, j+1, control_buffer, MPI_COMM_WORLD);
+							
+							head++;
+						}
+					}
+
+					// MASTER can also do some work here
+					if (head < total_runs) {
+						slides[head] = total_configs[head]->compute();
+						head++;
+						completed++;
+					}
+
+					if (world_size != 1) {
+						// Collect results and free workers
+						MPI_Status status;
+						MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+						int message_length;
+						MPI_Get_count(&status, MPI_CHAR, &message_length);
+						int message_source = status.MPI_SOURCE;
+						index_buffer = status.MPI_TAG;
+
+						char* message_buffer = (char*) std::malloc(message_length);
+						MPI_Recv(message_buffer, message_length, MPI_CHAR, message_source, index_buffer, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+						slides[index_buffer] = DataSlide::from_string(std::string(message_buffer));
+
+						// Mark worker as free
+						free_processes[message_source-1] = true;
+						completed++;
+					}
+
+					// Display progress
+					if (display_progress) {
+						percent_finished = std::round(float(completed)/total_runs * 100);
+						if (percent_finished != prev_percent_finished) {
+							prev_percent_finished = percent_finished;
+							auto elapsed = std::chrono::high_resolution_clock::now();
+							int duration = std::chrono::duration_cast<std::chrono::seconds>(elapsed - run_start).count();
+							float seconds_per_job = duration/float(completed);
+							int remaining_time = seconds_per_job * (total_runs - completed);
+
+							print_progress(percent_finished/100., remaining_time);
+						}
+					}
+				}
+
+				// Cleanup remaining workers
+				for (uint i = 0; i < num_workers; i++) {
+					if (free_processes[i])
+						MPI_Send(&index_buffer, 1, MPI_INT, i+1, TERMINATE, MPI_COMM_WORLD);
+				}
+
+				// Construct final DataFrame and return
+				uint idx = 0;
+				for (uint i = 0; i < num_configs; i++) {
+					DataSlide ds = slides[idx];
+					uint nruns = configs[i]->get_nruns();
+					for (uint j = 1; j < nruns; j++) {
+						idx++;
+						ds = ds.combine(slides[idx]);
+					}
+					idx++;
+
+					df.add_slide(ds);
+				}
+
+
+				if (display_progress) {
+					print_progress(1., 0);	
+					std::cout << std::endl;
+				}
+
+				auto stop = std::chrono::high_resolution_clock::now();
+				auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+
+				df.add_param("num_threads", (int) num_threads);
+				df.add_param("num_jobs", (int) total_runs);
+				df.add_param("time", (int) duration.count());
+				df.promote_params();
+			} else {
+				uint idx;
+				while (true) {
+					// Receive control code and index
+					MPI_Status status;
+					MPI_Probe(MASTER, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+					control_buffer = status.MPI_TAG;
+					MPI_Recv(&index_buffer, 1, MPI_INT, MASTER, control_buffer, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+					if (control_buffer == TERMINATE)
+						break;
+
+					// Do work
+					DataSlide slide = total_configs[index_buffer]->compute();
+					std::string message = slide.to_string(0, false, true);
+					MPI_Send(message.c_str(), message.size(), MPI_CHAR, MASTER, index_buffer, MPI_COMM_WORLD);
+				}
+			}
+#else
+			std::cout << "OpenMPI is not supported for this build.\n";
+			assert(false);
+#endif
+		}
+
+		void compute_bspl(bool display_progress) {
+#ifndef OMPI
+			auto start = std::chrono::high_resolution_clock::now();
+
+			uint num_configs = configs.size();
+
+			std::vector<std::unique_ptr<Config>> total_configs;
+			uint total_runs = 0;
+			for (uint i = 0; i < num_configs; i++) {
+				configs[i]->clone();
+				uint nruns = configs[i]->get_nruns();
+				total_runs += nruns;
+				for (uint j = 0; j < nruns; j++)
+					total_configs.push_back(std::move(configs[i]->clone()));
+			}
 
 			std::cout << "num_configs: " << num_configs << std::endl;
 			std::cout << "total_runs: " << total_runs << std::endl;
 			if (display_progress) print_progress(0.);	
 
-			BS::thread_pool threads(num_threads);
-
-			std::vector<std::future<DataSlide>> results(total_runs);
 			std::vector<DataSlide> slides(total_runs);
+			BS::thread_pool threads(num_threads);
+			std::vector<std::future<DataSlide>> results(total_runs);
+
 			uint idx = 0;
 			for (uint i = 0; i < num_configs; i++) {
 				// Cloning and discarding calls constructors which emplace default values into params of configs[i]
@@ -619,13 +846,6 @@ class ParallelCompute {
 				}
 			}
 
-			if (display_progress) {
-				print_progress(1., 0);	
-				std::cout << std::endl;
-			}
-
-			DataFrame df;
-
 			idx = 0;
 			for (uint i = 0; i < num_configs; i++) {
 				DataSlide ds = slides[idx];
@@ -639,6 +859,12 @@ class ParallelCompute {
 				df.add_slide(ds);
 			}
 
+			if (display_progress) {
+				print_progress(1., 0);	
+				std::cout << std::endl;
+			}
+
+
 			auto stop = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
 
@@ -646,8 +872,29 @@ class ParallelCompute {
 			df.add_param("num_jobs", (int) total_runs);
 			df.add_param("time", (int) duration.count());
 			df.promote_params();
+#else
+			std::cout << "Thread pooling is not supported for this build.\n";
+#endif
+		}
 
-			return df;
+	public:
+		DataFrame df;
+		uint num_threads;
+
+		ParallelCompute(std::vector<std::unique_ptr<Config>> configs, uint num_threads) : configs(std::move(configs)),
+																						  num_threads(num_threads) {}
+
+		void compute(bool display_progress=false) {
+#ifdef OMPI
+			compute_ompi(display_progress);
+#else
+			compute_bspl(display_progress);
+#endif
+		}
+
+		bool write_json(std::string filename) const {
+			df.write_json(filename);
+			return true;
 		}
 };
 
@@ -661,5 +908,3 @@ static std::string join(const std::vector<std::string> &v, const std::string &de
     }
     return s;
 }
-
-#endif

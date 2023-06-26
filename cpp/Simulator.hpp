@@ -1,5 +1,4 @@
-#ifndef SIMULATOR_H
-#define SIMULATOR_H
+#pragma once
 
 #include <iostream>
 #include <DataFrame.hpp>
@@ -242,5 +241,3 @@ class TimeConfig : public Config {
             return config;
         }
 };
-
-#endif
