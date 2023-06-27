@@ -241,3 +241,13 @@ class TimeConfig : public Config {
             return config;
         }
 };
+
+// Prepares a TimeConfig with a templated Simulator type.
+template <class SimulatorType>
+std::unique_ptr<Config> prepare_timeconfig(Params &params) {
+    std::unique_ptr<TimeConfig> config(new TimeConfig(params));
+    std::unique_ptr<Simulator> sim(new SimulatorType(params));
+
+    config->init_simulator(std::move(sim));
+    return config;
+}
