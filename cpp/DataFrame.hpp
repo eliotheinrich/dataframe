@@ -35,11 +35,13 @@
 	}													\
 }
 
-#else // Otherwise, just use threadpool
-
-#include <BS_thread_pool.hpp>
+#else
 
 #define DO_IF_MASTER(x) x
+
+#ifndef SERIAL
+#include <BS_thread_pool.hpp>
+#endif
 
 #endif
 
@@ -171,6 +173,8 @@ class Params {
 			} else {
 				std::cout << "Invalid json item type on " << p << "; aborting.\n";
 				assert(false);
+
+				return var_t{0};
 			}
 		}
 
@@ -628,6 +632,9 @@ class ParallelCompute {
 
 		void compute_ompi(bool display_progress) {
 #ifdef OMPI
+			DO_IF_MASTER(
+				std::cout << "Computing with OMPI.\n";
+			)
 			auto start = std::chrono::high_resolution_clock::now();
 
 			uint num_configs = configs.size();
@@ -782,14 +789,80 @@ class ParallelCompute {
 					MPI_Send(message.c_str(), message.size(), MPI_CHAR, MASTER, index_buffer, MPI_COMM_WORLD);
 				}
 			}
-#else
-			std::cout << "OpenMPI is not supported for this build.\n";
-			assert(false);
 #endif
+		}
+
+		void compute_serial(bool display_progress) {
+			std::cout << "Computing in serial.\n";
+			auto start = std::chrono::high_resolution_clock::now();
+
+			uint num_configs = configs.size();
+
+			std::vector<std::unique_ptr<Config>> total_configs;
+			uint total_runs = 0;
+			for (uint i = 0; i < num_configs; i++) {
+				configs[i]->clone();
+				uint nruns = configs[i]->get_nruns();
+				total_runs += nruns;
+				for (uint j = 0; j < nruns; j++)
+					total_configs.push_back(std::move(configs[i]->clone()));
+			}
+
+			std::cout << "num_configs: " << num_configs << std::endl;
+			std::cout << "total_runs: " << total_runs << std::endl;
+			if (display_progress) print_progress(0.);	
+
+			std::vector<DataSlide> slides(total_runs);
+
+			uint idx = 0;
+			auto run_start = std::chrono::high_resolution_clock::now();
+			uint percent_finished = 0;
+			uint prev_percent_finished = percent_finished;
+			for (uint i = 0; i < num_configs; i++) {
+				// Cloning and discarding calls constructors which emplace default values into params of configs[i]
+				// This is a gross hack
+				// TODO fix
+				configs[i]->clone();
+				uint nruns = configs[i]->get_nruns();
+				for (uint j = 0; j < nruns; j++) {
+					std::shared_ptr<Config> cfg = configs[i]->clone();
+					df.add_slide(cfg->compute());
+					idx++;
+
+					if (display_progress) {
+						percent_finished = std::round(float(i)/total_runs * 100);
+						if (percent_finished != prev_percent_finished) {
+							prev_percent_finished = percent_finished;
+							auto elapsed = std::chrono::high_resolution_clock::now();
+							int duration = std::chrono::duration_cast<std::chrono::seconds>(elapsed - run_start).count();
+							float seconds_per_job = duration/float(i);
+							int remaining_time = seconds_per_job * (total_runs - i);
+
+							print_progress(percent_finished/100., remaining_time);
+						}
+					}
+				}
+			}
+
+			if (display_progress) {
+				print_progress(1., 0);	
+				std::cout << std::endl;
+			}
+
+
+			auto stop = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+
+			df.add_param("num_threads", (int) num_threads);
+			df.add_param("num_jobs", (int) total_runs);
+			df.add_param("time", (int) duration.count());
+			df.promote_params();
 		}
 
 		void compute_bspl(bool display_progress) {
 #ifndef OMPI
+#ifndef SERIAL
+			std::cout << "Computing with BSPL.\n";
 			auto start = std::chrono::high_resolution_clock::now();
 
 			uint num_configs = configs.size();
@@ -872,8 +945,7 @@ class ParallelCompute {
 			df.add_param("num_jobs", (int) total_runs);
 			df.add_param("time", (int) duration.count());
 			df.promote_params();
-#else
-			std::cout << "Thread pooling is not supported for this build.\n";
+#endif
 #endif
 		}
 
@@ -887,6 +959,8 @@ class ParallelCompute {
 		void compute(bool display_progress=false) {
 #ifdef OMPI
 			compute_ompi(display_progress);
+#elif defined SERIAL
+			compute_serial(display_progress);
 #else
 			compute_bspl(display_progress);
 #endif
