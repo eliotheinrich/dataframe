@@ -576,12 +576,16 @@ class DataFrame {
 class Config {
 	protected:
 		Params params;
+		uint num_runs;
 
 	public:
 		friend class ParallelCompute;
 
-		Config(Params &params) : params(params) {}
-		Config(Config &c) : params(c.params) {}
+		Config(Params &params) : params(params) {
+			num_runs = params.get<int>("num_runs");
+		}
+		Config(Config &c) : Config(c.params) {}
+
 		virtual ~Config() {}
 
 		std::string to_string() const {
@@ -589,7 +593,7 @@ class Config {
 		}
 
 		// To implement
-		virtual uint get_nruns() const { return 1; }
+		virtual uint get_nruns() const { return num_runs; }
 		virtual DataSlide compute()=0;
 		virtual std::unique_ptr<Config> clone()=0;
 };
@@ -772,6 +776,8 @@ class ParallelCompute {
 				df.add_param("num_jobs", (int) total_runs);
 				df.add_param("time", (int) duration.count());
 				df.promote_params();
+
+				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
 			} else {
 				uint idx;
 				while (true) {
@@ -826,7 +832,9 @@ class ParallelCompute {
 				uint nruns = configs[i]->get_nruns();
 				for (uint j = 0; j < nruns; j++) {
 					std::shared_ptr<Config> cfg = configs[i]->clone();
-					df.add_slide(cfg->compute());
+					DataSlide slide = cfg->compute();
+					slide.add_param(cfg->params);
+					df.add_slide(slide);
 					idx++;
 
 					if (display_progress) {
@@ -857,12 +865,14 @@ class ParallelCompute {
 			df.add_param("num_jobs", (int) total_runs);
 			df.add_param("time", (int) duration.count());
 			df.promote_params();
+
+			std::cout << "Total runtime: " << (int) duration.count() << std::endl;
 		}
 
 		void compute_bspl(bool display_progress) {
 #ifndef OMPI
 #ifndef SERIAL
-			std::cout << "Computing with BSPL.\n";
+			std::cout << "Computing with BSPL. " << num_threads << " threads available.\n";
 			auto start = std::chrono::high_resolution_clock::now();
 
 			uint num_configs = configs.size();
@@ -945,6 +955,8 @@ class ParallelCompute {
 			df.add_param("num_jobs", (int) total_runs);
 			df.add_param("time", (int) duration.count());
 			df.promote_params();
+
+			std::cout << "Total runtime: " << (int) duration.count() << std::endl;
 #endif
 #endif
 		}

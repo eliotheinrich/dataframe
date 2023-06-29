@@ -8,7 +8,6 @@
 #include <memory>
 #include <random>
 
-#define DEFAULT_NUM_RUNS 1u
 #define DEFAULT_EQUILIBRATION_STEPS 0u
 #define DEFAULT_SAMPLING_TIMESTEPS 0u
 #define DEFAULT_MEASUREMENT_FREQ 1u
@@ -61,7 +60,6 @@ class Simulator {
 class TimeConfig : public Config {
     private:
         std::unique_ptr<Simulator> simulator;
-        uint nruns;
 
         static float correlation_coefficient(const std::vector<double> &y) {
             uint n = y.size();
@@ -156,7 +154,6 @@ class TimeConfig : public Config {
         }
 
         TimeConfig(Params &params) : Config(params) {
-            nruns = params.get<int>("num_runs", DEFAULT_NUM_RUNS);
             equilibration_timesteps = params.get<int>("equilibration_timesteps", DEFAULT_EQUILIBRATION_STEPS);
             sampling_timesteps = params.get<int>("sampling_timesteps", DEFAULT_SAMPLING_TIMESTEPS);
             measurement_freq = params.get<int>("measurement_freq", DEFAULT_MEASUREMENT_FREQ);
@@ -167,8 +164,6 @@ class TimeConfig : public Config {
                 convergence_threshold = params.get<float>("convergence_threshold", DEFAULT_CONVERGENCE_THRESHOLD);
             }
         }
-
-        virtual uint get_nruns() const override { return nruns; }
 
         virtual DataSlide compute() override {
             DataSlide slide;
