@@ -23,19 +23,35 @@ FetchContent_Declare(
     nlohmann
     GIT_REPOSITORY https://github.com/nlohmann/json
     GIT_TAG master
+    GIT_SHALLOW TRUE
 )
 
 FetchContent_Declare(
     bspl
     GIT_REPOSITORY https://github.com/bshoshany/thread-pool
     GIT_TAG master
+    GIT_SHALLOW TRUE
 )
 
 FetchContent_MakeAvailable(nlohmann bspl)
 
 include_directories(
+    src
     ${nlohmann_SOURCE_DIR}/include 
     ${bspl_SOURCE_DIR}/include 
 )
 
-nanobind_add_module(dataframe PyDataFrameModule.cpp)
+nanobind_add_module(dataframe_bindings src/PyDataFrameModule.cpp)
+
+if (CALL_FROM_SETUP_PY)
+  set(DATAFRAME_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
+else()
+  set(DATAFRAME_INSTALL_PREFIX ${Python_SITELIB})
+endif()
+
+install(
+  TARGETS dataframe_bindings
+  LIBRARY DESTINATION ${DATAFRAME_INSTALL_PREFIX}
+  ARCHIVE DESTINATION ${DATAFRAME_INSTALL_PREFIX}
+  RUNTIME DESTINATION ${DATAFRAME_INSTALL_PREFIX}
+)

@@ -100,7 +100,7 @@ struct make_query_unique {
 
 		std::vector<var_t> var_t_return_vals;
 
-		for (auto const val : var_t_vals) {
+		for (auto const &val : var_t_vals) {
 			if (std::find(var_t_return_vals.begin(), var_t_return_vals.end(), val) == var_t_return_vals.end())
 				var_t_return_vals.push_back(val);
 		}
@@ -108,7 +108,7 @@ struct make_query_unique {
 		std::sort(var_t_return_vals.begin(), var_t_return_vals.end());
 
 		std::vector<T> return_vals;
-		for (auto const val : var_t_return_vals)
+		for (auto const &val : var_t_return_vals)
 			return_vals.push_back(std::get<T>(val));
 
 
@@ -142,12 +142,14 @@ static bool operator!=(const var_t& v, const var_t& t) {
 }
 
 static bool operator<(const var_t& lhs, const var_t& rhs) {
-	if (lhs.index() == 2 && rhs.index() != 2) return true;
+	if (lhs.index() == 2 && rhs.index() == 2) return std::get<std::string>(lhs) < std::get<std::string>(rhs);
+	else if (lhs.index() == 2 && rhs.index() != 2) return true;
 	else if (lhs.index() != 2 && rhs.index() == 2) return false;
 
-	double d1, d2;
+	double d1 = 0., d2 = 0.;
 	if (lhs.index() == 0) d1 = double(std::get<int>(lhs));
 	else if (lhs.index() == 1) d1 = std::get<double>(lhs);
+	else d1 = 0.;
 
 	if (rhs.index() == 0) d2 = double(std::get<int>(rhs));
 	else if (rhs.index() == 1) d2 = std::get<double>(rhs);

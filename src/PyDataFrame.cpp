@@ -47,6 +47,7 @@ std::string write_config(const std::vector<Params>& params) {
 	return s;
 }
 
+// Provide this function to initialize dataframe in other projects
 void init_dataframe(nb::module_ &m) {
 	m.def("load_json", static_cast<std::vector<Params>(*)(std::string, bool)>(&load_json), "data"_a, "verbose"_a = false);
 	m.def("write_config", &write_config);
