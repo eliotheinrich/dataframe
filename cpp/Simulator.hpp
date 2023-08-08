@@ -19,26 +19,28 @@
 #define DEFAULT_AUTOCONVERGE false
 #define DEFAULT_CONVERGENCE_THRESHOLD 0.75
 
-#define CLONE(A, B) virtual std::unique_ptr<A> clone(Params &params) override { return std::unique_ptr<A>(new B(params)); }
+#define CLONE(A, B) virtual std::shared_ptr<A> clone(Params &params) override { return std::shared_ptr<A>(new B(params)); }
 
 class Simulator {
     private:
-        std::minstd_rand rng;
         int seed;
+        
+    protected:
+        std::minstd_rand rng;
 
     public:
         int rand() { return rng(); }
         float randf() { return float(rng())/float(RAND_MAX); }
 
         Simulator(Params &params) {
-            seed = params.get<int>("random_seed", DEFAULT_RANDOM_SEED);
+            seed = get<int>(params, "random_seed", DEFAULT_RANDOM_SEED);
             if (seed == -1) rng = std::minstd_rand(std::rand());
             else rng = std::minstd_rand(seed);
         }
 
         virtual ~Simulator() {}
 
-        virtual std::unique_ptr<Simulator> clone(Params &params)=0;
+        virtual std::shared_ptr<Simulator> clone(Params &params)=0;
         virtual void timesteps(uint num_steps)=0;
 
         // By default, do nothing special during equilibration timesteps
@@ -59,7 +61,7 @@ class Simulator {
 
 class TimeConfig : public Config {
     private:
-        std::unique_ptr<Simulator> simulator;
+        std::shared_ptr<Simulator> simulator;
 
         static float correlation_coefficient(const std::vector<double> &y) {
             uint n = y.size();
@@ -149,23 +151,25 @@ class TimeConfig : public Config {
         bool autoconverge;
         float convergence_threshold;
 
-        void init_simulator(std::unique_ptr<Simulator> sim) {
+        void init_simulator(std::shared_ptr<Simulator> sim) {
             simulator = std::move(sim);
         }
 
         TimeConfig(Params &params) : Config(params) {
-            equilibration_timesteps = params.get<int>("equilibration_timesteps", DEFAULT_EQUILIBRATION_STEPS);
-            sampling_timesteps = params.get<int>("sampling_timesteps", DEFAULT_SAMPLING_TIMESTEPS);
-            measurement_freq = params.get<int>("measurement_freq", DEFAULT_MEASUREMENT_FREQ);
-            temporal_avg = (bool) params.get<int>("temporal_avg", DEFAULT_TEMPORAL_AVG);
+            equilibration_timesteps = get<int>(params, "equilibration_timesteps", DEFAULT_EQUILIBRATION_STEPS);
+            sampling_timesteps = get<int>(params, "sampling_timesteps", DEFAULT_SAMPLING_TIMESTEPS);
+            measurement_freq = get<int>(params, "measurement_freq", DEFAULT_MEASUREMENT_FREQ);
+            temporal_avg = (bool) get<int>(params, "temporal_avg", DEFAULT_TEMPORAL_AVG);
 
-            autoconverge = (bool) params.get<int>("autoconverge", DEFAULT_AUTOCONVERGE);
+            autoconverge = (bool) get<int>(params, "autoconverge", DEFAULT_AUTOCONVERGE);
             if (autoconverge) {
-                convergence_threshold = params.get<float>("convergence_threshold", DEFAULT_CONVERGENCE_THRESHOLD);
+                convergence_threshold = get<double>(params, "convergence_threshold", DEFAULT_CONVERGENCE_THRESHOLD);
             }
         }
 
         virtual DataSlide compute() override {
+			auto start_time = std::chrono::high_resolution_clock::now();
+
             DataSlide slide;
 
             simulator->init_state();
@@ -226,12 +230,18 @@ class TimeConfig : public Config {
 
             slide.add_param("num_samples", (int) num_intervals);
 
+
+		    auto end_time = std::chrono::high_resolution_clock::now();
+			int duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time).count();
+            slide.add_data("time");
+            slide.push_data("time", duration);
+
             return slide;
         }
 
-        virtual std::unique_ptr<Config> clone() override {
-            std::unique_ptr<TimeConfig> config(new TimeConfig(params));
-            std::unique_ptr<Simulator> sim = simulator.get()->clone(params);
+        virtual std::shared_ptr<Config> clone() override {
+            std::shared_ptr<TimeConfig> config(new TimeConfig(params));
+            std::shared_ptr<Simulator> sim = simulator.get()->clone(params);
             config->init_simulator(std::move(sim));
             return config;
         }
@@ -239,9 +249,9 @@ class TimeConfig : public Config {
 
 // Prepares a TimeConfig with a templated Simulator type.
 template <class SimulatorType>
-std::unique_ptr<Config> prepare_timeconfig(Params &params) {
-    std::unique_ptr<TimeConfig> config(new TimeConfig(params));
-    std::unique_ptr<Simulator> sim(new SimulatorType(params));
+std::shared_ptr<Config> prepare_timeconfig(Params &params) {
+    std::shared_ptr<TimeConfig> config(new TimeConfig(params));
+    std::shared_ptr<Simulator> sim(new SimulatorType(params));
 
     config->init_simulator(std::move(sim));
     return config;

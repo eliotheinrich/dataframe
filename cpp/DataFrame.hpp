@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <variant>
+#include <unordered_set>
 #include <nlohmann/json.hpp>
 
 #ifdef DEBUG
@@ -50,24 +51,80 @@ class Sample;
 class DataSlide;
 class DataFrame;
 class Config;
-class Params;
 class ParallelCompute;
 
 static std::string join(const std::vector<std::string> &v, const std::string &delim);
 
-typedef std::variant<int, float, std::string> var_t;
+typedef std::variant<int, double, std::string> var_t;
+typedef std::variant<var_t, std::vector<int>, std::vector<double>, std::vector<std::string>, std::vector<std::vector<double>>> query_t;
 typedef std::map<std::string, Sample> data_t;
+typedef std::map<std::string, var_t> Params;
+
+static query_t to_query_t(const std::vector<var_t>& vec) {
+	if (vec.size() == 0)
+		return query_t{std::vector<double>()};
+	
+	uint index = vec[0].index();
+	if (index == 0) {
+		std::vector<double> vals; 
+		for (auto const &v : vec)
+			vals.push_back(std::get<int>(v));
+		return query_t{vals};
+	} else if (index == 1) {
+		std::vector<double> vals; 
+		for (auto const &v : vec)
+			vals.push_back(std::get<double>(v));
+		return query_t{vals};
+	} else {
+		std::vector<std::string> vals; 
+		for (auto const &v : vec)
+			vals.push_back(std::get<std::string>(v));
+		return query_t{vals};
+	}
+}
+
+static query_t to_query_t(const std::vector<std::vector<double>>& v) {
+	return query_t{v};
+}
+
+struct make_query_unique {
+	query_t operator()(const var_t& v) const { return v; }
+	query_t operator()(const std::vector<std::vector<double>>& data) const { return data; }
+
+	template <class T>
+	query_t operator()(const std::vector<T>& vec) const { 
+		std::vector<var_t> var_t_vals;
+		std::transform(vec.begin(), vec.end(), std::back_inserter(var_t_vals),
+			[](T val) { return var_t{val}; });
+		
+
+		std::vector<var_t> var_t_return_vals;
+
+		for (auto const val : var_t_vals) {
+			if (std::find(var_t_return_vals.begin(), var_t_return_vals.end(), val) == var_t_return_vals.end())
+				var_t_return_vals.push_back(val);
+		}
+
+		std::sort(var_t_return_vals.begin(), var_t_return_vals.end());
+
+		std::vector<T> return_vals;
+		for (auto const val : var_t_return_vals)
+			return_vals.push_back(std::get<T>(val));
+
+
+		return query_t{return_vals};
+	}
+};
+
+// Explicit template instantiation
+template query_t make_query_unique::operator()(const std::vector<int>& vec) const;
+template query_t make_query_unique::operator()(const std::vector<double>& vec) const;
+template query_t make_query_unique::operator()(const std::vector<std::string>& vec) const;
 
 struct var_to_string {
 	std::string operator()(const int& i) const { return std::to_string(i); }
-	std::string operator()(const float& f) const { return std::to_string(f); }
+	std::string operator()(const double& f) const { return std::to_string(f); }
 	std::string operator()(const std::string& s) const { return "\"" + s + "\""; }
-};
-
-struct get_var {
-	int operator()(const int& i) const { return i; }
-	float operator()(const float& f) const { return f; }
-	std::string operator()(const std::string& s) const { return s; }
 };
 
 #define DF_EPS 0.00001
@@ -76,7 +133,7 @@ static bool operator==(const var_t& v, const var_t& t) {
 	if (v.index() != t.index()) return false;
 
 	if (v.index() == 0) return std::get<int>(v) == std::get<int>(t);
-	else if (v.index() == 1) return std::abs(std::get<float>(v) - std::get<float>(t)) < DF_EPS;
+	else if (v.index() == 1) return std::abs(std::get<double>(v) - std::get<double>(t)) < DF_EPS;
 	else return std::get<std::string>(v) == std::get<std::string>(t);
 }
 
@@ -84,171 +141,143 @@ static bool operator!=(const var_t& v, const var_t& t) {
 	return !(v == t);
 }
 
-class Params {		
-	public:
-		std::map<std::string, var_t> fields;
+static bool operator<(const var_t& lhs, const var_t& rhs) {
+	if (lhs.index() == 2 && rhs.index() != 2) return true;
+	else if (lhs.index() != 2 && rhs.index() == 2) return false;
 
-		Params() {}
-		~Params() {}
+	double d1, d2;
+	if (lhs.index() == 0) d1 = double(std::get<int>(lhs));
+	else if (lhs.index() == 1) d1 = std::get<double>(lhs);
 
-		Params(Params *p) {
-			for (auto &[key, val] : p->fields) fields.emplace(key, val); // TODO CHECK COPY SEMANTICS
-		}
+	if (rhs.index() == 0) d2 = double(std::get<int>(rhs));
+	else if (rhs.index() == 1) d2 = std::get<double>(rhs);
 
-		std::string to_string(uint indentation=0) const {
-			std::string s = "";
-			for (uint i = 0; i < indentation; i++) s += "\t";
-			std::vector<std::string> buffer;
-			
+	return d1 < d2;
+}
 
-			for (auto const &[key, field] : fields) {
-				buffer.push_back("\"" + key + "\": " + std::visit(var_to_string(), field));
-			}
 
-			std::string delim = ",\n";
-			for (uint i = 0; i < indentation; i++) delim += "\t";
-			s += join(buffer, delim);
+template <class json_object>
+static var_t parse_json_type(json_object p) {
+	if ((p.type() == nlohmann::json::value_t::number_integer) || 
+		(p.type() == nlohmann::json::value_t::number_unsigned) ||
+		(p.type() == nlohmann::json::value_t::boolean)) {
+		return var_t{(int) p};
+	}  else if (p.type() == nlohmann::json::value_t::number_float) {
+		return var_t{(double) p};
+	} else if (p.type() == nlohmann::json::value_t::string) {
+		return var_t{std::string(p)};
+	} else {
+		std::cout << "Invalid json item type on " << p << "; aborting.\n";
+		assert(false);
 
-			return s;
-		}
+		return var_t{0};
+	}
+}
 
-		template <typename T>
-		T get(std::string s) const {
-			if (!contains(s)) {
-				std::cout << "Key \"" + s + "\" not found.\n"; 
-                assert(false);
-			}
+static std::string params_to_string(Params const& params, uint indentation=0) {
+	std::string s = "";
+	for (uint i = 0; i < indentation; i++) s += "\t";
+	std::vector<std::string> buffer;
 
-			return std::get<T>(fields.at(s));
-		}
+	for (auto const &[key, field] : params) {
+		buffer.push_back("\"" + key + "\": " + std::visit(var_to_string(), field));
+	}
 
-		template <typename T>
-		T get(std::string s, T defaultv) {
-			if (!contains(s)) {
-				add(s, defaultv);
-				return defaultv;
-			}
+	std::string delim = ",\n";
+	for (uint i = 0; i < indentation; i++) delim += "\t";
+	s += join(buffer, delim);
 
-			return std::get<T>(fields.at(s));
-		}
+	return s;
+}
 
-		template <typename T>
-		void add(std::string s, T const& val) { fields[s] = var_t{val}; }
+template <class T>
+T get(Params &params, std::string key, T defaultv) {
+	if (params.count(key))
+		return std::get<T>(params[key]);
+	
+	params[key] = var_t{defaultv};
+	return defaultv;
+}
 
-		bool contains(std::string s) const { return fields.count(s); }
-		bool remove(std::string s) {
-			if (fields.count(s)) {
-				fields.erase(s);
-				return true;
-			}
-			return false;
-		}
+template <class T>
+T get(Params &params, std::string key) {
+	return std::get<T>(params[key]);
+}
 
-		bool operator==(const Params &p) const {
-			for (auto const &[key, field] : fields) {
-				if (!p.contains(key)) return false;
-				if (p.fields.at(key) != field) return false;
-			}
-			for (auto const &[key, field] : p.fields) {
-				if (!contains(key)) return false;
-			}
+static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose) {
+	if (verbose) {
+		DO_IF_MASTER(std::cout << "Loaded: \n" << data.dump() << "\n";)
+	}
 
-			return true;
-		}
+	std::vector<Params> params;
 
-		bool operator!=(const Params &p) const {
-			return !((*this) == p);
-		}
-
-		template <typename json_object>
-		static var_t parse_json_type(json_object p) {
-			if ((p.type() == nlohmann::json::value_t::number_integer) || 
-				(p.type() == nlohmann::json::value_t::number_unsigned) ||
-				(p.type() == nlohmann::json::value_t::boolean)) {
-				return var_t{(int) p};
-			}  else if (p.type() == nlohmann::json::value_t::number_float) {
-				return var_t{(float) p};
-			} else if (p.type() == nlohmann::json::value_t::string) {
-				return var_t{std::string(p)};
-			} else {
-				std::cout << "Invalid json item type on " << p << "; aborting.\n";
-				assert(false);
-
-				return var_t{0};
-			}
-		}
-
-		static std::vector<Params> load_json(nlohmann::json data, Params p, bool debug) {
-			if (debug) {
-				DO_IF_MASTER(std::cout << "Loaded: \n" << data.dump() << "\n";)
-			}
-
-			std::vector<Params> params;
-
-			// Dealing with model parameters
-			std::vector<std::map<std::string, var_t>> zparams;
-			if (data.contains("zparams")) {
-				for (uint i = 0; i < data["zparams"].size(); i++) {
-					zparams.push_back(std::map<std::string, var_t>());
-					for (auto const &[key, val] : data["zparams"][i].items()) {
-						if (data.contains(key)) {
-							std::cout << "Key " << key << " passed as a zipped parameter and an unzipped parameter; aborting.\n";
-							assert(false);
-						}
-						zparams[i][key] = parse_json_type(val);
-					}
+	// Dealing with model parameters
+	std::vector<std::map<std::string, var_t>> zparams;
+	if (data.contains("zparams")) {
+		for (uint i = 0; i < data["zparams"].size(); i++) {
+			zparams.push_back(std::map<std::string, var_t>());
+			for (auto const &[key, val] : data["zparams"][i].items()) {
+				if (data.contains(key)) {
+					std::cout << "Key " << key << " passed as a zipped parameter and an unzipped parameter; aborting.\n";
+					assert(false);
 				}
-
-				data.erase("zparams");
+				zparams[i][key] = parse_json_type(val);
 			}
-
-			if (zparams.size() > 0) {
-				for (uint i = 0; i < zparams.size(); i++) {
-					for (auto const &[k, v] : zparams[i]) p.add(k, v);
-					std::vector<Params> new_params = load_json(data, Params(&p), false);
-					params.insert(params.end(), new_params.begin(), new_params.end());
-				}
-
-				return params;
-			}
-
-			// Dealing with config parameters
-			std::vector<std::string> scalars;
-			std::string vector_key; // Only need one for next recursive call
-			bool contains_vector = false;
-			for (auto const &[key, val] : data.items()) {
-				if (val.type() == nlohmann::json::value_t::array) {
-					vector_key = key;
-					contains_vector = true;
-				} else {
-					p.add(key, parse_json_type(val));
-					scalars.push_back(key);
-				}
-			}
-
-			for (auto key : scalars) data.erase(key);
-
-			if (!contains_vector) {
-				params.push_back(p);
-			} else {
-				auto vals = data[vector_key];
-				data.erase(vector_key);
-				for (auto v : vals) {
-					p.add(vector_key, parse_json_type(v));
-
-					std::vector<Params> new_params = load_json(data, &p, false);
-					params.insert(params.end(), new_params.begin(), new_params.end());
-				}
-			}
-
-			return params;
 		}
 
-		static std::vector<Params> load_json(nlohmann::json data, bool debug=false) {
-			return load_json(data, Params(), debug);
+		data.erase("zparams");
+	}
+
+	if (zparams.size() > 0) {
+		for (uint i = 0; i < zparams.size(); i++) {
+			for (auto const &[k, v] : zparams[i]) p[k] = v;
+			std::vector<Params> new_params = load_json(data, Params(p), false);
+			params.insert(params.end(), new_params.begin(), new_params.end());
 		}
 
-};
+		return params;
+	}
+
+	// Dealing with config parameters
+	std::vector<std::string> scalars;
+	std::string vector_key; // Only need one for next recursive call
+	bool contains_vector = false;
+	for (auto const &[key, val] : data.items()) {
+		if (val.type() == nlohmann::json::value_t::array) {
+			vector_key = key;
+			contains_vector = true;
+		} else {
+			p[key] = parse_json_type(val);
+			scalars.push_back(key);
+		}
+	}
+
+	for (auto key : scalars) data.erase(key);
+
+	if (!contains_vector) {
+		params.push_back(p);
+	} else {
+		auto vals = data[vector_key];
+		data.erase(vector_key);
+		for (auto v : vals) {
+			p[vector_key] = parse_json_type(v);
+
+			std::vector<Params> new_params = load_json(data, p, false);
+			params.insert(params.end(), new_params.begin(), new_params.end());
+		}
+	}
+
+	return params;
+}
+
+static std::vector<Params> load_json(nlohmann::json data, bool verbose=false) {
+	return load_json(data, Params(), verbose);
+}
+
+static std::vector<Params> load_json(std::string s, bool verbose=false) {
+	std::replace(s.begin(), s.end(), '\'', '"');
+	return load_json(nlohmann::json::parse(s), verbose);
+}
 
 class Sample {
     private:
@@ -265,7 +294,7 @@ class Sample {
 		Sample(const std::vector<T> &v) {
 			num_samples = v.size();
 			mean = std::accumulate(v.begin(), v.end(), 0.0);
-			float sum = 0.0;
+			double sum = 0.0;
 			for (auto const t : v) {
 				sum += std::pow(t - mean, 2.0);
 			}
@@ -364,35 +393,66 @@ class DataSlide {
 
 		DataSlide() {}
 		DataSlide(Params &params) : params(params) {}
+		DataSlide(std::string s) {
+			nlohmann::json ds_json = nlohmann::json::parse("{" + s + "}");
 
-		bool contains(std::string s) const {
-			return params.contains(s) || data.count(s);
+			for (auto const &[k, val] : ds_json.items()) {
+				if (val.type() == nlohmann::json::value_t::array) {
+					add_data(k);
+					for (auto const &v : val)
+						push_data(k, Sample(v.dump()));
+				} else
+					add_param(k, parse_json_type(val));
+			}
 		}
 
-		var_t get(std::string s) const {
-			if (contains(s)) return params.fields.at(s);
+		bool contains(std::string s) const {
+			return params.count(s) || data.count(s);
+		}
 
-			std::cout << "Key not found: " << s << std::endl;
-			assert(false);
+		var_t get_param(std::string s) const {
+			return params.at(s);
 		}
 
 		template <typename T>
-		void add_param(std::string s, T const& t) { params.add(s, t); }
+		void add_param(std::string s, T const& t) { 
+			params[s] = t; 
+		}
 
 		void add_param(Params &params) {
-			for (auto const &[key, field] : params.fields) {
+			for (auto const &[key, field] : params) {
 				add_param(key, field);
 			}
 		}
 
 		void add_data(std::string s) { data.emplace(s, std::vector<Sample>()); }
+
 		void push_data(std::string s, Sample sample) {
 			data[s].push_back(sample);
 		}
 
+		void push_data(std::string s, double d) {
+			data[s].push_back(Sample(d));
+		}
+
+		void push_data(std::string s, double d, double std, uint num_samples) {
+			data[s].push_back(Sample(d, std, num_samples));
+		}
+
+		std::vector<double> get_data(std::string s) {
+			if (!data.count(s))
+				return std::vector<double>();
+
+			std::vector<double> d;
+			for (auto const &s : data[s])
+				d.push_back(s.get_mean());
+			
+			return d;
+		}
+
 		bool remove(std::string s) {
-			if (params.contains(s)) { 
-				return params.remove(s);
+			if (params.count(s)) { 
+				return params.erase(s);
 			} else if (data.count(s)) {
 				data.erase(s);
 				return true;
@@ -406,9 +466,9 @@ class DataSlide {
 			std::string tabs = "";
 			for (uint i = 0; i < indentation; i++) tabs += tab;
 			
-			std::string s = params.to_string(indentation);
+			std::string s = params_to_string(params, indentation);
 
-			if ((params.fields.size() != 0) && (data.size() != 0)) s += "," + nline + tabs;
+			if ((!params.empty()) && (!data.empty())) s += "," + nline + tabs;
 
 			std::string delim = "," + nline + tabs;
 			std::vector<std::string> buffer;
@@ -424,23 +484,6 @@ class DataSlide {
 
 			s += join(buffer, delim);
 			return s;
-		}
-
-		static DataSlide from_string(std::string ds_str) {
-			nlohmann::json ds_json = nlohmann::json::parse("{" + ds_str + "}");
-
-			DataSlide ds;
-
-			for (auto const &[k, val] : ds_json.items()) {
-				if (val.type() == nlohmann::json::value_t::array) {
-					ds.add_data(k);
-					for (auto const &v : val)
-						ds.push_data(k, Sample(v.dump()));
-				} else
-					ds.add_param(k, Params::parse_json_type(val));
-			}
-
-			return ds;
 		}
 
 		bool congruent(DataSlide &ds) {
@@ -481,11 +524,50 @@ class DataSlide {
 
 class DataFrame {
 	private:
-		Params params;
-		std::vector<DataSlide> slides;
+		bool qtable_initialized;
+		// qtable stores a list of key: {val: corresponding_slide_indices}
+		std::map<std::string, std::map<var_t, std::vector<uint>>> qtable;
 
+		void init_qtable() {
+			std::map<std::string, std::unordered_set<var_t>> key_vals;
+
+			for (auto const &slide : slides) {
+				for (auto const &[key, val] : slide.params) {
+					if (!key_vals.count(key))
+						key_vals[key] = std::unordered_set<var_t>();
+					
+					key_vals[key].insert(val);
+				}
+			}
+
+			// Setting up keys of qtable
+			for (auto const &[key, vals] : key_vals) {
+				qtable[key] = std::map<var_t, std::vector<uint>>();
+				for (auto const &val : vals) {
+					qtable[key][val] = std::vector<uint>();
+				}
+			}
+
+			for (uint n = 0; n < slides.size(); n++) {
+				auto slide = slides[n];
+				for (auto const &[key, _] : key_vals)
+					qtable[key][slide.params[key]].push_back(n);
+			}
+
+			qtable_initialized = true;
+		}
+
+		void promote_field(std::string s) {
+			add_param(s, slides.begin()->get_param(s));
+			for (auto &slide : slides) {
+				slide.remove(s);
+			}
+		}
 
 	public:
+		Params params;
+		std::vector<DataSlide> slides;
+		
 		DataFrame() {}
 
 		DataFrame(std::vector<DataSlide> slides) {
@@ -494,27 +576,43 @@ class DataFrame {
 
 		void add_slide(DataSlide ds) {
 			slides.push_back(ds);
+			qtable_initialized = false;
 		}
 
 		template <typename T>
-		void add_param(std::string s, T const& t) { params.add(s, t); }
+		void add_param(std::string s, T const& t) { 
+			params[s] = t; 
+
+			qtable_initialized = false;
+		}
+
 		void add_param(Params &params) {
-			for (auto const &[key, field] : params.fields) {
+			for (auto const &[key, field] : params) {
 				add_param(key, field);
 			}
+
+			qtable_initialized = false;
+		}
+
+		bool contains(std::string s) const {
+			return params.count(s);
+		}
+
+		var_t get_param(std::string s) const {
+			return params.at(s);
 		}
 
 		bool remove(std::string s) {
-			return params.remove(s);
+			qtable_initialized = false;
+			return params.erase(s);
 		}
 
-		// TODO use nlohmann?
-		void write_json(std::string filename) const {
+		std::string to_string() const {
 			std::string s = "";
 
 			s += "{\n\t\"params\": {\n";
 
-			s += params.to_string(2);
+			s += params_to_string(params, 2);
 
 			s += "\n\t},\n\t\"slides\": [\n";
 
@@ -528,6 +626,13 @@ class DataFrame {
 
 			s += "\n\t]\n}\n";
 
+			return s;
+		}
+
+		// TODO use nlohmann?
+		void write_json(std::string filename) const {
+			std::string s = to_string();
+
 			// Save to file
 			if (std::remove(filename.c_str())) std::cout << "Deleting old data\n";
 
@@ -536,28 +641,21 @@ class DataFrame {
 			output_file.close();
 		}
 
-		bool field_congruent(std::string s) {
+		bool field_congruent(std::string s) const {
 			if (slides.size() == 0) return true;
 
 			DataSlide first_slide = slides[0];
 
 			if (!first_slide.contains(s)) return false;
 
-			var_t first_slide_val = first_slide.get(s);
+			var_t first_slide_val = first_slide.get_param(s);
 
 			for (auto slide : slides) {
 				if (!slide.contains(s)) return false;
-				if (slide.get(s) != first_slide_val) return false;
+				if (slide.get_param(s) != first_slide_val) return false;
 			}
 
 			return true;
-		}
-
-		void promote_field(std::string s) {
-			add_param(s, slides.begin()->get(s));
-			for (auto &slide : slides) {
-				slide.remove(s);
-			}
 		}
 
 		void promote_params() {
@@ -566,10 +664,83 @@ class DataFrame {
 			DataSlide first_slide = slides[0];
 
 			std::vector<std::string> keys;
-			for (auto const &[key, _] : first_slide.params.fields) keys.push_back(key);
+			for (auto const &[key, _] : first_slide.params) keys.push_back(key);
 			for (auto key : keys) {
 				if (field_congruent(key)) promote_field(key);
 			}
+		}
+
+		query_t query(std::vector<std::string> keys, std::map<std::string, var_t> constraints, bool unique = false) {
+			if (unique) {
+				auto query_result = query(keys, constraints);
+				return std::visit(make_query_unique(), query_result);
+			}
+
+			if (!qtable_initialized)
+				init_qtable();
+
+			// Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
+			for (auto const &[key, val] : constraints) {
+				if (params.count(key) && params[key] != val)
+					return query_t{std::vector<double>()};
+			}
+
+			// If key corresponds to a single Frame-level param, return it
+			if (keys.size() == 1) {
+				auto key = keys[0];
+				if (params.count(key))
+					return query_t{params[key]};
+			}
+
+
+			std::map<std::string, var_t> relevant_constraints;
+			for (auto const &[key, val] : constraints) {
+				if (!params.count(key))
+					relevant_constraints[key] = val;
+			}
+
+			std::unordered_set<uint> inds;
+			for (uint i = 0; i < slides.size(); i++) inds.insert(i);
+	
+			for (auto const &[key, val] : relevant_constraints) {
+				// Take set intersection
+				std::unordered_set<uint> tmp;
+				for (auto const i : qtable[key][val]) {
+					if (inds.count(i))
+						tmp.insert(i);
+				}
+
+				inds = tmp;
+			}
+			
+			
+			// See if keys correspond to Slide-level params or data
+			std::vector<var_t> param_vals;
+			std::vector<std::vector<double>> data_vals;
+			bool vars_param = false;
+			bool vars_data = false;
+			for (auto const &key : keys) {
+				for (auto const i : inds) {
+					auto slide = slides[i];
+					if (slide.params.count(key)) {
+						vars_param = true;
+						param_vals.push_back(slide.params[key]);
+					} else if (slide.data.count(key)) {
+						vars_data = true;
+						data_vals.push_back(slide.get_data(key));
+					}
+				}
+			}
+
+			if (!vars_param && !vars_data)
+				return query_t{std::vector<double>()};
+			
+			if (vars_param)
+				return to_query_t(param_vals);
+			else if (vars_data)
+				return to_query_t(data_vals);
+			else
+				return query_t{std::vector<double>()};
 		}
 };
 
@@ -582,20 +753,20 @@ class Config {
 		friend class ParallelCompute;
 
 		Config(Params &params) : params(params) {
-			num_runs = params.get<int>("num_runs");
+			num_runs = get<int>(params, "num_runs");
 		}
 		Config(Config &c) : Config(c.params) {}
 
 		virtual ~Config() {}
 
 		std::string to_string() const {
-			return "{" + params.to_string() + "}";
+			return "{" + params_to_string(params) + "}";
 		}
 
 		// To implement
 		virtual uint get_nruns() const { return num_runs; }
 		virtual DataSlide compute()=0;
-		virtual std::unique_ptr<Config> clone()=0;
+		virtual std::shared_ptr<Config> clone()=0;
 };
 
 static void print_progress(float progress, int expected_time = -1) {
@@ -627,23 +798,20 @@ static void print_progress(float progress, int expected_time = -1) {
 
 class ParallelCompute {
 	private:
-		std::vector<std::unique_ptr<Config>> configs;
+		std::vector<std::shared_ptr<Config>> configs;
 		static DataSlide thread_compute(std::shared_ptr<Config> config) {
 			DataSlide slide = config->compute();
 			slide.add_param(config->params);
 			return slide;
 		}
 
-		void compute_ompi(bool display_progress) {
+		void compute_ompi(bool verbose) {
 #ifdef OMPI
-			DO_IF_MASTER(
-				std::cout << "Computing with OMPI.\n";
-			)
 			auto start = std::chrono::high_resolution_clock::now();
 
 			uint num_configs = configs.size();
 
-			std::vector<std::unique_ptr<Config>> total_configs;
+			std::vector<std::shared_ptr<Config>> total_configs;
 			uint total_runs = 0;
 			for (uint i = 0; i < num_configs; i++) {
 				configs[i]->clone();
@@ -652,13 +820,6 @@ class ParallelCompute {
 				for (uint j = 0; j < nruns; j++)
 					total_configs.push_back(std::move(configs[i]->clone()));
 			}
-
-			DO_IF_MASTER(
-				std::cout << "num_configs: " << num_configs << std::endl;
-				std::cout << "total_runs: " << total_runs << std::endl;
-			)
-			if (display_progress) 
-				print_progress(0.);	
 
 			std::vector<DataSlide> slides(total_runs);
 
@@ -670,6 +831,13 @@ class ParallelCompute {
 			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
 			if (rank == MASTER) {
+				if (verbose) {
+					std::cout << "Computing with OMPI.\n";
+					std::cout << "num_configs: " << num_configs << std::endl;
+					std::cout << "total_runs: " << total_runs << std::endl;
+					print_progress(0.);	
+				}
+
 				uint num_workers = world_size - 1;
 				std::vector<bool> free_processes(num_workers, true);
 				bool terminate = false;
@@ -721,7 +889,7 @@ class ParallelCompute {
 
 						char* message_buffer = (char*) std::malloc(message_length);
 						MPI_Recv(message_buffer, message_length, MPI_CHAR, message_source, index_buffer, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-						slides[index_buffer] = DataSlide::from_string(std::string(message_buffer));
+						slides[index_buffer] = DataSlide(std::string(message_buffer));
 
 						// Mark worker as free
 						free_processes[message_source-1] = true;
@@ -729,7 +897,7 @@ class ParallelCompute {
 					}
 
 					// Display progress
-					if (display_progress) {
+					if (verbose) {
 						percent_finished = std::round(float(completed)/total_runs * 100);
 						if (percent_finished != prev_percent_finished) {
 							prev_percent_finished = percent_finished;
@@ -764,7 +932,7 @@ class ParallelCompute {
 				}
 
 
-				if (display_progress) {
+				if (verbose) {
 					print_progress(1., 0);	
 					std::cout << std::endl;
 				}
@@ -774,10 +942,11 @@ class ParallelCompute {
 
 				df.add_param("num_threads", (int) num_threads);
 				df.add_param("num_jobs", (int) total_runs);
-				df.add_param("time", (int) duration.count());
+				df.add_param("total_time", (int) duration.count());
 				df.promote_params();
+				if (verbose)
+					std::cout << "Total runtime: " << (int) duration.count() << std::endl;
 
-				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
 			} else {
 				uint idx;
 				while (true) {
@@ -798,13 +967,12 @@ class ParallelCompute {
 #endif
 		}
 
-		void compute_serial(bool display_progress) {
-			std::cout << "Computing in serial.\n";
+		void compute_serial(bool verbose) {
 			auto start = std::chrono::high_resolution_clock::now();
 
 			uint num_configs = configs.size();
 
-			std::vector<std::unique_ptr<Config>> total_configs;
+			std::vector<std::shared_ptr<Config>> total_configs;
 			uint total_runs = 0;
 			for (uint i = 0; i < num_configs; i++) {
 				configs[i]->clone();
@@ -814,9 +982,12 @@ class ParallelCompute {
 					total_configs.push_back(std::move(configs[i]->clone()));
 			}
 
-			std::cout << "num_configs: " << num_configs << std::endl;
-			std::cout << "total_runs: " << total_runs << std::endl;
-			if (display_progress) print_progress(0.);	
+			if (verbose) {
+				std::cout << "Computing in serial.\n";
+				std::cout << "num_configs: " << num_configs << std::endl;
+				std::cout << "total_runs: " << total_runs << std::endl;
+				print_progress(0.);	
+			}
 
 			std::vector<DataSlide> slides(total_runs);
 
@@ -837,7 +1008,7 @@ class ParallelCompute {
 					df.add_slide(slide);
 					idx++;
 
-					if (display_progress) {
+					if (verbose) {
 						percent_finished = std::round(float(i)/total_runs * 100);
 						if (percent_finished != prev_percent_finished) {
 							prev_percent_finished = percent_finished;
@@ -852,7 +1023,7 @@ class ParallelCompute {
 				}
 			}
 
-			if (display_progress) {
+			if (verbose) {
 				print_progress(1., 0);	
 				std::cout << std::endl;
 			}
@@ -863,21 +1034,21 @@ class ParallelCompute {
 
 			df.add_param("num_threads", (int) num_threads);
 			df.add_param("num_jobs", (int) total_runs);
-			df.add_param("time", (int) duration.count());
+			df.add_param("total_time", (int) duration.count());
 			df.promote_params();
 
-			std::cout << "Total runtime: " << (int) duration.count() << std::endl;
+			if (verbose)
+				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
 		}
 
-		void compute_bspl(bool display_progress) {
+		void compute_bspl(bool verbose) {
 #ifndef OMPI
 #ifndef SERIAL
-			std::cout << "Computing with BSPL. " << num_threads << " threads available.\n";
 			auto start = std::chrono::high_resolution_clock::now();
 
 			uint num_configs = configs.size();
 
-			std::vector<std::unique_ptr<Config>> total_configs;
+			std::vector<std::shared_ptr<Config>> total_configs;
 			uint total_runs = 0;
 			for (uint i = 0; i < num_configs; i++) {
 				configs[i]->clone();
@@ -887,9 +1058,12 @@ class ParallelCompute {
 					total_configs.push_back(std::move(configs[i]->clone()));
 			}
 
-			std::cout << "num_configs: " << num_configs << std::endl;
-			std::cout << "total_runs: " << total_runs << std::endl;
-			if (display_progress) print_progress(0.);	
+			if (verbose) {
+				std::cout << "Computing with BSPL. " << num_threads << " threads available.\n";
+				std::cout << "num_configs: " << num_configs << std::endl;
+				std::cout << "total_runs: " << total_runs << std::endl;
+				print_progress(0.);	
+			}
 
 			std::vector<DataSlide> slides(total_runs);
 			BS::thread_pool threads(num_threads);
@@ -915,7 +1089,7 @@ class ParallelCompute {
 			for (uint i = 0; i < total_runs; i++) {
 				slides[i] = results[i].get();
 				
-				if (display_progress) {
+				if (verbose) {
 					percent_finished = std::round(float(i)/total_runs * 100);
 					if (percent_finished != prev_percent_finished) {
 						prev_percent_finished = percent_finished;
@@ -942,7 +1116,7 @@ class ParallelCompute {
 				df.add_slide(ds);
 			}
 
-			if (display_progress) {
+			if (verbose) {
 				print_progress(1., 0);	
 				std::cout << std::endl;
 			}
@@ -953,10 +1127,11 @@ class ParallelCompute {
 
 			df.add_param("num_threads", (int) num_threads);
 			df.add_param("num_jobs", (int) total_runs);
-			df.add_param("time", (int) duration.count());
+			df.add_param("total_time", (int) duration.count());
 			df.promote_params();
 
-			std::cout << "Total runtime: " << (int) duration.count() << std::endl;
+			if (verbose)
+				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
 #endif
 #endif
 		}
@@ -965,16 +1140,16 @@ class ParallelCompute {
 		DataFrame df;
 		uint num_threads;
 
-		ParallelCompute(std::vector<std::unique_ptr<Config>> configs, uint num_threads) : configs(std::move(configs)),
+		ParallelCompute(std::vector<std::shared_ptr<Config>> configs, uint num_threads) : configs(std::move(configs)),
 																						  num_threads(num_threads) {}
 
-		void compute(bool display_progress=false) {
+		void compute(bool verbose=false) {
 #ifdef OMPI
-			compute_ompi(display_progress);
+			compute_ompi(verbose);
 #elif defined SERIAL
-			compute_serial(display_progress);
+			compute_serial(verbose);
 #else
-			compute_bspl(display_progress);
+			compute_bspl(verbose);
 #endif
 		}
 
