@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <sstream>
 #include <fstream>
@@ -64,7 +65,7 @@ static query_t to_query_t(const std::vector<var_t>& vec) {
 	if (vec.size() == 0)
 		return query_t{std::vector<double>()};
 	
-	uint index = vec[0].index();
+	uint32_t index = vec[0].index();
 	if (index == 0) {
 		std::vector<double> vals; 
 		for (auto const &v : vec)
@@ -176,9 +177,9 @@ static var_t parse_json_type(json_object p) {
 	}
 }
 
-static std::string params_to_string(Params const& params, uint indentation=0) {
+static std::string params_to_string(Params const& params, uint32_t indentation=0) {
 	std::string s = "";
-	for (uint i = 0; i < indentation; i++) s += "\t";
+	for (uint32_t i = 0; i < indentation; i++) s += "\t";
 	std::vector<std::string> buffer;
 
 	for (auto const &[key, field] : params) {
@@ -186,7 +187,7 @@ static std::string params_to_string(Params const& params, uint indentation=0) {
 	}
 
 	std::string delim = ",\n";
-	for (uint i = 0; i < indentation; i++) delim += "\t";
+	for (uint32_t i = 0; i < indentation; i++) delim += "\t";
 	s += join(buffer, delim);
 
 	return s;
@@ -216,7 +217,7 @@ static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose
 	// Dealing with model parameters
 	std::vector<std::map<std::string, var_t>> zparams;
 	if (data.contains("zparams")) {
-		for (uint i = 0; i < data["zparams"].size(); i++) {
+		for (uint32_t i = 0; i < data["zparams"].size(); i++) {
 			zparams.push_back(std::map<std::string, var_t>());
 			for (auto const &[key, val] : data["zparams"][i].items()) {
 				if (data.contains(key)) {
@@ -231,7 +232,7 @@ static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose
 	}
 
 	if (zparams.size() > 0) {
-		for (uint i = 0; i < zparams.size(); i++) {
+		for (uint32_t i = 0; i < zparams.size(); i++) {
 			for (auto const &[k, v] : zparams[i]) p[k] = v;
 			std::vector<Params> new_params = load_json(data, Params(p), false);
 			params.insert(params.end(), new_params.begin(), new_params.end());
@@ -285,12 +286,12 @@ class Sample {
     private:
         double mean;
         double std;
-        uint num_samples;
+        uint32_t num_samples;
 
 	public:
 		Sample() : mean(0.), std(0.), num_samples(0) {}
         Sample(double mean) : mean(mean), std(0.), num_samples(1) {}
-		Sample(double mean, double std, uint num_samples) : mean(mean), std(std), num_samples(num_samples) {}
+		Sample(double mean, double std, uint32_t num_samples) : mean(mean), std(std), num_samples(num_samples) {}
 
 		template<class T>
 		Sample(const std::vector<T> &v) {
@@ -307,8 +308,8 @@ class Sample {
 		Sample(const std::string &s) {
 			if (s.front() == '[' && s.back() == ']') {
 				std::string trimmed = s.substr(1, s.length() - 2);
-				std::vector<uint> pos;
-				for (uint i = 0; i < trimmed.length(); i++) {
+				std::vector<uint32_t> pos;
+				for (uint32_t i = 0; i < trimmed.length(); i++) {
 					if (trimmed[i] == ',')
 						pos.push_back(i);
 				}
@@ -339,15 +340,15 @@ class Sample {
 			this->std = std;
 		}
 
-        uint get_num_samples() const {
+        uint32_t get_num_samples() const {
 			return this->num_samples;
 		}
-		void set_num_samples(uint num_samples) {
+		void set_num_samples(uint32_t num_samples) {
 			this->num_samples = num_samples;
 		}
 
         Sample combine(const Sample &other) const {
-			uint combined_samples = this->num_samples + other.get_num_samples();
+			uint32_t combined_samples = this->num_samples + other.get_num_samples();
 			if (combined_samples == 0) return Sample();
 			
 			double samples1f = get_num_samples(); double samples2f = other.get_num_samples();
@@ -363,7 +364,7 @@ class Sample {
 
 		static Sample collapse(const std::vector<Sample> &samples) {
 			Sample s = samples[0];
-			for (uint i = 1; i < samples.size(); i++) {
+			for (uint32_t i = 1; i < samples.size(); i++) {
 				s = s.combine(samples[i]);
 			}
 
@@ -437,7 +438,7 @@ class DataSlide {
 			data[s].push_back(Sample(d));
 		}
 
-		void push_data(std::string s, double d, double std, uint num_samples) {
+		void push_data(std::string s, double d, double std, uint32_t num_samples) {
 			data[s].push_back(Sample(d, std, num_samples));
 		}
 
@@ -462,11 +463,11 @@ class DataSlide {
 			return false;
 		}
 
-		std::string to_string(uint indentation=0, bool pretty=true, bool save_full_sample=false) const {
+		std::string to_string(uint32_t indentation=0, bool pretty=true, bool save_full_sample=false) const {
 			std::string tab = pretty ? "\t" : "";
 			std::string nline = pretty ? "\n" : "";
 			std::string tabs = "";
-			for (uint i = 0; i < indentation; i++) tabs += tab;
+			for (uint32_t i = 0; i < indentation; i++) tabs += tab;
 			
 			std::string s = params_to_string(params, indentation);
 
@@ -513,7 +514,7 @@ class DataSlide {
 
 			for (auto const &[key, samples] : data) {
 				dn.add_data(key);
-				for (uint i = 0; i < samples.size(); i++) {
+				for (uint32_t i = 0; i < samples.size(); i++) {
 					dn.push_data(key, samples[i].combine(ds.data[key][i]));
 				}
 			}
@@ -528,7 +529,7 @@ class DataFrame {
 	private:
 		bool qtable_initialized;
 		// qtable stores a list of key: {val: corresponding_slide_indices}
-		std::map<std::string, std::map<var_t, std::vector<uint>>> qtable;
+		std::map<std::string, std::map<var_t, std::vector<uint32_t>>> qtable;
 
 		void init_qtable() {
 			std::map<std::string, std::unordered_set<var_t>> key_vals;
@@ -544,13 +545,13 @@ class DataFrame {
 
 			// Setting up keys of qtable
 			for (auto const &[key, vals] : key_vals) {
-				qtable[key] = std::map<var_t, std::vector<uint>>();
+				qtable[key] = std::map<var_t, std::vector<uint32_t>>();
 				for (auto const &val : vals) {
-					qtable[key][val] = std::vector<uint>();
+					qtable[key][val] = std::vector<uint32_t>();
 				}
 			}
 
-			for (uint n = 0; n < slides.size(); n++) {
+			for (uint32_t n = 0; n < slides.size(); n++) {
 				auto slide = slides[n];
 				for (auto const &[key, _] : key_vals)
 					qtable[key][slide.params[key]].push_back(n);
@@ -573,7 +574,7 @@ class DataFrame {
 		DataFrame() {}
 
 		DataFrame(std::vector<DataSlide> slides) {
-			for (uint i = 0; i < slides.size(); i++) add_slide(slides[i]); 
+			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
 		}
 
 		void add_slide(DataSlide ds) {
@@ -701,12 +702,12 @@ class DataFrame {
 					relevant_constraints[key] = val;
 			}
 
-			std::unordered_set<uint> inds;
-			for (uint i = 0; i < slides.size(); i++) inds.insert(i);
+			std::unordered_set<uint32_t> inds;
+			for (uint32_t i = 0; i < slides.size(); i++) inds.insert(i);
 	
 			for (auto const &[key, val] : relevant_constraints) {
 				// Take set intersection
-				std::unordered_set<uint> tmp;
+				std::unordered_set<uint32_t> tmp;
 				for (auto const i : qtable[key][val]) {
 					if (inds.count(i))
 						tmp.insert(i);
@@ -749,7 +750,7 @@ class DataFrame {
 class Config {
 	protected:
 		Params params;
-		uint num_runs;
+		uint32_t num_runs;
 
 	public:
 		friend class ParallelCompute;
@@ -766,7 +767,7 @@ class Config {
 		}
 
 		// To implement
-		virtual uint get_nruns() const { return num_runs; }
+		virtual uint32_t get_nruns() const { return num_runs; }
 		virtual DataSlide compute()=0;
 		virtual std::shared_ptr<Config> clone()=0;
 };
@@ -785,9 +786,9 @@ static void print_progress(float progress, int expected_time = -1) {
 		if (expected_time == -1) time << "";
 		else {
 			time << " [ ETA: ";
-			uint num_seconds = expected_time % 60;
-			uint num_minutes = expected_time/60;
-			uint num_hours = num_minutes/60;
+			uint32_t num_seconds = expected_time % 60;
+			uint32_t num_minutes = expected_time/60;
+			uint32_t num_hours = num_minutes/60;
 			num_minutes -= num_hours*60;
 			time << std::setfill('0') << std::setw(2) << num_hours << ":" 
 				<< std::setfill('0') << std::setw(2) << num_minutes << ":" 
@@ -811,15 +812,15 @@ class ParallelCompute {
 #ifdef OMPI
 			auto start = std::chrono::high_resolution_clock::now();
 
-			uint num_configs = configs.size();
+			uint32_t num_configs = configs.size();
 
 			std::vector<std::shared_ptr<Config>> total_configs;
-			uint total_runs = 0;
-			for (uint i = 0; i < num_configs; i++) {
+			uint32_t total_runs = 0;
+			for (uint32_t i = 0; i < num_configs; i++) {
 				configs[i]->clone();
-				uint nruns = configs[i]->get_nruns();
+				uint32_t nruns = configs[i]->get_nruns();
 				total_runs += nruns;
-				for (uint j = 0; j < nruns; j++)
+				for (uint32_t j = 0; j < nruns; j++)
 					total_configs.push_back(std::move(configs[i]->clone()));
 			}
 
@@ -840,20 +841,20 @@ class ParallelCompute {
 					print_progress(0.);	
 				}
 
-				uint num_workers = world_size - 1;
+				uint32_t num_workers = world_size - 1;
 				std::vector<bool> free_processes(num_workers, true);
 				bool terminate = false;
 
 				auto run_start = std::chrono::high_resolution_clock::now();
-				uint percent_finished = 0;
-				uint prev_percent_finished = percent_finished;
+				uint32_t percent_finished = 0;
+				uint32_t prev_percent_finished = percent_finished;
 
-				uint completed = 0;
+				uint32_t completed = 0;
 
-				uint head = 0;
+				uint32_t head = 0;
 				while (completed < total_runs) {
 					// Assign work to all free processes
-					for (uint j = 0; j < num_workers; j++) {
+					for (uint32_t j = 0; j < num_workers; j++) {
 						if (head >= total_runs)
 							terminate = true;
 
@@ -914,17 +915,17 @@ class ParallelCompute {
 				}
 
 				// Cleanup remaining workers
-				for (uint i = 0; i < num_workers; i++) {
+				for (uint32_t i = 0; i < num_workers; i++) {
 					if (free_processes[i])
 						MPI_Send(&index_buffer, 1, MPI_INT, i+1, TERMINATE, MPI_COMM_WORLD);
 				}
 
 				// Construct final DataFrame and return
-				uint idx = 0;
-				for (uint i = 0; i < num_configs; i++) {
+				uint32_t idx = 0;
+				for (uint32_t i = 0; i < num_configs; i++) {
 					DataSlide ds = slides[idx];
-					uint nruns = configs[i]->get_nruns();
-					for (uint j = 1; j < nruns; j++) {
+					uint32_t nruns = configs[i]->get_nruns();
+					for (uint32_t j = 1; j < nruns; j++) {
 						idx++;
 						ds = ds.combine(slides[idx]);
 					}
@@ -950,7 +951,7 @@ class ParallelCompute {
 					std::cout << "Total runtime: " << (int) duration.count() << std::endl;
 
 			} else {
-				uint idx;
+				uint32_t idx;
 				while (true) {
 					// Receive control code and index
 					MPI_Status status;
@@ -972,15 +973,15 @@ class ParallelCompute {
 		void compute_serial(bool verbose) {
 			auto start = std::chrono::high_resolution_clock::now();
 
-			uint num_configs = configs.size();
+			uint32_t num_configs = configs.size();
 
 			std::vector<std::shared_ptr<Config>> total_configs;
-			uint total_runs = 0;
-			for (uint i = 0; i < num_configs; i++) {
+			uint32_t total_runs = 0;
+			for (uint32_t i = 0; i < num_configs; i++) {
 				configs[i]->clone();
-				uint nruns = configs[i]->get_nruns();
+				uint32_t nruns = configs[i]->get_nruns();
 				total_runs += nruns;
-				for (uint j = 0; j < nruns; j++)
+				for (uint32_t j = 0; j < nruns; j++)
 					total_configs.push_back(std::move(configs[i]->clone()));
 			}
 
@@ -993,17 +994,17 @@ class ParallelCompute {
 
 			std::vector<DataSlide> slides(total_runs);
 
-			uint idx = 0;
+			uint32_t idx = 0;
 			auto run_start = std::chrono::high_resolution_clock::now();
-			uint percent_finished = 0;
-			uint prev_percent_finished = percent_finished;
-			for (uint i = 0; i < num_configs; i++) {
+			uint32_t percent_finished = 0;
+			uint32_t prev_percent_finished = percent_finished;
+			for (uint32_t i = 0; i < num_configs; i++) {
 				// Cloning and discarding calls constructors which emplace default values into params of configs[i]
 				// This is a gross hack
 				// TODO fix
 				configs[i]->clone();
-				uint nruns = configs[i]->get_nruns();
-				for (uint j = 0; j < nruns; j++) {
+				uint32_t nruns = configs[i]->get_nruns();
+				for (uint32_t j = 0; j < nruns; j++) {
 					std::shared_ptr<Config> cfg = configs[i]->clone();
 					DataSlide slide = cfg->compute();
 					slide.add_param(cfg->params);
@@ -1048,15 +1049,15 @@ class ParallelCompute {
 #ifndef SERIAL
 			auto start = std::chrono::high_resolution_clock::now();
 
-			uint num_configs = configs.size();
+			uint32_t num_configs = configs.size();
 
 			std::vector<std::shared_ptr<Config>> total_configs;
-			uint total_runs = 0;
-			for (uint i = 0; i < num_configs; i++) {
+			uint32_t total_runs = 0;
+			for (uint32_t i = 0; i < num_configs; i++) {
 				configs[i]->clone();
-				uint nruns = configs[i]->get_nruns();
+				uint32_t nruns = configs[i]->get_nruns();
 				total_runs += nruns;
-				for (uint j = 0; j < nruns; j++)
+				for (uint32_t j = 0; j < nruns; j++)
 					total_configs.push_back(std::move(configs[i]->clone()));
 			}
 
@@ -1071,14 +1072,14 @@ class ParallelCompute {
 			BS::thread_pool threads(num_threads);
 			std::vector<std::future<DataSlide>> results(total_runs);
 
-			uint idx = 0;
-			for (uint i = 0; i < num_configs; i++) {
+			uint32_t idx = 0;
+			for (uint32_t i = 0; i < num_configs; i++) {
 				// Cloning and discarding calls constructors which emplace default values into params of configs[i]
 				// This is a gross hack
 				// TODO fix
 				configs[i]->clone();
-				uint nruns = configs[i]->get_nruns();
-				for (uint j = 0; j < nruns; j++) {
+				uint32_t nruns = configs[i]->get_nruns();
+				for (uint32_t j = 0; j < nruns; j++) {
 					std::shared_ptr<Config> cfg = configs[i]->clone();
 					results[idx] = threads.submit(ParallelCompute::thread_compute, cfg);
 					idx++;
@@ -1086,9 +1087,9 @@ class ParallelCompute {
 			}
 
 			auto run_start = std::chrono::high_resolution_clock::now();
-			uint percent_finished = 0;
-			uint prev_percent_finished = percent_finished;
-			for (uint i = 0; i < total_runs; i++) {
+			uint32_t percent_finished = 0;
+			uint32_t prev_percent_finished = percent_finished;
+			for (uint32_t i = 0; i < total_runs; i++) {
 				slides[i] = results[i].get();
 				
 				if (verbose) {
@@ -1106,10 +1107,10 @@ class ParallelCompute {
 			}
 
 			idx = 0;
-			for (uint i = 0; i < num_configs; i++) {
+			for (uint32_t i = 0; i < num_configs; i++) {
 				DataSlide ds = slides[idx];
-				uint nruns = configs[i]->get_nruns();
-				for (uint j = 1; j < nruns; j++) {
+				uint32_t nruns = configs[i]->get_nruns();
+				for (uint32_t j = 1; j < nruns; j++) {
 					idx++;
 					ds = ds.combine(slides[idx]);
 				}
@@ -1140,9 +1141,9 @@ class ParallelCompute {
 
 	public:
 		DataFrame df;
-		uint num_threads;
+		uint32_t num_threads;
 
-		ParallelCompute(std::vector<std::shared_ptr<Config>> configs, uint num_threads) : configs(std::move(configs)),
+		ParallelCompute(std::vector<std::shared_ptr<Config>> configs, uint32_t num_threads) : configs(std::move(configs)),
 																						  num_threads(num_threads) {}
 
 		void compute(bool verbose=false) {

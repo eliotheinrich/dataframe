@@ -57,7 +57,7 @@ void init_dataframe(nb::module_ &m) {
 	void (DataSlide::*ds_add_param2)(std::string, var_t const&) = &DataSlide::add_param;
 
 	void (DataSlide::*push_data1)(std::string, double) = &DataSlide::push_data;
-	void (DataSlide::*push_data2)(std::string, double, double, uint) = &DataSlide::push_data;
+	void (DataSlide::*push_data2)(std::string, double, double, uint32_t) = &DataSlide::push_data;
 
 	nb::class_<DataSlide>(m, "DataSlide")
 		.def(nb::init<>())
@@ -96,7 +96,7 @@ void init_dataframe(nb::module_ &m) {
 		.def("query", &DataFrame::query, "keys"_a, "constraints"_a, "unique"_a = false);
 	
 	nb::class_<ParallelCompute>(m, "ParallelCompute")
-		.def(nb::init<std::vector<std::shared_ptr<Config>>, uint>(), "configs"_a = std::vector<std::shared_ptr<Config>>(), "num_threads"_a = 1)
+		.def(nb::init<std::vector<std::shared_ptr<Config>>, uint32_t>(), "configs"_a = std::vector<std::shared_ptr<Config>>(), "num_threads"_a = 1)
 		.def_rw("dataframe", &ParallelCompute::df)
 		.def("compute", &ParallelCompute::compute, "verbose"_a = false)
 		.def("write_json", &ParallelCompute::write_json);
