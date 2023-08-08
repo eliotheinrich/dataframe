@@ -1,9 +1,8 @@
-/target
-/Cargo.lock
+.vscode
+
 *.egg-info
 pydf/__pycache__/
 __pycache__
 *.pyc
-
 
 

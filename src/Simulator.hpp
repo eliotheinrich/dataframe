@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include <DataFrame.hpp>
 #include <algorithm>
 #include <numeric>
@@ -41,11 +40,11 @@ class Simulator {
         virtual ~Simulator() {}
 
         virtual std::shared_ptr<Simulator> clone(Params &params)=0;
-        virtual void timesteps(uint num_steps)=0;
+        virtual void timesteps(uint32_t num_steps)=0;
 
         // By default, do nothing special during equilibration timesteps
         // May want to include, i.e., annealing 
-        virtual void equilibration_timesteps(uint num_steps) {
+        virtual void equilibration_timesteps(uint32_t num_steps) {
             timesteps(num_steps);
         }
         
@@ -64,16 +63,16 @@ class TimeConfig : public Config {
         std::shared_ptr<Simulator> simulator;
 
         static float correlation_coefficient(const std::vector<double> &y) {
-            uint n = y.size();
+            uint32_t n = y.size();
 
             double varx = std::sqrt(n*(n*n - 1.)/((n-1.)*12.));
             double my = 0.;
-            for (uint i = 0; i < n; i++)
+            for (uint32_t i = 0; i < n; i++)
                 my += y[i];
             my /= n;
 
             double vary = 0.;
-            for (uint i = 0; i < n; i++)
+            for (uint32_t i = 0; i < n; i++)
                 vary += std::pow(y[i] - my, 2);
             vary = std::sqrt(vary/(n - 1.));
 
@@ -81,7 +80,7 @@ class TimeConfig : public Config {
             if (vary < 1e-5) return 0;
 
             double sumxy = 0.;
-            for (uint i = 0; i < n; i++)
+            for (uint32_t i = 0; i < n; i++)
                 sumxy += i*y[i];
             
             float r = (sumxy - n*my*(n-1.)/2.)/((n-1.)*varx*vary);
@@ -98,14 +97,14 @@ class TimeConfig : public Config {
             }
 
                 /*
-                uint n = ksamples.size();
+                uint32_t n = ksamples.size();
                 double sx = n*(n-1.)/2.;
                 double sxx = n*(n-1.)*(2.*n - 1.)/6.;
                 double sy = 0.;
                 double sxy;
 
                 auto means = Sample::get_means(ksamples);
-                for (uint i = 0; i < n; i++) {
+                for (uint32_t i = 0; i < n; i++) {
                     sy += means[i];
                     sxy += i*means[i];
                 }
@@ -114,12 +113,12 @@ class TimeConfig : public Config {
                 double intercept = (sy*sxx - sx*sxy)/(n*sxx - sx*sx);
 
                 std::vector<double> noise;
-                for (uint i = 0; i < n; i++)
+                for (uint32_t i = 0; i < n; i++)
                     noise.push_back(means[i] - (slope*i + intercept));
                 
                 double m = 0.;
                 double m2 = 0.;
-                for (uint i = 0; i < n; i++) {
+                for (uint32_t i = 0; i < n; i++) {
                     m += noise[i];
                     m2 += noise[i]*noise[i];
                 }
@@ -127,7 +126,7 @@ class TimeConfig : public Config {
                 double s = std::sqrt(std::abs(m2 - m*m));
 
                 float bounded = 0.;
-                for (uint i = 0; i < n; i++) {
+                for (uint32_t i = 0; i < n; i++) {
                     if (noise[i] > m + 2*s || noise[i] < m - 2*s)
                         bounded++;
                 }
@@ -142,9 +141,9 @@ class TimeConfig : public Config {
 
 
     public:
-        uint sampling_timesteps;
-        uint equilibration_timesteps;
-        uint measurement_freq;
+        uint32_t sampling_timesteps;
+        uint32_t equilibration_timesteps;
+        uint32_t measurement_freq;
         bool temporal_avg;
 
 
