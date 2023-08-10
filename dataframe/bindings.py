@@ -74,6 +74,9 @@ class DataFrame:
 
     def __str__(self) -> str:
         return str(self._dataframe)
+    
+    def __add__(self, other):
+        return self._dataframe + other
 
     def write_json(self, filename: str):
         self._dataframe.write_json(filename)

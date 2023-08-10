@@ -394,7 +394,9 @@ class DataSlide {
 		std::map<std::string, std::vector<Sample>> data;
 
 		DataSlide() {}
+
 		DataSlide(Params &params) : params(params) {}
+
 		DataSlide(const std::string &s) {
 			std::string trimmed = s;
 			uint32_t start_pos = trimmed.find_first_not_of(" \t\n\r");
@@ -415,6 +417,15 @@ class DataSlide {
 				} else
 					add_param(k, parse_json_type(val));
 			}
+		}
+
+		DataSlide(const DataSlide& other) : DataSlide(Params(other.params)) {
+			for (auto const& [key, vals] : other.data) {
+				data[key] = std::vector<Sample>();
+				for (auto const& val : vals)
+					data[key].push_back(val);
+			}
+
 		}
 
 		bool contains(std::string s) const {
@@ -581,11 +592,11 @@ class DataFrame {
 		
 		DataFrame() {}
 
-		DataFrame(std::vector<DataSlide> slides) {
+		DataFrame(const std::vector<DataSlide>& slides) {
 			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
 		}
 
-		DataFrame(std::string s) {
+		DataFrame(const std::string& s) {
 			nlohmann::json data = nlohmann::json::parse(s);
 			for (auto const &[key, val] : data["params"].items())
 				params[key] = parse_json_type(val);
@@ -594,6 +605,14 @@ class DataFrame {
 				std::cout << slide_str.dump() << std::endl;
 				add_slide(DataSlide(slide_str.dump()));
 			}
+		}
+
+		DataFrame(const DataFrame& other) {
+			for (auto const& [key, val] : other.params)
+				params[key] = val;
+			
+			for (auto const& slide : other.slides)
+				add_slide(DataSlide(slide));
 		}
 
 		void add_slide(DataSlide ds) {
@@ -763,6 +782,87 @@ class DataFrame {
 				return to_query_t(data_vals);
 			else
 				return query_t{std::vector<double>()};
+		}
+
+		DataFrame combine(const DataFrame &other) const {
+			if (params.empty() && slides.empty())
+				return DataFrame(other);
+			else if (other.params.empty() && other.slides.empty())
+				return DataFrame(*this);
+			
+			std::unordered_set<std::string> self_frame_params;
+			for (auto const& [k, _] : params)
+				self_frame_params.insert(k);
+
+			std::unordered_set<std::string> other_frame_params;
+			for (auto const& [k, _] : other.params)
+				other_frame_params.insert(k);
+
+			// both_frame_params is the intersection of keys of params and other.params
+			std::unordered_set<std::string> both_frame_params;
+			for (auto const& k : self_frame_params) {
+				if (other_frame_params.count(k))
+					both_frame_params.insert(k);
+			}
+
+			// Erase keys which appear in both frame params
+			std::unordered_set<std::string> to_erase;
+			for (auto const& k : self_frame_params) {
+				if (other_frame_params.count(k))
+					to_erase.insert(k);
+			}
+
+			for (auto const& k : to_erase)
+				self_frame_params.erase(k);
+
+			to_erase.clear();
+			for (auto const& k : other_frame_params) {
+				if (self_frame_params.count(k))
+					to_erase.insert(k);
+			}
+
+			for (auto const& k : to_erase)
+				other_frame_params.erase(k);
+
+			// self_frame_params and other_frame_params now only contain parameters unique to that frame
+			
+
+			DataFrame df;
+			Params self_slide_params;
+			Params other_slide_params;
+
+			for (auto const& k : both_frame_params) {
+				if (params.at(k) == other.params.at(k))
+					df.add_param(k, params.at(k));
+				else {
+					self_slide_params[k] = params.at(k);
+					other_slide_params[k] = other.params.at(k);
+				}
+			}
+
+			for (auto const& k : self_frame_params)
+				self_slide_params[k] = params.at(k);
+			
+			for (auto const& k : other_frame_params)
+				other_slide_params[k] = other.params.at(k);
+			
+			for (auto const& slide : slides) {
+				DataSlide ds(slide);
+				for (auto const& [k, v] : self_slide_params)
+					ds.add_param(k, v);
+				
+				df.add_slide(ds);
+			}
+
+			for (auto const& slide : other.slides) {
+				DataSlide ds(slide);
+				for (auto const& [k, v] : other_slide_params)
+					ds.add_param(k, v);
+				
+				df.add_slide(ds);
+			}
+
+			return df;
 		}
 };
 
