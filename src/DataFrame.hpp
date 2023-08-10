@@ -419,7 +419,10 @@ class DataSlide {
 			}
 		}
 
-		DataSlide(const DataSlide& other) : DataSlide(Params(other.params)) {
+		DataSlide(const DataSlide& other) {
+			for (auto const& [key, val]: other.params)
+				add_param(key, val);
+
 			for (auto const& [key, vals] : other.data) {
 				data[key] = std::vector<Sample>();
 				for (auto const& val : vals)
@@ -602,7 +605,6 @@ class DataFrame {
 				params[key] = parse_json_type(val);
 		
 			for (auto const &slide_str : data["slides"]) {
-				std::cout << slide_str.dump() << std::endl;
 				add_slide(DataSlide(slide_str.dump()));
 			}
 		}
