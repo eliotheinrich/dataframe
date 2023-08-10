@@ -47,7 +47,6 @@
 
 #endif
 
-
 class Sample;
 class DataSlide;
 class DataFrame;
@@ -396,8 +395,17 @@ class DataSlide {
 
 		DataSlide() {}
 		DataSlide(Params &params) : params(params) {}
-		DataSlide(std::string s) {
-			nlohmann::json ds_json = nlohmann::json::parse("{" + s + "}");
+		DataSlide(const std::string &s) {
+			std::string trimmed = s;
+			uint32_t start_pos = trimmed.find_first_not_of(" \t\n\r");
+			uint32_t end_pos = trimmed.find_last_not_of(" \t\n\r");
+			trimmed = trimmed.substr(start_pos, end_pos - start_pos + 1);
+
+			nlohmann::json ds_json;
+			if (trimmed.empty() || trimmed.front() != '{' || trimmed.back() != '}')
+				ds_json = nlohmann::json::parse("{" + trimmed + "}");
+			else
+				ds_json = nlohmann::json::parse(trimmed);
 
 			for (auto const &[k, val] : ds_json.items()) {
 				if (val.type() == nlohmann::json::value_t::array) {
@@ -575,6 +583,17 @@ class DataFrame {
 
 		DataFrame(std::vector<DataSlide> slides) {
 			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
+		}
+
+		DataFrame(std::string s) {
+			nlohmann::json data = nlohmann::json::parse(s);
+			for (auto const &[key, val] : data["params"].items())
+				params[key] = parse_json_type(val);
+		
+			for (auto const &slide_str : data["slides"]) {
+				std::cout << slide_str.dump() << std::endl;
+				add_slide(DataSlide(slide_str.dump()));
+			}
 		}
 
 		void add_slide(DataSlide ds) {

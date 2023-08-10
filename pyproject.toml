@@ -1,0 +1,23 @@
+[build-system]
+requires = ["scikit-build-core>=0.4.3", "nanobind>=1.3.2"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "dataframe"
+version = "0.0.1"
+description = "Provides access to C++ classes and methods for parallel computation and data management"
+requires-python = ">=3.8"
+authors = [
+	{ name = "Eliot Heinrich", email = "heinriea@bc.edu" },
+]
+
+[tool.scikit-build]
+minimum-version = "0.4"
+build-dir = "build/{wheel_tag}"
+wheel.py-api = "cp312"
+
+[tool.cibuildwheel]
+build-verbosity = 1
+
+[tool.cibuildwheel.macos.environment]
+MACOSX_DEPLOYMENT_TARGET = "10.14"

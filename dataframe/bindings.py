@@ -1,18 +1,19 @@
 import dataframe.dataframe_bindings as _df
 
-def load_json(filename: str, verbose: bool = False) -> list:
-    return _df.load_json(filename, verbose)
-
-def write_config(params: list) -> str:
-    return _df.write_config(params)
-    
-
 class DataSlide:
-    def __init__(self):
-        self._dataslide = _df.DataSlide()
+    def __init__(self, data: str | dict | None = None):
+        if data is None:
+            self._dataslide = _df.DataSlide()
+        else:
+            self._dataslide = _df.DataSlide(data)
+
+    @property
+    def params(self):
+        return self._dataslide.params
     
-    def __init__(self, data: str | dict):
-        self._dataslide = _df.DataSlide(data)
+    @property
+    def data(self):
+        return self._dataslide.data
     
     def add_param(self, s: str, p: int | float | str):
         self._dataslide.add_param(s, p)
@@ -42,13 +43,20 @@ class DataSlide:
         return self._dataslide.combine(slide)
 
 class DataFrame:
-    def __init__(self):
-        self._dataframe = _df.DataFrame()
-        self.params = self._dataframe.params
+    def __init__(self, data: list | str | None = None):
+        if data is None:
+            self._dataframe = _df.DataFrame()
+        else:
+            self._dataframe = _df.DataFrame(data)
+        
+    @property
+    def params(self):
+        return self._dataframe.params
     
-    def __init__(self, data):
-        self._dataframe = _df.DataFrame(data)
-    
+    @property
+    def slides(self):
+        return self._dataframe.slides
+        
     def add_slide(self, slide):
         self._dataframe.add_slide(slide)
     
@@ -73,17 +81,39 @@ class DataFrame:
     def promote_params(self):
         self._dataframe.promote_params()
     
-    def query(self, keys: list, constraints: dict, unique: bool = False) -> list:
+    def query(self, keys: list | str, constraints: dict | None = None, unique: bool = False) -> list:
+        if isinstance(keys, str):
+            keys = [keys]
+        if constraints is None:
+            constraints = {}
         return self._dataframe.query(keys, constraints, unique)
           
+    def query_unique(self, keys: list | str, constraints: dict | None = None) -> list:
+        return self.query(keys, constraints, unique=True)
 
 class ParallelCompute:
-    def __init__(self, configs):
-        self._pc = _df.ParallelCompute(configs)
-        self.dataframe = None 
+    def __init__(self, configs, num_threads: int = 1):
+        self._pc = _df.ParallelCompute(configs, num_threads)
+    
+    @property
+    def dataframe(self):
+        return self._pc.dataframe
     
     def compute(self, verbose: bool = False):
         self._pc.compute(verbose)
     
     def write_json(self, filename: str):
         self._pc.write_json(filename)
+
+def load_data(filename: str) -> DataFrame:
+    with open(filename, 'r') as f:
+        s = f.read()
+    
+    return DataFrame(s)
+
+def load_json(filename: str, verbose: bool = False) -> list:
+    return _df.load_json(filename, verbose)
+
+def write_config(params: list) -> str:
+    return _df.write_config(params)
+    

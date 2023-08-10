@@ -1,14 +1,19 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15..3.26)
 
-project(dataframe)
-
-find_package(Python 3.9 COMPONENTS Interpreter Development REQUIRED)
+project(dataframe LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
+
+find_package(Python 3.10 
+  REQUIRED COMPONENTS Interpreter Development.Module
+  OPTIONAL_COMPONENTS Development.SABIModule
+)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
+
+#set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
 # Finding nanobind
 execute_process(
@@ -42,17 +47,20 @@ include_directories(
     ${bspl_SOURCE_DIR}/include 
 )
 
-nanobind_add_module(dataframe_bindings src/PyDataFrameModule.cpp)
+nanobind_add_module(
+  dataframe_bindings 
+  STABLE_ABI
+  NB_STATIC
+  src/PyDataFrameModule.cpp
+)
 
-if (CALL_FROM_SETUP_PY)
-  set(DATAFRAME_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
-else()
-  set(DATAFRAME_INSTALL_PREFIX ${Python_SITELIB})
-endif()
+#if (CALL_FROM_SETUP_PY)
+#  set(DATAFRAME_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
+#else()
+#  set(DATAFRAME_INSTALL_PREFIX ${Python_SITELIB})
+#endif()
 
 install(
   TARGETS dataframe_bindings
-  LIBRARY DESTINATION ${DATAFRAME_INSTALL_PREFIX}
-  ARCHIVE DESTINATION ${DATAFRAME_INSTALL_PREFIX}
-  RUNTIME DESTINATION ${DATAFRAME_INSTALL_PREFIX}
+  LIBRARY DESTINATION dataframe
 )

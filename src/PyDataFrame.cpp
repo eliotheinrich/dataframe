@@ -82,6 +82,7 @@ void init_dataframe(nb::module_ &m) {
 	nb::class_<DataFrame>(m, "DataFrame")
 		.def(nb::init<>())
 		.def(nb::init<std::vector<DataSlide>>())
+		.def(nb::init<std::string>())
 		.def_rw("params", &DataFrame::params)
 		.def_rw("slides", &DataFrame::slides)
 		.def("add_slide", &DataFrame::add_slide)
