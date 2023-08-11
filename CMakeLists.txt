@@ -54,12 +54,6 @@ nanobind_add_module(
   src/PyDataFrameModule.cpp
 )
 
-#if (CALL_FROM_SETUP_PY)
-#  set(DATAFRAME_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
-#else()
-#  set(DATAFRAME_INSTALL_PREFIX ${Python_SITELIB})
-#endif()
-
 install(
   TARGETS dataframe_bindings
   LIBRARY DESTINATION dataframe

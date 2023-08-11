@@ -764,13 +764,12 @@ class DataFrame {
 			bool vars_data = false;
 			for (auto const &key : keys) {
 				for (auto const i : inds) {
-					auto slide = slides[i];
-					if (slide.params.count(key)) {
+					if (slides[i].params.count(key)) {
 						vars_param = true;
-						param_vals.push_back(slide.params[key]);
-					} else if (slide.data.count(key)) {
+						param_vals.push_back(slides[i].params[key]);
+					} else if (slides[i].data.count(key)) {
 						vars_data = true;
-						data_vals.push_back(slide.get_data(key));
+						data_vals.push_back(slides[i].get_data(key));
 					}
 				}
 			}
