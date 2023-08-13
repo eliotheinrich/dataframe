@@ -843,7 +843,6 @@ class DataFrame {
 
 		void reduce() {
 			promote_params();
-			//std::cout << "Starting reduce; there are " << slides.size() << " slides.\n";
 
 			std::vector<DataSlide> new_slides;
 
@@ -854,23 +853,18 @@ class DataFrame {
 
 				DataSlide slide(slides[i]);
 				std::unordered_set<uint32_t> inds = compatible_inds(slide.params);
-				//std::cout << "inds compatible with " << i << std::endl;
 				for (auto const j : inds) {
 					if (i == j) continue;
-				//	std::cout << j << " ";
 					slide = slide.combine(slides[j]);
 					reduced.insert(j);
 				} 
-				//std::cout << "\n";
+				new_slides.push_back(slide);
 			}
 
-
-			//std::cout << "Ending reduce; there are " << slides.size() << " slides.\n";
+			slides = new_slides;
 		}
 
 		DataFrame combine(const DataFrame &other) const {
-			//std::cout << "Before combine: \n" << to_string() << std::endl;
-			//std::cout << "and: \n" << other.to_string() << std::endl;
 			if (params.empty() && slides.empty())
 				return DataFrame(other);
 			else if (other.params.empty() && other.slides.empty())
@@ -911,19 +905,6 @@ class DataFrame {
 				other_frame_params.erase(k);
 
 			// self_frame_params and other_frame_params now only contain parameters unique to that frame
-			
-			//std::cout << "self_frame_params: ";
-			//for (auto const k : self_frame_params)
-			//	std::cout << k << " ";
-			//std::cout << "\n";
-			//std::cout << "other_frame_params: ";
-			//for (auto const k : other_frame_params)
-			//	std::cout << k << " ";
-			//std::cout << "\n";
-			//std::cout << "both_frame_params: ";
-			//for (auto const k : both_frame_params)
-			//	std::cout << k << " ";
-			//std::cout << "\n";
 
 			DataFrame df;
 			Params self_slide_params;
@@ -943,7 +924,7 @@ class DataFrame {
 			
 			for (auto const& k : other_frame_params)
 				other_slide_params[k] = other.params.at(k);
-			
+
 			for (auto const& slide : slides) {
 				DataSlide ds(slide);
 				for (auto const& [k, v] : self_slide_params)
@@ -960,7 +941,6 @@ class DataFrame {
 				df.add_slide(ds);
 			}
 
-			//std::cout << "Before reduce: " << df.to_string() << std::endl;
 			df.reduce();
 
 			return df;
