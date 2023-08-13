@@ -55,85 +55,23 @@ class ParallelCompute;
 
 static std::string join(const std::vector<std::string> &v, const std::string &delim);
 
+
+// --- DEFINING VALID PARAMETER VALUES ---
 typedef std::variant<int, double, std::string> var_t;
-typedef std::variant<var_t, std::vector<int>, std::vector<double>, std::vector<std::string>, std::vector<std::vector<double>>> query_t;
-typedef std::map<std::string, Sample> data_t;
-typedef std::map<std::string, var_t> Params;
 
-static query_t to_query_t(const std::vector<var_t>& vec) {
-	if (vec.size() == 0)
-		return query_t{std::vector<double>()};
-	
-	uint32_t index = vec[0].index();
-	if (index == 0) {
-		std::vector<double> vals; 
-		for (auto const &v : vec)
-			vals.push_back(std::get<int>(v));
-		return query_t{vals};
-	} else if (index == 1) {
-		std::vector<double> vals; 
-		for (auto const &v : vec)
-			vals.push_back(std::get<double>(v));
-		return query_t{vals};
-	} else {
-		std::vector<std::string> vals; 
-		for (auto const &v : vec)
-			vals.push_back(std::get<std::string>(v));
-		return query_t{vals};
-	}
-}
+#define VAR_T_EPS 0.00001
 
-static query_t to_query_t(const std::vector<std::vector<double>>& v) {
-	return query_t{v};
-}
-
-struct make_query_unique {
-	query_t operator()(const var_t& v) const { return v; }
-	query_t operator()(const std::vector<std::vector<double>>& data) const { return data; }
-
-	template <class T>
-	query_t operator()(const std::vector<T>& vec) const { 
-		std::vector<var_t> var_t_vals;
-		std::transform(vec.begin(), vec.end(), std::back_inserter(var_t_vals),
-			[](T val) { return var_t{val}; });
-		
-
-		std::vector<var_t> var_t_return_vals;
-
-		for (auto const &val : var_t_vals) {
-			if (std::find(var_t_return_vals.begin(), var_t_return_vals.end(), val) == var_t_return_vals.end())
-				var_t_return_vals.push_back(val);
-		}
-
-		std::sort(var_t_return_vals.begin(), var_t_return_vals.end());
-
-		std::vector<T> return_vals;
-		for (auto const &val : var_t_return_vals)
-			return_vals.push_back(std::get<T>(val));
-
-
-		return query_t{return_vals};
-	}
-};
-
-// Explicit template instantiation
-template query_t make_query_unique::operator()(const std::vector<int>& vec) const;
-template query_t make_query_unique::operator()(const std::vector<double>& vec) const;
-template query_t make_query_unique::operator()(const std::vector<std::string>& vec) const;
-
-struct var_to_string {
+struct var_t_to_string {
 	std::string operator()(const int& i) const { return std::to_string(i); }
 	std::string operator()(const double& f) const { return std::to_string(f); }
 	std::string operator()(const std::string& s) const { return "\"" + s + "\""; }
 };
 
-#define DF_EPS 0.00001
-
 static bool operator==(const var_t& v, const var_t& t) {
 	if (v.index() != t.index()) return false;
 
 	if (v.index() == 0) return std::get<int>(v) == std::get<int>(t);
-	else if (v.index() == 1) return std::abs(std::get<double>(v) - std::get<double>(t)) < DF_EPS;
+	else if (v.index() == 1) return std::abs(std::get<double>(v) - std::get<double>(t)) < VAR_T_EPS;
 	else return std::get<std::string>(v) == std::get<std::string>(t);
 }
 
@@ -157,6 +95,82 @@ static bool operator<(const var_t& lhs, const var_t& rhs) {
 	return d1 < d2;
 }
 
+typedef std::map<std::string, Sample> data_t;
+typedef std::map<std::string, var_t> Params;
+
+// --- DEFINING VALID QUERY RESULTS ---
+typedef std::variant<var_t, std::vector<var_t>, std::vector<std::vector<double>>> query_t;
+
+struct make_query_t_unique {
+	query_t operator()(const var_t& v) const { return v; }
+	query_t operator()(const std::vector<std::vector<double>>& data) const { return data; }
+
+	query_t operator()(const std::vector<var_t>& vec) const { 
+		std::vector<var_t> return_vals;
+
+		for (auto const &val : vec) {
+			if (std::find(return_vals.begin(), return_vals.end(), val) == return_vals.end())
+				return_vals.push_back(val);
+		}
+
+		std::sort(return_vals.begin(), return_vals.end());
+
+		return return_vals;
+	}
+};
+
+struct query_t_to_string {
+	std::string operator()(const var_t& v) { return std::visit(var_t_to_string(), v); }
+
+	std::string operator()(const std::vector<var_t>& vec) {
+		std::vector<std::string> buffer;
+		for (auto const val : vec)
+			buffer.push_back(std::visit(var_t_to_string(), val));
+		return "[" + join(buffer, ", ") + "]";
+	}
+
+	std::string operator()(const std::vector<std::vector<double>>& v) {
+		std::vector<std::string> buffer1;
+		for (auto const& row : v) {
+			std::vector<std::string> buffer2;
+			for (auto const d : row)
+				buffer2.push_back(std::to_string(d));
+			buffer1.push_back("[" + join(buffer2, ", ") + "]");
+		}
+		return "[" + join(buffer1, "\n") + "]";
+	}
+};
+
+typedef std::variant<query_t, std::vector<query_t>> query_result;
+
+struct query_to_string {
+	std::string operator()(const query_t& q) { 
+		return std::visit(query_t_to_string(), q); 
+	}
+
+	std::string operator()(const std::vector<query_t>& results) { 
+		std::vector<std::string> buffer;
+		for (auto const& q : results)
+			buffer.push_back(std::visit(query_t_to_string(), q));
+		
+		return "[" + join(buffer, ", ") + "]";
+	}
+};
+
+struct make_query_unique {
+	query_result operator()(const query_t& q) {
+		return std::visit(make_query_t_unique(), q);
+	}
+
+	query_result operator()(const std::vector<query_t>& results) {
+		std::vector<query_t> new_results(results.size());
+		std::transform(results.begin(), results.end(), std::back_inserter(new_results),
+			[](const query_t& q) { return std::visit(make_query_t_unique(), q); }
+		);
+
+		return new_results;
+	}
+};
 
 template <class json_object>
 static var_t parse_json_type(json_object p) {
@@ -182,7 +196,7 @@ static std::string params_to_string(Params const& params, uint32_t indentation=0
 	std::vector<std::string> buffer;
 
 	for (auto const &[key, field] : params) {
-		buffer.push_back("\"" + key + "\": " + std::visit(var_to_string(), field));
+		buffer.push_back("\"" + key + "\": " + std::visit(var_t_to_string(), field));
 	}
 
 	std::string delim = ",\n";
@@ -713,10 +727,10 @@ class DataFrame {
 			}
 		}
 
-		query_t query(std::vector<std::string> keys, std::map<std::string, var_t> constraints, bool unique = false) {
+		query_result query(std::vector<std::string> keys, std::map<std::string, var_t> constraints, bool unique = false) {
 			if (unique) {
-				auto query_result = query(keys, constraints);
-				return std::visit(make_query_unique(), query_result);
+				auto result = query(keys, constraints, false);
+				return std::visit(make_query_unique(), result);
 			}
 
 			if (!qtable_initialized)
@@ -725,23 +739,17 @@ class DataFrame {
 			// Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
 			for (auto const &[key, val] : constraints) {
 				if (params.count(key) && params[key] != val)
-					return query_t{std::vector<double>()};
+					return query_t{std::vector<var_t>()};
 			}
 
-			// If key corresponds to a single Frame-level param, return it
-			if (keys.size() == 1) {
-				auto key = keys[0];
-				if (params.count(key))
-					return query_t{params[key]};
-			}
-
-
+			// Determine which constraints are relevant, i.e. correspond to existing Slide-level parameters
 			std::map<std::string, var_t> relevant_constraints;
 			for (auto const &[key, val] : constraints) {
 				if (!params.count(key))
 					relevant_constraints[key] = val;
 			}
 
+			// Determine indices of slides which respect the given constraints
 			std::unordered_set<uint32_t> inds;
 			for (uint32_t i = 0; i < slides.size(); i++) inds.insert(i);
 	
@@ -756,33 +764,34 @@ class DataFrame {
 				inds = tmp;
 			}
 			
+
+			// Compile result of query
+			std::vector<query_t> result;
 			
-			// See if keys correspond to Slide-level params or data
-			std::vector<var_t> param_vals;
-			std::vector<std::vector<double>> data_vals;
-			bool vars_param = false;
-			bool vars_data = false;
-			for (auto const &key : keys) {
-				for (auto const i : inds) {
-					if (slides[i].params.count(key)) {
-						vars_param = true;
+			for (auto const& key : keys) {
+				query_t key_result;
+				if (params.count(key)) {
+					key_result = query_t{params[key]};
+				} else if (slides[0].params.count(key)) {
+					std::vector<var_t> param_vals;
+					for (auto const i : inds)
 						param_vals.push_back(slides[i].params[key]);
-					} else if (slides[i].data.count(key)) {
-						vars_data = true;
+					key_result = query_t{param_vals};
+				} else {
+					std::vector<std::vector<double>> data_vals;
+					for (auto const i : inds)
 						data_vals.push_back(slides[i].get_data(key));
-					}
+					key_result = query_t{data_vals};
 				}
+
+				result.push_back(key_result);
 			}
 
-			if (!vars_param && !vars_data)
-				return query_t{std::vector<double>()};
-			
-			if (vars_param)
-				return to_query_t(param_vals);
-			else if (vars_data)
-				return to_query_t(data_vals);
+			if (result.size() == 1)
+				return query_result{result[0]};
 			else
-				return query_t{std::vector<double>()};
+				return query_result{result};
+
 		}
 
 		DataFrame combine(const DataFrame &other) const {
