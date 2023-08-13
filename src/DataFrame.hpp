@@ -190,7 +190,7 @@ static var_t parse_json_type(json_object p) {
 	}
 }
 
-static std::string params_to_string(Params const& params, uint32_t indentation=0) {
+static std::string params_to_string(const Params& params, uint32_t indentation=0) {
 	std::string s = "";
 	for (uint32_t i = 0; i < indentation; i++) s += "\t";
 	std::vector<std::string> buffer;
@@ -207,7 +207,7 @@ static std::string params_to_string(Params const& params, uint32_t indentation=0
 }
 
 template <class T>
-T get(Params &params, std::string key, T defaultv) {
+T get(Params &params, const std::string& key, T defaultv) {
 	if (params.count(key))
 		return std::get<T>(params[key]);
 	
@@ -216,7 +216,7 @@ T get(Params &params, std::string key, T defaultv) {
 }
 
 template <class T>
-T get(Params &params, std::string key) {
+T get(Params &params, const std::string& key) {
 	return std::get<T>(params[key]);
 }
 
@@ -290,9 +290,10 @@ static std::vector<Params> load_json(nlohmann::json data, bool verbose=false) {
 	return load_json(data, Params(), verbose);
 }
 
-static std::vector<Params> load_json(std::string s, bool verbose=false) {
-	std::replace(s.begin(), s.end(), '\'', '"');
-	return load_json(nlohmann::json::parse(s), verbose);
+static std::vector<Params> load_json(const std::string& s, bool verbose=false) {
+	std::string t(s);
+	std::replace(t.begin(), t.end(), '\'', '"');
+	return load_json(nlohmann::json::parse(t), verbose);
 }
 
 class Sample {
@@ -445,40 +446,40 @@ class DataSlide {
 
 		}
 
-		bool contains(std::string s) const {
+		bool contains(const std::string& s) const {
 			return params.count(s) || data.count(s);
 		}
 
-		var_t get_param(std::string s) const {
+		var_t get_param(const std::string& s) const {
 			return params.at(s);
 		}
 
 		template <typename T>
-		void add_param(std::string s, T const& t) { 
+		void add_param(const std::string& s, T const& t) { 
 			params[s] = t; 
 		}
 
-		void add_param(Params &params) {
+		void add_param(const Params &params) {
 			for (auto const &[key, field] : params) {
 				add_param(key, field);
 			}
 		}
 
-		void add_data(std::string s) { data.emplace(s, std::vector<Sample>()); }
+		void add_data(const std::string& s) { data.emplace(s, std::vector<Sample>()); }
 
-		void push_data(std::string s, Sample sample) {
+		void push_data(const std::string& s, Sample sample) {
 			data[s].push_back(sample);
 		}
 
-		void push_data(std::string s, double d) {
+		void push_data(const std::string& s, double d) {
 			data[s].push_back(Sample(d));
 		}
 
-		void push_data(std::string s, double d, double std, uint32_t num_samples) {
+		void push_data(const std::string& s, double d, double std, uint32_t num_samples) {
 			data[s].push_back(Sample(d, std, num_samples));
 		}
 
-		std::vector<double> get_data(std::string s) {
+		std::vector<double> get_data(const std::string& s) {
 			if (!data.count(s))
 				return std::vector<double>();
 
@@ -489,7 +490,7 @@ class DataSlide {
 			return d;
 		}
 
-		bool remove(std::string s) {
+		bool remove(const std::string& s) {
 			if (params.count(s)) { 
 				return params.erase(s);
 			} else if (data.count(s)) {
@@ -525,12 +526,12 @@ class DataSlide {
 			return s;
 		}
 
-		bool congruent(DataSlide &ds) {
+		bool congruent(const DataSlide &ds) {
 			if (params != ds.params) return false;
 
 			for (auto const &[key, samples] : data) {
 				if (!ds.data.count(key)) return false;
-				if (ds.data[key].size() != data[key].size()) return false;
+				if (ds.data.at(key).size() != data.at(key).size()) return false;
 			}
 			for (auto const &[key, val] : ds.data) {
 				if (!data.count(key)) return false;
@@ -539,7 +540,7 @@ class DataSlide {
 			return true;
 		}
 
-		DataSlide combine(DataSlide &ds) {
+		DataSlide combine(const DataSlide &ds) {
 			if (!congruent(ds)) {
 				std::cout << "DataSlides not congruent.\n"; 
 				std::cout << to_string() << "\n\n\n" << ds.to_string() << std::endl;
@@ -551,7 +552,7 @@ class DataSlide {
 			for (auto const &[key, samples] : data) {
 				dn.add_data(key);
 				for (uint32_t i = 0; i < samples.size(); i++) {
-					dn.push_data(key, samples[i].combine(ds.data[key][i]));
+					dn.push_data(key, samples[i].combine(ds.data.at(key)[i]));
 				}
 			}
 
@@ -596,15 +597,38 @@ class DataFrame {
 			qtable_initialized = true;
 		}
 
-		void promote_field(std::string s) {
+		void promote_field(const std::string& s) {
 			add_param(s, slides.begin()->get_param(s));
 			for (auto &slide : slides) {
 				slide.remove(s);
 			}
 		}
 
+		std::unordered_set<uint32_t> compatible_inds(const std::map<std::string, var_t>& constraints) {
+			if (!qtable_initialized)
+				init_qtable();
+
+			std::unordered_set<uint32_t> inds;
+			for (uint32_t i = 0; i < slides.size(); i++) inds.insert(i);
+	
+			for (auto const &[key, val] : constraints) {
+				// Take set intersection
+				std::unordered_set<uint32_t> tmp;
+				for (auto const i : qtable[key][val]) {
+					if (inds.count(i))
+						tmp.insert(i);
+				}
+
+				inds = tmp;
+			}
+			
+			return inds;
+		}
+
+
 	public:
 		Params params;
+		Params metadata;
 		std::vector<DataSlide> slides;
 		
 		DataFrame() {}
@@ -617,6 +641,11 @@ class DataFrame {
 			nlohmann::json data = nlohmann::json::parse(s);
 			for (auto const &[key, val] : data["params"].items())
 				params[key] = parse_json_type(val);
+			
+			if (data.contains("metadata")) {
+				for (auto const &[key, val] : data["metadata"].items())
+					metadata[key] = parse_json_type(val);
+			}
 		
 			for (auto const &slide_str : data["slides"]) {
 				add_slide(DataSlide(slide_str.dump()));
@@ -627,41 +656,71 @@ class DataFrame {
 			for (auto const& [key, val] : other.params)
 				params[key] = val;
 			
+			for (auto const& [key, val] : other.metadata)
+				metadata[key] = val;
+			
 			for (auto const& slide : other.slides)
 				add_slide(DataSlide(slide));
 		}
 
-		void add_slide(DataSlide ds) {
+		void add_slide(const DataSlide& ds) {
 			slides.push_back(ds);
 			qtable_initialized = false;
 		}
 
 		template <typename T>
-		void add_param(std::string s, T const& t) { 
+		void add_param(const std::string& s, const T & t) { 
 			params[s] = t; 
 
 			qtable_initialized = false;
 		}
 
-		void add_param(Params &params) {
-			for (auto const &[key, field] : params) {
+		template <typename T>
+		void add_metadata(const std::string& s, const T & t) {
+			metadata[s] = t;
+		}
+
+		void add_param(const Params &params) {
+			for (auto const &[key, field] : params)
 				add_param(key, field);
-			}
 
 			qtable_initialized = false;
 		}
 
-		bool contains(std::string s) const {
+		void add_metadata(const Params &params) {
+			for (auto const &[key, field] : metadata)
+				add_metadata(key, field);
+		}
+
+		bool contains(const std::string& s) const {
 			return params.count(s);
 		}
 
-		var_t get_param(std::string s) const {
+		var_t get(const std::string& s) const {
+			if (params.count(s)) return get_param(s);
+			else return get_metadata(s);
+		}
+
+		var_t get_param(const std::string& s) const {
 			return params.at(s);
 		}
 
-		bool remove(std::string s) {
+		var_t get_metadata(const std::string& s) const {
+			return metadata.at(s);
+		}
+
+		bool remove(const std::string& s) {
+			if (params.count(s)) return remove_param(s);
+			else return remove_metadata(s);
+		}
+
+		bool remove_param(const std::string& s) {
 			qtable_initialized = false;
 			return params.erase(s);
+		}
+
+		bool remove_metadata(const std::string& s) {
+			return metadata.erase(s);
 		}
 
 		std::string to_string() const {
@@ -670,6 +729,10 @@ class DataFrame {
 			s += "{\n\t\"params\": {\n";
 
 			s += params_to_string(params, 2);
+
+			s += "\n\t},\n\t\"metadata\": {\n";
+
+			s += params_to_string(metadata, 2);
 
 			s += "\n\t},\n\t\"slides\": [\n";
 
@@ -733,9 +796,6 @@ class DataFrame {
 				return std::visit(make_query_unique(), result);
 			}
 
-			if (!qtable_initialized)
-				init_qtable();
-
 			// Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
 			for (auto const &[key, val] : constraints) {
 				if (params.count(key) && params[key] != val)
@@ -750,20 +810,7 @@ class DataFrame {
 			}
 
 			// Determine indices of slides which respect the given constraints
-			std::unordered_set<uint32_t> inds;
-			for (uint32_t i = 0; i < slides.size(); i++) inds.insert(i);
-	
-			for (auto const &[key, val] : relevant_constraints) {
-				// Take set intersection
-				std::unordered_set<uint32_t> tmp;
-				for (auto const i : qtable[key][val]) {
-					if (inds.count(i))
-						tmp.insert(i);
-				}
-
-				inds = tmp;
-			}
-			
+			std::unordered_set<uint32_t> inds = compatible_inds(relevant_constraints);
 
 			// Compile result of query
 			std::vector<query_t> result;
@@ -794,7 +841,36 @@ class DataFrame {
 
 		}
 
+		void reduce() {
+			promote_params();
+			//std::cout << "Starting reduce; there are " << slides.size() << " slides.\n";
+
+			std::vector<DataSlide> new_slides;
+
+			std::unordered_set<uint32_t> reduced;
+			for (uint32_t i = 0; i < slides.size(); i++) {
+				if (reduced.count(i))
+					continue;
+
+				DataSlide slide(slides[i]);
+				std::unordered_set<uint32_t> inds = compatible_inds(slide.params);
+				//std::cout << "inds compatible with " << i << std::endl;
+				for (auto const j : inds) {
+					if (i == j) continue;
+				//	std::cout << j << " ";
+					slide = slide.combine(slides[j]);
+					reduced.insert(j);
+				} 
+				//std::cout << "\n";
+			}
+
+
+			//std::cout << "Ending reduce; there are " << slides.size() << " slides.\n";
+		}
+
 		DataFrame combine(const DataFrame &other) const {
+			//std::cout << "Before combine: \n" << to_string() << std::endl;
+			//std::cout << "and: \n" << other.to_string() << std::endl;
 			if (params.empty() && slides.empty())
 				return DataFrame(other);
 			else if (other.params.empty() && other.slides.empty())
@@ -816,26 +892,38 @@ class DataFrame {
 			}
 
 			// Erase keys which appear in both frame params
-			std::unordered_set<std::string> to_erase;
+			std::unordered_set<std::string> to_erase1;
 			for (auto const& k : self_frame_params) {
 				if (other_frame_params.count(k))
-					to_erase.insert(k);
+					to_erase1.insert(k);
 			}
 
-			for (auto const& k : to_erase)
-				self_frame_params.erase(k);
-
-			to_erase.clear();
+			std::unordered_set<std::string> to_erase2;
 			for (auto const& k : other_frame_params) {
 				if (self_frame_params.count(k))
-					to_erase.insert(k);
+					to_erase2.insert(k);
 			}
 
-			for (auto const& k : to_erase)
+			for (auto const& k : to_erase1)
+				self_frame_params.erase(k);
+
+			for (auto const& k : to_erase2)
 				other_frame_params.erase(k);
 
 			// self_frame_params and other_frame_params now only contain parameters unique to that frame
 			
+			//std::cout << "self_frame_params: ";
+			//for (auto const k : self_frame_params)
+			//	std::cout << k << " ";
+			//std::cout << "\n";
+			//std::cout << "other_frame_params: ";
+			//for (auto const k : other_frame_params)
+			//	std::cout << k << " ";
+			//std::cout << "\n";
+			//std::cout << "both_frame_params: ";
+			//for (auto const k : both_frame_params)
+			//	std::cout << k << " ";
+			//std::cout << "\n";
 
 			DataFrame df;
 			Params self_slide_params;
@@ -871,6 +959,9 @@ class DataFrame {
 				
 				df.add_slide(ds);
 			}
+
+			//std::cout << "Before reduce: " << df.to_string() << std::endl;
+			df.reduce();
 
 			return df;
 		}
@@ -1072,9 +1163,9 @@ class ParallelCompute {
 				auto stop = std::chrono::high_resolution_clock::now();
 				auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
 
-				df.add_param("num_threads", (int) num_threads);
-				df.add_param("num_jobs", (int) total_runs);
-				df.add_param("total_time", (int) duration.count());
+				df.add_metadata("num_threads", (int) num_threads);
+				df.add_metadata("num_jobs", (int) total_runs);
+				df.add_metadata("total_time", (int) duration.count());
 				df.promote_params();
 				if (verbose)
 					std::cout << "Total runtime: " << (int) duration.count() << std::endl;
@@ -1164,9 +1255,9 @@ class ParallelCompute {
 			auto stop = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
 
-			df.add_param("num_threads", (int) num_threads);
-			df.add_param("num_jobs", (int) total_runs);
-			df.add_param("total_time", (int) duration.count());
+			df.add_metadata("num_threads", (int) num_threads);
+			df.add_metadata("num_jobs", (int) total_runs);
+			df.add_metadata("total_time", (int) duration.count());
 			df.promote_params();
 
 			if (verbose)
@@ -1257,9 +1348,9 @@ class ParallelCompute {
 			auto stop = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
 
-			df.add_param("num_threads", (int) num_threads);
-			df.add_param("num_jobs", (int) total_runs);
-			df.add_param("total_time", (int) duration.count());
+			df.add_metadata("num_threads", (int) num_threads);
+			df.add_metadata("num_jobs", (int) total_runs);
+			df.add_metadata("total_time", (int) duration.count());
 			df.promote_params();
 
 			if (verbose)
