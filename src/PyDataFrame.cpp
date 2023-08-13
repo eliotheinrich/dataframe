@@ -53,7 +53,7 @@ void init_dataframe(nb::module_ &m) {
 	m.def("write_config", &write_config);
 
 	// Need to statically cast overloaded templated methods
-	void (DataSlide::*ds_add_param1)(Params&) = &DataSlide::add_param;
+	void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
 	void (DataSlide::*ds_add_param2)(const std::string&, var_t const&) = &DataSlide::add_param;
 
 	void (DataSlide::*push_data1)(const std::string&, double) = &DataSlide::push_data;

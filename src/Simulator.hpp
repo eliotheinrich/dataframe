@@ -227,9 +227,6 @@ class TimeConfig : public Config {
                 }
             }
 
-            slide.add_metadata("num_samples", (int) num_intervals);
-
-
 		    auto end_time = std::chrono::high_resolution_clock::now();
 			int duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time).count();
             slide.add_data("time");
