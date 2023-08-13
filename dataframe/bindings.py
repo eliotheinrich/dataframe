@@ -63,6 +63,9 @@ class DataFrame:
     def add_param(self, s: str, p: int | float | str):
         self._dataframe.add_param(s, p)
     
+    def add_metadata(self, s: str, p: int | float | str):
+        self._dataframe.add_metadata(s, p)
+    
     def remove(self, s: str):
         self._dataframe.remove(s)
     
