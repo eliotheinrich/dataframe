@@ -49,15 +49,15 @@ std::string write_config(const std::vector<Params>& params) {
 
 // Provide this function to initialize dataframe in other projects
 void init_dataframe(nb::module_ &m) {
-	m.def("load_json", static_cast<std::vector<Params>(*)(std::string, bool)>(&load_json), "data"_a, "verbose"_a = false);
+	m.def("load_json", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&load_json), "data"_a, "verbose"_a = false);
 	m.def("write_config", &write_config);
 
 	// Need to statically cast overloaded templated methods
 	void (DataSlide::*ds_add_param1)(Params&) = &DataSlide::add_param;
-	void (DataSlide::*ds_add_param2)(std::string, var_t const&) = &DataSlide::add_param;
+	void (DataSlide::*ds_add_param2)(const std::string&, var_t const&) = &DataSlide::add_param;
 
-	void (DataSlide::*push_data1)(std::string, double) = &DataSlide::push_data;
-	void (DataSlide::*push_data2)(std::string, double, double, uint32_t) = &DataSlide::push_data;
+	void (DataSlide::*push_data1)(const std::string&, double) = &DataSlide::push_data;
+	void (DataSlide::*push_data2)(const std::string&, double, double, uint32_t) = &DataSlide::push_data;
 
 	nb::class_<DataSlide>(m, "DataSlide")
 		.def(nb::init<>())
@@ -78,8 +78,10 @@ void init_dataframe(nb::module_ &m) {
 		.def("congruent", &DataSlide::congruent)
 		.def("combine", &DataSlide::combine);
 	
-	void (DataFrame::*df_add_param1)(Params&) = &DataFrame::add_param;
-	void (DataFrame::*df_add_param2)(std::string, var_t const&) = &DataFrame::add_param;
+	void (DataFrame::*df_add_param1)(const Params&) = &DataFrame::add_param;
+	void (DataFrame::*df_add_param2)(const std::string&, var_t const&) = &DataFrame::add_param;
+	void (DataFrame::*df_add_metadata1)(const Params&) = &DataFrame::add_metadata;
+	void (DataFrame::*df_add_metadata2)(const std::string&, var_t const&) = &DataFrame::add_metadata;
 	nb::class_<DataFrame>(m, "DataFrame")
 		.def(nb::init<>())
 		.def(nb::init<const std::vector<DataSlide>&>())
@@ -90,9 +92,11 @@ void init_dataframe(nb::module_ &m) {
 		.def("add_slide", &DataFrame::add_slide)
 		.def("add_param", df_add_param1)
 		.def("add_param", df_add_param2)
+		.def("add_metadata", df_add_metadata1)
+		.def("add_metadata", df_add_metadata2)
 		.def("remove", &DataFrame::remove)
 		.def("__contains__", &DataFrame::contains)
-		.def("__getitem__", &DataFrame::get_param)
+		.def("__getitem__", &DataFrame::get)
 		.def("__str__", &DataFrame::to_string)
 		.def("__add__", &DataFrame::combine)
 		.def("write_json", &DataFrame::write_json)
