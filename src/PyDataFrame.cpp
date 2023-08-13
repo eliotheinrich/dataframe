@@ -33,7 +33,7 @@ std::string write_config(const std::vector<Params>& params) {
 		std::sort(sorted_vals.begin(), sorted_vals.end());
 		
 		for (auto val : sorted_vals)
-			buffer2.push_back(std::visit(var_to_string(), val));
+			buffer2.push_back(std::visit(var_t_to_string(), val));
 		
 		b1 += join(buffer2, ", ");
 		if (vals[key].size() > 1) b1 += "]";
