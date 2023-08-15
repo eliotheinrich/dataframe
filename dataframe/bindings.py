@@ -43,8 +43,10 @@ class DataSlide:
         return self._dataslide.combine(slide)
 
 class DataFrame:
-    def __init__(self, data: list | str | None = None):
-        if data is None:
+    def __init__(self, data: list | str | _df.DataFrame | None = None):
+        if isinstance(data, DataFrame):
+            self._dataframe = data._dataframe
+        elif data is None:
             self._dataframe = _df.DataFrame()
         else:
             self._dataframe = _df.DataFrame(data)
