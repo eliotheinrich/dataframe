@@ -55,7 +55,7 @@ class Simulator {
             return std::map<std::string, std::vector<Sample>>();
         }
 
-        virtual void init_state()=0;
+        virtual void init_state(uint32_t num_threads)=0;
 };
 
 class TimeConfig : public Config {
@@ -166,12 +166,12 @@ class TimeConfig : public Config {
             }
         }
 
-        virtual DataSlide compute() override {
+        virtual DataSlide compute(uint32_t num_threads) override {
 			auto start_time = std::chrono::high_resolution_clock::now();
 
             DataSlide slide;
 
-            simulator->init_state();
+            simulator->init_state(num_threads);
 
             simulator->equilibration_timesteps(equilibration_timesteps);
 
@@ -238,7 +238,7 @@ class TimeConfig : public Config {
         virtual std::shared_ptr<Config> clone() override {
             std::shared_ptr<TimeConfig> config(new TimeConfig(params));
             std::shared_ptr<Simulator> sim = simulator.get()->clone(params);
-            config->init_simulator(std::move(sim));
+            config->init_simulator(sim);
             return config;
         }
 };
