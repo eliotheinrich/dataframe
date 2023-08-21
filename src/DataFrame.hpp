@@ -989,7 +989,7 @@ class Config {
 
 		// To implement
 		virtual uint32_t get_nruns() const { return num_runs; }
-		virtual DataSlide compute()=0;
+		virtual DataSlide compute(uint32_t num_threads)=0;
 		virtual std::shared_ptr<Config> clone()=0;
 };
 
@@ -1023,8 +1023,8 @@ static void print_progress(float progress, int expected_time = -1) {
 class ParallelCompute {
 	private:
 		std::vector<std::shared_ptr<Config>> configs;
-		static DataSlide thread_compute(std::shared_ptr<Config> config) {
-			DataSlide slide = config->compute();
+		static DataSlide thread_compute(std::shared_ptr<Config> config, uint32_t num_threads) {
+			DataSlide slide = config->compute(num_threads);
 			slide.add_param(config->params);
 			return slide;
 		}
@@ -1097,7 +1097,7 @@ class ParallelCompute {
 
 					// MASTER can also do some work here
 					if (head < total_runs) {
-						slides[head] = total_configs[head]->compute();
+						slides[head] = total_configs[head]->compute(num_threads_per_task);
 						head++;
 						completed++;
 					}
@@ -1183,7 +1183,7 @@ class ParallelCompute {
 						break;
 
 					// Do work
-					DataSlide slide = total_configs[index_buffer]->compute();
+					DataSlide slide = total_configs[index_buffer]->compute(num_threads_per_task);
 					std::string message = slide.to_string(0, false, true);
 					MPI_Send(message.c_str(), message.size(), MPI_CHAR, MASTER, index_buffer, MPI_COMM_WORLD);
 				}
@@ -1227,7 +1227,7 @@ class ParallelCompute {
 				uint32_t nruns = configs[i]->get_nruns();
 				for (uint32_t j = 0; j < nruns; j++) {
 					std::shared_ptr<Config> cfg = configs[i]->clone();
-					DataSlide slide = cfg->compute();
+					DataSlide slide = cfg->compute(num_threads_per_task);
 					slide.add_param(cfg->params);
 					df.add_slide(slide);
 					idx++;
@@ -1302,7 +1302,7 @@ class ParallelCompute {
 				uint32_t nruns = configs[i]->get_nruns();
 				for (uint32_t j = 0; j < nruns; j++) {
 					std::shared_ptr<Config> cfg = configs[i]->clone();
-					results[idx] = threads.submit(ParallelCompute::thread_compute, cfg);
+					results[idx] = threads.submit(ParallelCompute::thread_compute, cfg, num_threads_per_task);
 					idx++;
 				}
 			}
@@ -1363,9 +1363,13 @@ class ParallelCompute {
 	public:
 		DataFrame df;
 		uint32_t num_threads;
+		uint32_t num_threads_per_task;
 
-		ParallelCompute(std::vector<std::shared_ptr<Config>> configs, uint32_t num_threads) : configs(std::move(configs)),
-																						  num_threads(num_threads) {}
+		ParallelCompute(
+			std::vector<std::shared_ptr<Config>> configs, 
+			uint32_t num_threads, 
+			uint32_t num_threads_per_task
+		) : configs(std::move(configs)), num_threads(num_threads), num_threads_per_task(num_threads_per_task) {}
 
 		void compute(bool verbose=false) {
 #ifdef OMPI
