@@ -43,8 +43,10 @@ class DataSlide:
         return self._dataslide.combine(slide)
 
 class DataFrame:
-    def __init__(self, data: list | str | _df.DataFrame | None = None):
-        if isinstance(data, DataFrame):
+    def __init__(self, data: list | str | _df.DataFrame | None = None, params = None):
+        if params is not None:
+            self._dataframe = _df.DataFrame(params, data) 
+        elif isinstance(data, DataFrame):
             self._dataframe = data._dataframe
         elif data is None:
             self._dataframe = _df.DataFrame()
@@ -60,7 +62,7 @@ class DataFrame:
         return self._dataframe.slides
         
     def add_slide(self, slide):
-        self._dataframe.add_slide(slide)
+        self._dataframe.add_slide(slide._dataslide)
     
     def add_param(self, s: str, p: int | float | str):
         self._dataframe.add_param(s, p)
@@ -90,6 +92,9 @@ class DataFrame:
     
     def promote_params(self):
         self._dataframe.promote_params()
+    
+    def filter(self, constraints: dict):
+        return DataFrame(self._dataframe.filter(constraints))
     
     def query(self, keys: list | str, constraints: dict | None = None, unique: bool = False) -> list:
         if isinstance(keys, str):

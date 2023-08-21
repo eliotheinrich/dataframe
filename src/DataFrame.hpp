@@ -102,7 +102,7 @@ typedef std::map<std::string, var_t> Params;
 typedef std::variant<var_t, std::vector<var_t>, std::vector<std::vector<double>>> query_t;
 
 struct make_query_t_unique {
-	query_t operator()(const var_t& v) const { return v; }
+	query_t operator()(const var_t& v) const { return std::vector<var_t>{v}; }
 	query_t operator()(const std::vector<std::vector<double>>& data) const { return data; }
 
 	query_t operator()(const std::vector<var_t>& vec) const { 
@@ -608,10 +608,23 @@ class DataFrame {
 			if (!qtable_initialized)
 				init_qtable();
 
+			// Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
+			for (auto const &[key, val] : constraints) {
+				if (params.count(key) && params[key] != val)
+					return std::unordered_set<uint32_t>();
+			}
+
+			// Determine which constraints are relevant, i.e. correspond to existing Slide-level parameters
+			std::map<std::string, var_t> relevant_constraints;
+			for (auto const &[key, val] : constraints) {
+				if (!params.count(key))
+					relevant_constraints[key] = val;
+			}
+
 			std::unordered_set<uint32_t> inds;
 			for (uint32_t i = 0; i < slides.size(); i++) inds.insert(i);
 	
-			for (auto const &[key, val] : constraints) {
+			for (auto const &[key, val] : relevant_constraints) {
 				// Take set intersection
 				std::unordered_set<uint32_t> tmp;
 				for (auto const i : qtable[key][val]) {
@@ -634,6 +647,11 @@ class DataFrame {
 		DataFrame() {}
 
 		DataFrame(const std::vector<DataSlide>& slides) {
+			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
+		}
+
+		DataFrame(const Params& params, const std::vector<DataSlide>& slides) {
+			add_param(params);
 			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
 		}
 
@@ -790,27 +808,30 @@ class DataFrame {
 			}
 		}
 
-		query_result query(std::vector<std::string> keys, std::map<std::string, var_t> constraints, bool unique = false) {
+		DataFrame filter(const Params& constraints) {
+			auto inds = compatible_inds(constraints);
+
+			std::vector<DataSlide> slides;
+			for (uint32_t i = 0; i < this->slides.size(); i++) {
+				if (!inds.count(i))
+					slides.push_back(this->slides[i]);
+			}
+			
+			return DataFrame(params, slides);
+		}
+
+		query_result query(const std::vector<std::string>& keys, const Params& constraints, bool unique = false) {
 			if (unique) {
 				auto result = query(keys, constraints, false);
 				return std::visit(make_query_unique(), result);
 			}
 
-			// Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
-			for (auto const &[key, val] : constraints) {
-				if (params.count(key) && params[key] != val)
-					return query_t{std::vector<var_t>()};
-			}
-
-			// Determine which constraints are relevant, i.e. correspond to existing Slide-level parameters
-			std::map<std::string, var_t> relevant_constraints;
-			for (auto const &[key, val] : constraints) {
-				if (!params.count(key))
-					relevant_constraints[key] = val;
-			}
-
 			// Determine indices of slides which respect the given constraints
-			std::unordered_set<uint32_t> inds = compatible_inds(relevant_constraints);
+			auto inds = compatible_inds(constraints);
+			
+			// Constraints yield no valid slides, so return nothing
+			if (inds.empty())
+				return query_result{std::vector<var_t>()};
 
 			// Compile result of query
 			std::vector<query_t> result;

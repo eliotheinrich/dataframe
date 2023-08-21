@@ -85,6 +85,7 @@ void init_dataframe(nb::module_ &m) {
 	nb::class_<DataFrame>(m, "DataFrame")
 		.def(nb::init<>())
 		.def(nb::init<const std::vector<DataSlide>&>())
+		.def(nb::init<const Params&, const std::vector<DataSlide>&>())
 		.def(nb::init<const std::string&>())
 		.def(nb::init<const DataFrame&>())
 		.def_rw("params", &DataFrame::params)
@@ -101,6 +102,7 @@ void init_dataframe(nb::module_ &m) {
 		.def("__add__", &DataFrame::combine)
 		.def("write_json", &DataFrame::write_json)
 		.def("promote_params", &DataFrame::promote_params)
+		.def("filter", &DataFrame::filter)
 		.def("query", &DataFrame::query, "keys"_a, "constraints"_a, "unique"_a = false);
 	
 	nb::class_<ParallelCompute>(m, "ParallelCompute")
