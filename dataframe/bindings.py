@@ -99,8 +99,8 @@ class DataFrame:
     def modify_slides(func):
         for slide in self.slides:
             func(slide)
-        
-        return DataFrame(self.slides, self.params)
+
+        self._dataframe = _df.DataFrame(self.params, self.slides) 
     
     def query(self, keys: list | str, constraints: dict | None = None, unique: bool = False) -> list:
         if isinstance(keys, str):
