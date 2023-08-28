@@ -229,10 +229,20 @@ static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose
 
 	// Dealing with model parameters
 	std::vector<std::map<std::string, var_t>> zparams;
-	if (data.contains("zparams")) {
-		for (uint32_t i = 0; i < data["zparams"].size(); i++) {
+	std::string zparam_key;
+	bool found_zparam_key = false;
+	for (auto const& [key, val] : data.items()) {
+		if (key.find("zparams") != std::string::npos) {
+			zparam_key = key;
+			found_zparam_key = true;
+			break;
+		}
+	}
+
+	if (found_zparam_key) {
+		for (uint32_t i = 0; i < data[zparam_key].size(); i++) {
 			zparams.push_back(std::map<std::string, var_t>());
-			for (auto const &[key, val] : data["zparams"][i].items()) {
+			for (auto const &[key, val] : data[zparam_key][i].items()) {
 				if (data.contains(key)) {
 					std::cout << "Key " << key << " passed as a zipped parameter and an unzipped parameter; aborting.\n";
 					assert(false);
@@ -241,7 +251,7 @@ static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose
 			}
 		}
 
-		data.erase("zparams");
+		data.erase(zparam_key);
 	}
 
 	if (zparams.size() > 0) {
