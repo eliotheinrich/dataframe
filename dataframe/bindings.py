@@ -96,6 +96,12 @@ class DataFrame:
     def filter(self, constraints: dict):
         return DataFrame(self._dataframe.filter(constraints))
     
+    def modify_slides(func):
+        for slide in self.slides:
+            func(slide)
+
+        self._dataframe = _df.DataFrame(self.params, self.slides) 
+    
     def query(self, keys: list | str, constraints: dict | None = None, unique: bool = False) -> list:
         if isinstance(keys, str):
             keys = [keys]
