@@ -11,10 +11,6 @@ class DataSlide:
     def params(self):
         return self._dataslide.params
     
-    @property
-    def data(self):
-        return self._dataslide.data
-    
     def add_param(self, s: str, p: int | float | str):
         self._dataslide.add_param(s, p)
     
@@ -33,6 +29,9 @@ class DataSlide:
     def __getitem__(self, s: str) -> int | float | str:
         return self._dataslide[s]
 
+    def __setitem__(self, s: str, val: int | float | str):
+        self._dataslide.__setitem__(s, val)
+
     def __str__(self) -> str:
         return str(self._dataslide)
 
@@ -41,6 +40,14 @@ class DataSlide:
 
     def combine(self, slide):
         return self._dataslide.combine(slide)
+
+
+class _SlideContainer:
+    def __init__(self, slides):
+        self._slides = slides
+    
+    def __getitem__(self, i):
+        return DataSlide(self._slides[i])
 
 class DataFrame:
     def __init__(self, data: list | str | _df.DataFrame | None = None, params = None):
@@ -53,13 +60,15 @@ class DataFrame:
         else:
             self._dataframe = _df.DataFrame(data)
         
+        self._slides = _SlideContainer(self._dataframe.slides)
+        
     @property
     def params(self):
         return self._dataframe.params
     
     @property
     def slides(self):
-        return self._dataframe.slides
+        return self._slides
         
     def add_slide(self, slide):
         self._dataframe.add_slide(slide._dataslide)
@@ -75,6 +84,9 @@ class DataFrame:
     
     def __contains__(self, s: str) -> bool:
         return s in self._dataframe
+    
+    def __setitem__(self, s: str, val: int | float | str):
+        self._dataframe.__setitem__(s, val)
     
     def __getitem__(self, s: str) -> int | float | str:
         return self._dataframe[s]
@@ -96,11 +108,11 @@ class DataFrame:
     def filter(self, constraints: dict):
         return DataFrame(self._dataframe.filter(constraints))
     
-    def modify_slides(func):
-        for slide in self.slides:
+    def modify_slides(self, func):
+        for slide in self._dataframe.slides:
             func(slide)
 
-        self._dataframe = _df.DataFrame(self.params, self.slides) 
+        self._dataframe = _df.DataFrame(self.params, self._dataframe.slides) 
     
     def query(self, keys: list | str, constraints: dict | None = None, unique: bool = False) -> list:
         if isinstance(keys, str):
