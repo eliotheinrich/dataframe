@@ -48,6 +48,9 @@ class _SlideContainer:
     
     def __getitem__(self, i):
         return DataSlide(self._slides[i])
+    
+    def __len__(self):
+        return len(self._slides)
 
 class DataFrame:
     def __init__(self, data: list | str | _df.DataFrame | None = None, params = None):
