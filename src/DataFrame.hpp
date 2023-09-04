@@ -13,6 +13,7 @@
 #include <iostream>
 #include <variant>
 #include <unordered_set>
+#include <set>
 #include <nlohmann/json.hpp>
 
 #ifdef DEBUG
@@ -21,30 +22,8 @@
 #define LOG(x)
 #endif
 
-#ifdef OMPI // OMPI definitions and requirements
-
-#include <mpi.h>
-
-#define MASTER 0
-#define TERMINATE 0
-#define CONTINUE 1
-
-#define DO_IF_MASTER(x) {								\
-	int __rank;											\
-	MPI_Comm_rank(MPI_COMM_WORLD, &__rank);				\
-	if (__rank == MASTER) {								\
-		x												\
-	}													\
-}
-
-#else
-
-#define DO_IF_MASTER(x) x
-
 #ifndef SERIAL
 #include <BS_thread_pool.hpp>
-#endif
-
 #endif
 
 class Sample;
@@ -53,7 +32,9 @@ class DataFrame;
 class Config;
 class ParallelCompute;
 
-static std::string join(const std::vector<std::string> &v, const std::string &delim);
+static std::string join(const std::vector<std::string> &, const std::string &);
+static std::vector<std::string> split(const std::string &, const std::string &);
+static void escape_sequences(std::string &);
 
 
 // --- DEFINING VALID PARAMETER VALUES ---
@@ -64,7 +45,11 @@ typedef std::variant<int, double, std::string> var_t;
 struct var_t_to_string {
 	std::string operator()(const int& i) const { return std::to_string(i); }
 	std::string operator()(const double& f) const { return std::to_string(f); }
-	std::string operator()(const std::string& s) const { return "\"" + s + "\""; }
+	std::string operator()(const std::string& s) const {
+		std::string tmp = s;
+		escape_sequences(tmp);
+		return "\"" + tmp + "\""; 
+	}
 };
 
 static bool operator==(const var_t& v, const var_t& t) {
@@ -221,9 +206,8 @@ T get(Params &params, const std::string& key) {
 }
 
 static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose) {
-	if (verbose) {
-		DO_IF_MASTER(std::cout << "Loaded: \n" << data.dump() << "\n";)
-	}
+	if (verbose)
+		std::cout << "Loaded: \n" << data.dump() << "\n";
 
 	std::vector<Params> params;
 
@@ -453,7 +437,14 @@ class DataSlide {
 				for (auto const& val : vals)
 					data[key].push_back(val);
 			}
+		}
 
+		static DataSlide copy_params(const DataSlide& other) {
+			DataSlide slide;
+			for (auto const& [key, val]: other.params)
+				slide.add_param(key, val);
+
+			return slide;
 		}
 
 		bool contains(const std::string& s) const {
@@ -614,7 +605,7 @@ class DataFrame {
 			}
 		}
 
-		std::unordered_set<uint32_t> compatible_inds(const std::map<std::string, var_t>& constraints) {
+		std::unordered_set<uint32_t> compatible_inds(const Params& constraints) {
 			if (!qtable_initialized)
 				init_qtable();
 
@@ -625,7 +616,7 @@ class DataFrame {
 			}
 
 			// Determine which constraints are relevant, i.e. correspond to existing Slide-level parameters
-			std::map<std::string, var_t> relevant_constraints;
+			Params relevant_constraints;
 			for (auto const &[key, val] : constraints) {
 				if (!params.count(key))
 					relevant_constraints[key] = val;
@@ -653,6 +644,8 @@ class DataFrame {
 		Params params;
 		Params metadata;
 		std::vector<DataSlide> slides;
+
+		friend class ParallelCompute;
 		
 		DataFrame() {}
 
@@ -694,6 +687,15 @@ class DataFrame {
 		void add_slide(const DataSlide& ds) {
 			slides.push_back(ds);
 			qtable_initialized = false;
+		}
+
+		bool remove_slide(uint32_t i) {
+			if (i >= slides.size())
+				return false;
+
+			slides.erase(slides.begin() + i);
+			qtable_initialized = false;
+			return true;
 		}
 
 		template <typename T>
@@ -782,7 +784,7 @@ class DataFrame {
 			std::string s = to_string();
 
 			// Save to file
-			if (std::remove(filename.c_str())) std::cout << "Deleting old data\n";
+			if (!std::remove(filename.c_str())) std::cout << "Deleting old data\n";
 
 			std::ofstream output_file(filename);
 			output_file << s;
@@ -979,28 +981,21 @@ class DataFrame {
 };
 
 #define DEFAULT_NUM_RUNS 1
-#define DEFAULT_CONFIG_NAME "run"
 #define DEFAULT_SERIALIZE false
-#define DEFAULT_DESERIALIZE false
 
 class Config {
-	protected:
-		Params params;
+	private:
 		uint32_t num_runs;
 
-		std::string name;
-		bool serialize;
-		bool deserialize;
-
 	public:
-		friend class ParallelCompute;
+		bool serialize;
+		Params params;
 
 		Config(Params &params) : params(params) {
 			num_runs = get<int>(params, "num_runs", DEFAULT_NUM_RUNS);
-			name = get<std::string>(params, "name", DEFAULT_CONFIG_NAME);
 			serialize = get<int>(params, "serialize", DEFAULT_SERIALIZE);
-			deserialize = get<int>(params, "deserialize", DEFAULT_DESERIALIZE);
 		}
+
 		Config(Config &c) : Config(c.params) {}
 
 		virtual ~Config() {}
@@ -1009,322 +1004,140 @@ class Config {
 			return "{" + params_to_string(params) + "}";
 		}
 
-		virtual void write_serialize(uint32_t) const {
-			// Do nothing if no implementation is provided
-		}
+		uint32_t get_nruns() const { return num_runs; }
 
 		// To implement
-		virtual uint32_t get_nruns() const { return num_runs; }
+		virtual std::string write_serialize() const {
+			return "No implementation for config.serialize() provided.\n";
+		}
+
 		virtual DataSlide compute(uint32_t num_threads)=0;
 		virtual std::shared_ptr<Config> clone()=0;
+		virtual std::shared_ptr<Config> deserialize(Params&, const std::string&) { return clone(); } // By default, just clone config
 };
-
-static void print_progress(float progress, int expected_time = -1) {
-	DO_IF_MASTER(
-		int bar_width = 70;
-		std::cout << "[";
-		int pos = bar_width * progress;
-		for (int i = 0; i < bar_width; ++i) {
-			if (i < pos) std::cout << "=";
-			else if (i == pos) std::cout << ">";
-			else std::cout << " ";
-		}
-		std::stringstream time;
-		if (expected_time == -1) time << "";
-		else {
-			time << " [ ETA: ";
-			uint32_t num_seconds = expected_time % 60;
-			uint32_t num_minutes = expected_time/60;
-			uint32_t num_hours = num_minutes/60;
-			num_minutes -= num_hours*60;
-			time << std::setfill('0') << std::setw(2) << num_hours << ":" 
-				<< std::setfill('0') << std::setw(2) << num_minutes << ":" 
-				<< std::setfill('0') << std::setw(2) << num_seconds << " ] ";
-		}
-		std::cout << "] " << int(progress * 100.0) << " %" << time.str()  << "\r";
-		std::cout.flush();
-	)
-}
 
 class ParallelCompute {
 	private:
+		uint32_t percent_finished;
+		uint32_t prev_percent_finished;
+
 		std::vector<std::shared_ptr<Config>> configs;
-		static DataSlide thread_compute(std::shared_ptr<Config> config, uint32_t num_threads, uint32_t idx) {
+
+		void print_progress(uint32_t i, uint32_t N, std::optional<std::chrono::high_resolution_clock::time_point> run_start = std::nullopt) {
+			percent_finished = std::round(float(i)/N * 100);
+			if (percent_finished != prev_percent_finished) {
+				prev_percent_finished = percent_finished;
+				int duration = -1;
+				if (run_start.has_value()) {
+					auto now = std::chrono::high_resolution_clock::now();
+					duration = std::chrono::duration_cast<std::chrono::seconds>(now - run_start.value()).count();
+				}
+				float seconds_per_job = duration/float(i);
+				int remaining_time = seconds_per_job * (N - i);
+
+				float progress = percent_finished/100.;
+
+				int bar_width = 70;
+				std::cout << "[";
+				int pos = bar_width * progress;
+				for (int i = 0; i < bar_width; ++i) {
+					if (i < pos) std::cout << "=";
+					else if (i == pos) std::cout << ">";
+					else std::cout << " ";
+				}
+				std::stringstream time;
+				if (duration == -1) time << "";
+				else {
+					time << " [ ETA: ";
+					uint32_t num_seconds = remaining_time % 60;
+					uint32_t num_minutes = remaining_time/60;
+					uint32_t num_hours = num_minutes/60;
+					num_minutes -= num_hours*60;
+					time << std::setfill('0') << std::setw(2) << num_hours << ":" 
+						<< std::setfill('0') << std::setw(2) << num_minutes << ":" 
+						<< std::setfill('0') << std::setw(2) << num_seconds << " ] ";
+				}
+				std::cout << "] " << int(progress * 100.0) << " %" << time.str()  << "\r";
+				std::cout.flush();
+			}
+		}
+
+		typedef std::pair<DataSlide, std::optional<std::string>> compute_result_t;
+
+		// Static so that can be passed to threadpool without memory sharing issues
+		static compute_result_t thread_compute(std::shared_ptr<Config> config, uint32_t num_threads) {
 			DataSlide slide = config->compute(num_threads);
+
+			std::optional<std::string> serialize_result = std::nullopt;
 			if (config->serialize)
-				config->write_serialize(idx);
+				serialize_result = config->write_serialize();
 
 			slide.add_param(config->params);
-			return slide;
+			return std::make_pair(slide, serialize_result);
 		}
 
-		void compute_ompi(bool verbose) {
-#ifdef OMPI
-			auto start = std::chrono::high_resolution_clock::now();
 
+		std::vector<compute_result_t> compute_serial(
+			std::vector<std::shared_ptr<Config>> total_configs,
+			bool verbose
+		) {
+			uint32_t total_runs = total_configs.size();
 			uint32_t num_configs = configs.size();
-
-			std::vector<std::shared_ptr<Config>> total_configs;
-			uint32_t total_runs = 0;
-			for (uint32_t i = 0; i < num_configs; i++) {
-				configs[i]->clone();
-				uint32_t nruns = configs[i]->get_nruns();
-				total_runs += nruns;
-				for (uint32_t j = 0; j < nruns; j++)
-					total_configs.push_back(std::move(configs[i]->clone()));
-			}
-
-			std::vector<DataSlide> slides(total_runs);
-
-			int world_size, rank;
-			int index_buffer;
-			int control_buffer;
-
-			MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-			if (rank == MASTER) {
-				if (verbose) {
-					std::cout << "Computing with OMPI.\n";
-					std::cout << "num_configs: " << num_configs << std::endl;
-					std::cout << "total_runs: " << total_runs << std::endl;
-					print_progress(0.);	
-				}
-
-				uint32_t num_workers = world_size - 1;
-				std::vector<bool> free_processes(num_workers, true);
-				bool terminate = false;
-
-				auto run_start = std::chrono::high_resolution_clock::now();
-				uint32_t percent_finished = 0;
-				uint32_t prev_percent_finished = percent_finished;
-
-				uint32_t completed = 0;
-
-				uint32_t head = 0;
-				while (completed < total_runs) {
-					// Assign work to all free processes
-					for (uint32_t j = 0; j < num_workers; j++) {
-						if (head >= total_runs)
-							terminate = true;
-
-						if (free_processes[j]) {
-							free_processes[j] = false;
-
-							if (terminate) {
-								control_buffer = TERMINATE;
-							} else {
-								control_buffer = CONTINUE;
-								index_buffer = head;
-							}
-
-							MPI_Send(&index_buffer, 1, MPI_INT, j+1, control_buffer, MPI_COMM_WORLD);
-							
-							head++;
-						}
-					}
-
-					// MASTER can also do some work here
-					if (head < total_runs) {
-						slides[head] = total_configs[head]->compute(num_threads_per_task);
-						head++;
-						completed++;
-					}
-
-					if (world_size != 1) {
-						// Collect results and free workers
-						MPI_Status status;
-						MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-						int message_length;
-						MPI_Get_count(&status, MPI_CHAR, &message_length);
-						int message_source = status.MPI_SOURCE;
-						index_buffer = status.MPI_TAG;
-
-						char* message_buffer = (char*) std::malloc(message_length);
-						MPI_Recv(message_buffer, message_length, MPI_CHAR, message_source, index_buffer, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-						slides[index_buffer] = DataSlide(std::string(message_buffer));
-
-						// Mark worker as free
-						free_processes[message_source-1] = true;
-						completed++;
-					}
-
-					// Display progress
-					if (verbose) {
-						percent_finished = std::round(float(completed)/total_runs * 100);
-						if (percent_finished != prev_percent_finished) {
-							prev_percent_finished = percent_finished;
-							auto elapsed = std::chrono::high_resolution_clock::now();
-							int duration = std::chrono::duration_cast<std::chrono::seconds>(elapsed - run_start).count();
-							float seconds_per_job = duration/float(completed);
-							int remaining_time = seconds_per_job * (total_runs - completed);
-
-							print_progress(percent_finished/100., remaining_time);
-						}
-					}
-				}
-
-				// Cleanup remaining workers
-				for (uint32_t i = 0; i < num_workers; i++) {
-					if (free_processes[i])
-						MPI_Send(&index_buffer, 1, MPI_INT, i+1, TERMINATE, MPI_COMM_WORLD);
-				}
-
-				// Construct final DataFrame and return
-				uint32_t idx = 0;
-				for (uint32_t i = 0; i < num_configs; i++) {
-					DataSlide ds = slides[idx];
-					uint32_t nruns = configs[i]->get_nruns();
-					for (uint32_t j = 1; j < nruns; j++) {
-						idx++;
-						ds = ds.combine(slides[idx]);
-					}
-					idx++;
-
-					df.add_slide(ds);
-				}
-
-
-				if (verbose) {
-					print_progress(1., 0);	
-					std::cout << std::endl;
-				}
-
-				auto stop = std::chrono::high_resolution_clock::now();
-				auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
-
-				df.add_metadata("num_threads", (int) num_threads);
-				df.add_metadata("num_jobs", (int) total_runs);
-				df.add_metadata("total_time", (int) duration.count());
-				df.promote_params();
-				if (verbose)
-					std::cout << "Total runtime: " << (int) duration.count() << std::endl;
-
-			} else {
-				uint32_t idx;
-				while (true) {
-					// Receive control code and index
-					MPI_Status status;
-					MPI_Probe(MASTER, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-					control_buffer = status.MPI_TAG;
-					MPI_Recv(&index_buffer, 1, MPI_INT, MASTER, control_buffer, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-					if (control_buffer == TERMINATE)
-						break;
-
-					// Do work
-					DataSlide slide = total_configs[index_buffer]->compute(num_threads_per_task);
-					std::string message = slide.to_string(0, false, true);
-					MPI_Send(message.c_str(), message.size(), MPI_CHAR, MASTER, index_buffer, MPI_COMM_WORLD);
-				}
-			}
-#endif
-		}
-
-		void compute_serial(bool verbose) {
-			auto start = std::chrono::high_resolution_clock::now();
-
-			uint32_t num_configs = configs.size();
-
-			std::vector<std::shared_ptr<Config>> total_configs;
-			uint32_t total_runs = 0;
-			for (uint32_t i = 0; i < num_configs; i++) {
-				configs[i]->clone();
-				uint32_t nruns = configs[i]->get_nruns();
-				total_runs += nruns;
-				for (uint32_t j = 0; j < nruns; j++)
-					total_configs.push_back(configs[i]->clone());
-			}
 
 			if (verbose) {
 				std::cout << "Computing in serial.\n";
 				std::cout << "num_configs: " << num_configs << std::endl;
 				std::cout << "total_runs: " << total_runs << std::endl;
-				print_progress(0.);	
+				print_progress(0, total_runs);	
 			}
 
-			std::vector<DataSlide> slides(total_runs);
+			std::vector<compute_result_t> results(total_runs);
 
-			uint32_t idx = 0;
 			auto run_start = std::chrono::high_resolution_clock::now();
-			uint32_t percent_finished = 0;
-			uint32_t prev_percent_finished = percent_finished;
+			uint32_t idx = 0;
 			for (uint32_t i = 0; i < num_configs; i++) {
 				// Cloning and discarding calls constructors which emplace default values into params of configs[i]
 				// This is a gross hack
 				// TODO fix
 				configs[i]->clone();
 				uint32_t nruns = configs[i]->get_nruns();
+				std::vector<std::string> serializations;
 				for (uint32_t j = 0; j < nruns; j++) {
 					std::shared_ptr<Config> cfg = configs[i]->clone();
-					DataSlide slide = cfg->compute(num_threads_per_task);
-					if (cfg->serialize)
-						cfg->write_serialize(j);
-
-					slide.add_param(cfg->params);
-					df.add_slide(slide);
+					results[idx] = ParallelCompute::thread_compute(cfg, num_threads_per_task);
 					idx++;
 
-					if (verbose) {
-						percent_finished = std::round(float(i)/total_runs * 100);
-						if (percent_finished != prev_percent_finished) {
-							prev_percent_finished = percent_finished;
-							auto elapsed = std::chrono::high_resolution_clock::now();
-							int duration = std::chrono::duration_cast<std::chrono::seconds>(elapsed - run_start).count();
-							float seconds_per_job = duration/float(i);
-							int remaining_time = seconds_per_job * (total_runs - i);
-
-							print_progress(percent_finished/100., remaining_time);
-						}
-					}
+					if (verbose)
+						print_progress(i, total_runs, run_start);
 				}
 			}
 
-			if (verbose) {
-				print_progress(1., 0);	
-				std::cout << std::endl;
-			}
-
-
-			auto stop = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
-
-			df.add_metadata("num_threads", (int) num_threads);
-			df.add_metadata("num_jobs", (int) total_runs);
-			df.add_metadata("total_time", (int) duration.count());
-			df.promote_params();
-
-			if (verbose)
-				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
+			return results;
 		}
 
-		void compute_bspl(bool verbose) {
-#ifndef OMPI
-#ifndef SERIAL
-			auto start = std::chrono::high_resolution_clock::now();
-
+		// Return a pair of slides and corresponding state (optional) serializations
+		std::vector<compute_result_t> compute_bspl(
+			std::vector<std::shared_ptr<Config>> total_configs, 
+			bool verbose
+		) {
+			uint32_t total_runs = total_configs.size();
 			uint32_t num_configs = configs.size();
-
-			std::vector<std::shared_ptr<Config>> total_configs;
-			uint32_t total_runs = 0;
-			for (uint32_t i = 0; i < num_configs; i++) {
-				configs[i]->clone();
-				uint32_t nruns = configs[i]->get_nruns();
-				total_runs += nruns;
-				for (uint32_t j = 0; j < nruns; j++)
-					total_configs.push_back(configs[i]->clone());
-			}
 
 			if (verbose) {
 				std::cout << "Computing with BSPL. " << num_threads << " threads available.\n";
 				std::cout << "num_configs: " << num_configs << std::endl;
 				std::cout << "total_runs: " << total_runs << std::endl;
-				print_progress(0.);	
+				print_progress(0, total_runs);
 			}
+
 
 			std::vector<DataSlide> slides(total_runs);
 			BS::thread_pool threads(num_threads);
-			std::vector<std::future<DataSlide>> results(total_runs);
+			std::vector<std::future<compute_result_t>> futures(total_runs);
+			std::vector<compute_result_t> results(total_runs);
 
+
+			auto run_start = std::chrono::high_resolution_clock::now();
 			uint32_t idx = 0;
 			for (uint32_t i = 0; i < num_configs; i++) {
 				// Cloning and discarding calls constructors which emplace default values into params of configs[i]
@@ -1334,88 +1147,152 @@ class ParallelCompute {
 				uint32_t nruns = configs[i]->get_nruns();
 				for (uint32_t j = 0; j < nruns; j++) {
 					std::shared_ptr<Config> cfg = configs[i]->clone();
-					results[idx] = threads.submit(ParallelCompute::thread_compute, cfg, num_threads_per_task, j);
+					futures[idx] = threads.submit(ParallelCompute::thread_compute, cfg, num_threads_per_task);
 					idx++;
 				}
 			}
 
-			auto run_start = std::chrono::high_resolution_clock::now();
-			uint32_t percent_finished = 0;
-			uint32_t prev_percent_finished = percent_finished;
 			for (uint32_t i = 0; i < total_runs; i++) {
-				slides[i] = results[i].get();
+				results[i] = futures[i].get();
 				
-				if (verbose) {
-					percent_finished = std::round(float(i)/total_runs * 100);
-					if (percent_finished != prev_percent_finished) {
-						prev_percent_finished = percent_finished;
-						auto elapsed = std::chrono::high_resolution_clock::now();
-						int duration = std::chrono::duration_cast<std::chrono::seconds>(elapsed - run_start).count();
-						float seconds_per_job = duration/float(i);
-						int remaining_time = seconds_per_job * (total_runs - i);
-
-						print_progress(percent_finished/100., remaining_time);
-					}
-				}
+				if (verbose)
+					print_progress(i, total_runs, run_start);
 			}
 
-			idx = 0;
-			for (uint32_t i = 0; i < num_configs; i++) {
-				DataSlide ds = slides[idx];
-				uint32_t nruns = configs[i]->get_nruns();
-				for (uint32_t j = 1; j < nruns; j++) {
-					idx++;
-					ds = ds.combine(slides[idx]);
-				}
-				idx++;
-
-				df.add_slide(ds);
-			}
-
-			if (verbose) {
-				print_progress(1., 0);	
-				std::cout << std::endl;
-			}
-
-
-			auto stop = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
-
-			df.add_metadata("num_threads", (int) num_threads);
-			df.add_metadata("num_jobs", (int) total_runs);
-			df.add_metadata("total_time", (int) duration.count());
-			df.promote_params();
-
-			if (verbose)
-				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
-#endif
-#endif
+			return results;
 		}
 
 	public:
 		DataFrame df;
+		DataFrame serialize_df;
 		uint32_t num_threads;
 		uint32_t num_threads_per_task;
+
+
+		bool serialize;
+		std::string serialize_name;
+
+		ParallelCompute(
+			std::vector<std::shared_ptr<Config>> configs, 
+			uint32_t num_threads, 
+			uint32_t num_threads_per_task,
+			bool serialize
+		) : configs(configs), num_threads(num_threads), num_threads_per_task(num_threads_per_task), serialize(serialize) {}
+
 
 		ParallelCompute(
 			std::vector<std::shared_ptr<Config>> configs, 
 			uint32_t num_threads, 
 			uint32_t num_threads_per_task
-		) : configs(std::move(configs)), num_threads(num_threads), num_threads_per_task(num_threads_per_task) {}
+		) : ParallelCompute(configs, num_threads, num_threads_per_task, false) {}
+
 
 		void compute(bool verbose=false) {
-#ifdef OMPI
-			compute_ompi(verbose);
-#elif defined SERIAL
-			compute_serial(verbose);
+			auto start = std::chrono::high_resolution_clock::now();
+
+			uint32_t num_configs = configs.size();
+
+			std::vector<std::shared_ptr<Config>> total_configs;
+			for (uint32_t i = 0; i < num_configs; i++) {
+				configs[i]->clone();
+				uint32_t nruns = configs[i]->get_nruns();
+				for (uint32_t j = 0; j < nruns; j++)
+					total_configs.push_back(configs[i]->clone());
+			}
+
+#ifdef SERIAL
+			auto results = compute_serial(total_configs, verbose);
 #else
-			compute_bspl(verbose);
+			auto results = compute_bspl(total_configs, verbose);
 #endif
+			uint32_t idx = 0;
+			for (uint32_t i = 0; i < num_configs; i++) {
+				auto [slide, serialization] = results[idx];
+				uint32_t nruns = configs[i]->get_nruns();
+
+				std::vector<std::optional<std::string>> slide_serializations;
+				slide_serializations.push_back(serialization);
+
+				for (uint32_t j = 1; j < nruns; j++) {
+					idx++;
+					auto [slide_tmp, serialization] = results[idx];
+					slide = slide.combine(slide_tmp);
+
+					if (serialize)
+						slide_serializations.push_back(serialization);
+				}
+				idx++;
+
+				df.add_slide(slide);	
+				DataSlide serialize_ds = DataSlide::copy_params(slide);
+
+				// Add serializations
+				for (uint32_t j = 0; j < nruns; j++) {
+					if (slide_serializations[j].has_value())
+						serialize_ds.add_param("serialization_" + std::to_string(j), slide_serializations[j].value());
+				}
+
+				serialize_df.add_slide(serialize_ds);
+			}
+
+			auto stop = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+
+			df.add_metadata("num_threads", (int) num_threads);
+			df.add_metadata("num_jobs", (int) total_configs.size());
+			df.add_metadata("total_time", (int) duration.count());
+			df.promote_params();
+
+			serialize_df.add_metadata("num_threads", (int) num_threads);
+			serialize_df.add_metadata("num_jobs", (int) total_configs.size());
+			serialize_df.add_metadata("total_time", (int) duration.count());
+			// A little hacky; need to set num_runs = 1 so that configs are not duplicated when a run is
+			// started from serialized data
+			for (auto &slide : serialize_df.slides)
+				slide.add_param("num_runs", 1);
+
+			// Combine congruent slides
+			uint32_t counted = 0;
+			std::vector<std::vector<uint32_t>> partitions;
+			uint32_t num_slides = df.slides.size();
+
+			std::vector<uint32_t> indices_v(num_slides);
+			std::iota(indices_v.begin(), indices_v.end(), 0);
+			std::set<uint32_t> indices(indices_v.begin(), indices_v.end());
+			while (counted < num_slides) {
+				uint32_t i = *indices.begin();
+				auto compatible_inds = df.compatible_inds(df.slides[i].params);
+
+				partitions.push_back(std::vector<uint32_t>(compatible_inds.begin(), compatible_inds.end()));
+
+				for (auto j : compatible_inds)
+					indices.erase(j);
+			
+				counted += compatible_inds.size();
+			}
+
+			std::vector<DataSlide> slides;
+			for (uint32_t i = 0; i < partitions.size(); i++) {
+				DataSlide slide = df.slides[partitions[i][0]];
+				for (uint32_t j = 1; j < partitions[i].size(); j++)
+					slide = slide.combine(df.slides[partitions[i][j]]);
+
+				slides.push_back(slide);
+			}
+
+			df.slides = slides;
+
+			if (verbose)
+				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
 		}
 
-		bool write_json(std::string filename) const {
+		void write_json(std::string filename) const {
 			df.write_json(filename);
-			return true;
+		}
+
+		void write_serialize_json(std::string filename) const {
+			if (serialize)
+				serialize_df.write_json(filename);
 		}
 };
 
@@ -1428,4 +1305,44 @@ static std::string join(const std::vector<std::string> &v, const std::string &de
         s += i;
     }
     return s;
+}
+
+static std::vector<std::string> split(const std::string &s, const std::string &delim) {
+    size_t pos_start = 0, pos_end, delim_len = delim.length();
+    std::string token;
+    std::vector<std::string> res;
+
+    while ((pos_end = s.find(delim, pos_start)) != std::string::npos) {
+        token = s.substr (pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        res.push_back (token);
+    }
+
+    res.push_back (s.substr (pos_start));
+    return res;
+}
+
+static void escape_sequences(std::string &str) {
+	std::pair<char, char> const sequences[] {
+		{ '\a', 'a' },
+		{ '\b', 'b' },
+		{ '\f', 'f' },
+		{ '\n', 'n' },
+		{ '\r', 'r' },
+		{ '\t', 't' },
+		{ '\v', 'v' },
+	};
+
+	for (size_t i = 0; i < str.length(); ++i) {
+		char *const c = str.data() + i;
+
+		for (auto const seq : sequences) {
+			if (*c == seq.first) {
+				*c = seq.second;
+				str.insert(i, "\\");
+				++i; // to account for inserted "\\"
+				break;
+			}
+		}
+	}
 }

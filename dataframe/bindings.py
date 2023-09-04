@@ -141,6 +141,9 @@ class ParallelCompute:
     def write_json(self, filename: str):
         self._pc.write_json(filename)
 
+    def write_serialize_json(self, filename: str):
+        self._pc.write_serialize_json(filename)
+
 def load_data(filename: str) -> DataFrame:
     with open(filename, 'r') as f:
         s = f.read()

@@ -43,7 +43,6 @@ class Simulator {
             return "serialize is not implemented for this simulator.\n";
         }
 
-        virtual std::shared_ptr<Simulator> clone(Params &params)=0;
         virtual void timesteps(uint32_t num_steps)=0;
 
         // By default, do nothing special during equilibration timesteps
@@ -60,6 +59,9 @@ class Simulator {
         }
 
         virtual void init_state(uint32_t num_threads)=0;
+        
+        virtual std::shared_ptr<Simulator> clone(Params &params)=0;
+        virtual std::shared_ptr<Simulator> deserialize(Params &params, const std::string&) { return clone(params); }
 };
 
 class TimeConfig : public Config {
@@ -170,13 +172,6 @@ class TimeConfig : public Config {
             }
         }
 
-        virtual void write_serialize(uint32_t index) const override {
-            std::ofstream file;
-            file.open(name + "_" + std::to_string(index) + ".dat");
-            file << simulator->serialize();
-            file.close();
-        }
-
         virtual DataSlide compute(uint32_t num_threads) override {
 			auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -248,7 +243,18 @@ class TimeConfig : public Config {
 
         virtual std::shared_ptr<Config> clone() override {
             std::shared_ptr<TimeConfig> config(new TimeConfig(params));
-            std::shared_ptr<Simulator> sim = simulator.get()->clone(params);
+            std::shared_ptr<Simulator> sim = simulator->clone(params);
+            config->init_simulator(sim);
+            return config;
+        }
+
+        virtual std::string write_serialize() const override {
+            return simulator->serialize();
+        }
+
+        virtual std::shared_ptr<Config> deserialize(Params &params, const std::string &data) override {
+            std::shared_ptr<TimeConfig> config(new TimeConfig(params));
+            std::shared_ptr<Simulator> sim = simulator->deserialize(params, data);
             config->init_simulator(sim);
             return config;
         }
