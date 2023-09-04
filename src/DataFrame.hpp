@@ -978,16 +978,28 @@ class DataFrame {
 		}
 };
 
+#define DEFAULT_NUM_RUNS 1
+#define DEFAULT_CONFIG_NAME "run"
+#define DEFAULT_SERIALIZE false
+#define DEFAULT_DESERIALIZE false
+
 class Config {
 	protected:
 		Params params;
 		uint32_t num_runs;
 
+		std::string name;
+		bool serialize;
+		bool deserialize;
+
 	public:
 		friend class ParallelCompute;
 
 		Config(Params &params) : params(params) {
-			num_runs = get<int>(params, "num_runs");
+			num_runs = get<int>(params, "num_runs", DEFAULT_NUM_RUNS);
+			name = get<std::string>(params, "name", DEFAULT_CONFIG_NAME);
+			serialize = get<int>(params, "serialize", DEFAULT_SERIALIZE);
+			deserialize = get<int>(params, "deserialize", DEFAULT_DESERIALIZE);
 		}
 		Config(Config &c) : Config(c.params) {}
 
@@ -996,6 +1008,8 @@ class Config {
 		std::string to_string() const {
 			return "{" + params_to_string(params) + "}";
 		}
+
+		virtual void write_serialize(uint32_t) const=0;
 
 		// To implement
 		virtual uint32_t get_nruns() const { return num_runs; }
@@ -1033,8 +1047,11 @@ static void print_progress(float progress, int expected_time = -1) {
 class ParallelCompute {
 	private:
 		std::vector<std::shared_ptr<Config>> configs;
-		static DataSlide thread_compute(std::shared_ptr<Config> config, uint32_t num_threads) {
+		static DataSlide thread_compute(std::shared_ptr<Config> config, uint32_t num_threads, uint32_t idx) {
 			DataSlide slide = config->compute(num_threads);
+			if (config->serialize)
+				config->write_serialize(idx);
+
 			slide.add_param(config->params);
 			return slide;
 		}
@@ -1213,7 +1230,7 @@ class ParallelCompute {
 				uint32_t nruns = configs[i]->get_nruns();
 				total_runs += nruns;
 				for (uint32_t j = 0; j < nruns; j++)
-					total_configs.push_back(std::move(configs[i]->clone()));
+					total_configs.push_back(configs[i]->clone());
 			}
 
 			if (verbose) {
@@ -1238,6 +1255,9 @@ class ParallelCompute {
 				for (uint32_t j = 0; j < nruns; j++) {
 					std::shared_ptr<Config> cfg = configs[i]->clone();
 					DataSlide slide = cfg->compute(num_threads_per_task);
+					if (cfg->serialize)
+						cfg->write_serialize(j);
+
 					slide.add_param(cfg->params);
 					df.add_slide(slide);
 					idx++;
@@ -1289,7 +1309,7 @@ class ParallelCompute {
 				uint32_t nruns = configs[i]->get_nruns();
 				total_runs += nruns;
 				for (uint32_t j = 0; j < nruns; j++)
-					total_configs.push_back(std::move(configs[i]->clone()));
+					total_configs.push_back(configs[i]->clone());
 			}
 
 			if (verbose) {
@@ -1312,7 +1332,7 @@ class ParallelCompute {
 				uint32_t nruns = configs[i]->get_nruns();
 				for (uint32_t j = 0; j < nruns; j++) {
 					std::shared_ptr<Config> cfg = configs[i]->clone();
-					results[idx] = threads.submit(ParallelCompute::thread_compute, cfg, num_threads_per_task);
+					results[idx] = threads.submit(ParallelCompute::thread_compute, cfg, num_threads_per_task, j);
 					idx++;
 				}
 			}

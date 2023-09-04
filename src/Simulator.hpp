@@ -39,6 +39,10 @@ class Simulator {
 
         virtual ~Simulator() {}
 
+        virtual std::string serialize() const {
+            return "serialize is not implemented for this simulator.\n";
+        }
+
         virtual std::shared_ptr<Simulator> clone(Params &params)=0;
         virtual void timesteps(uint32_t num_steps)=0;
 
@@ -164,6 +168,13 @@ class TimeConfig : public Config {
             if (autoconverge) {
                 convergence_threshold = get<double>(params, "convergence_threshold", DEFAULT_CONVERGENCE_THRESHOLD);
             }
+        }
+
+        virtual void write_serialize(uint32_t index) const override {
+            std::ofstream file;
+            file.open(name + "_" + std::to_string(index) + ".dat");
+            file << simulator.serialize();
+            file.close();
         }
 
         virtual DataSlide compute(uint32_t num_threads) override {
