@@ -74,6 +74,7 @@ void init_dataframe(nb::module_ &m) {
 		.def("remove", &DataSlide::remove)
 		.def("__contains__", &DataSlide::contains)
 		.def("__getitem__", &DataSlide::get_param)
+		.def("__setitem__", ds_add_param2)
 		.def("__str__", &DataSlide::to_string, "indentation"_a = 0, "pretty"_a = true, "save_full_sample"_a = false)
 		.def("congruent", &DataSlide::congruent)
 		.def("combine", &DataSlide::combine);
@@ -98,6 +99,7 @@ void init_dataframe(nb::module_ &m) {
 		.def("remove", &DataFrame::remove)
 		.def("__contains__", &DataFrame::contains)
 		.def("__getitem__", &DataFrame::get)
+		.def("__setitem__", df_add_param2)
 		.def("__str__", &DataFrame::to_string)
 		.def("__add__", &DataFrame::combine)
 		.def("write_json", &DataFrame::write_json)
