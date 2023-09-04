@@ -1009,7 +1009,9 @@ class Config {
 			return "{" + params_to_string(params) + "}";
 		}
 
-		virtual void write_serialize(uint32_t) const=0;
+		virtual void write_serialize(uint32_t) const {
+			// Do nothing if no implementation is provided
+		}
 
 		// To implement
 		virtual uint32_t get_nruns() const { return num_runs; }
