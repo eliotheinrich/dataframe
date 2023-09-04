@@ -173,7 +173,7 @@ class TimeConfig : public Config {
         virtual void write_serialize(uint32_t index) const override {
             std::ofstream file;
             file.open(name + "_" + std::to_string(index) + ".dat");
-            file << simulator.serialize();
+            file << simulator->serialize();
             file.close();
         }
 
