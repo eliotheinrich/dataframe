@@ -1200,11 +1200,13 @@ class ParallelCompute {
 					total_configs.push_back(configs[i]->clone());
 			}
 
+std::cout << "Starting to compute results.\n";
 #ifdef SERIAL
 			auto results = compute_serial(total_configs, verbose);
 #else
 			auto results = compute_bspl(total_configs, verbose);
 #endif
+std::cout << "Finished computing results.\n";
 			uint32_t idx = 0;
 			for (uint32_t i = 0; i < num_configs; i++) {
 				auto [slide, serialization] = results[idx];
@@ -1234,6 +1236,7 @@ class ParallelCompute {
 
 				serialize_df.add_slide(serialize_ds);
 			}
+std::cout << "df assembled.\n";
 
 			auto stop = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
