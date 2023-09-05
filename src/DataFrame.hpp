@@ -1022,6 +1022,7 @@ class ParallelCompute {
 		uint32_t prev_percent_finished;
 
 		std::vector<std::shared_ptr<Config>> configs;
+		DataFrame serialize_df;
 
 		void print_progress(uint32_t i, uint32_t N, std::optional<std::chrono::high_resolution_clock::time_point> run_start = std::nullopt) {
 			percent_finished = std::round(float(i)/N * 100);
@@ -1164,13 +1165,11 @@ class ParallelCompute {
 
 	public:
 		DataFrame df;
-		DataFrame serialize_df;
 		uint32_t num_threads;
 		uint32_t num_threads_per_task;
 
 
 		bool serialize;
-		std::string serialize_name;
 
 		ParallelCompute(
 			std::vector<std::shared_ptr<Config>> configs, 
@@ -1200,13 +1199,11 @@ class ParallelCompute {
 					total_configs.push_back(configs[i]->clone());
 			}
 
-std::cout << "Starting to compute results.\n";
 #ifdef SERIAL
 			auto results = compute_serial(total_configs, verbose);
 #else
 			auto results = compute_bspl(total_configs, verbose);
 #endif
-std::cout << "Finished computing results.\n";
 			uint32_t idx = 0;
 			for (uint32_t i = 0; i < num_configs; i++) {
 				auto [slide, serialization] = results[idx];
@@ -1220,8 +1217,7 @@ std::cout << "Finished computing results.\n";
 					auto [slide_tmp, serialization] = results[idx];
 					slide = slide.combine(slide_tmp);
 
-					if (serialize)
-						slide_serializations.push_back(serialization);
+					slide_serializations.push_back(serialization);
 				}
 				idx++;
 
@@ -1233,10 +1229,8 @@ std::cout << "Finished computing results.\n";
 					if (slide_serializations[j].has_value())
 						serialize_ds.add_param("serialization_" + std::to_string(j), slide_serializations[j].value());
 				}
-
 				serialize_df.add_slide(serialize_ds);
 			}
-std::cout << "df assembled.\n";
 
 			auto stop = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);

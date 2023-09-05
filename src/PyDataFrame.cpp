@@ -110,6 +110,7 @@ void init_dataframe(nb::module_ &m) {
 	nb::class_<ParallelCompute>(m, "ParallelCompute")
 		.def(nb::init<std::vector<std::shared_ptr<Config>>, uint32_t, uint32_t>(), "configs"_a = std::vector<std::shared_ptr<Config>>(), "num_threads"_a = 1, "num_threads_per_task"_a = 1)
 		.def_rw("dataframe", &ParallelCompute::df)
+		.def_rw("serialize", &ParallelCompute::serialize)
 		.def("compute", &ParallelCompute::compute, "verbose"_a = false)
 		.def("write_json", &ParallelCompute::write_json)
 		.def("write_serialize_json", &ParallelCompute::write_serialize_json);
