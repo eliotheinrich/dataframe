@@ -10,13 +10,13 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 std::string write_config(const std::vector<Params>& params) {
-	std::unordered_set<std::string> keys;
-	std::map<std::string, std::unordered_set<var_t>> vals;
+	std::set<std::string> keys;
+	std::map<std::string, std::set<var_t>> vals;
 	for (auto const &p : params) {
 		for (auto const &[k, v] : p) {
 			keys.insert(k);
 			if (!vals.count(k))
-				vals[k] = std::unordered_set<var_t>();
+				vals[k] = std::set<var_t>();
 			
 			vals[k].insert(v);
 		}

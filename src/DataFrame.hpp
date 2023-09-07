@@ -13,7 +13,6 @@
 #include <iostream>
 #include <variant>
 #include <optional>
-#include <unordered_set>
 #include <set>
 #include <nlohmann/json.hpp>
 
@@ -571,12 +570,12 @@ class DataFrame {
 		std::map<std::string, std::map<var_t, std::vector<uint32_t>>> qtable;
 
 		void init_qtable() {
-			std::map<std::string, std::unordered_set<var_t>> key_vals;
+			std::map<std::string, std::set<var_t>> key_vals;
 
 			for (auto const &slide : slides) {
 				for (auto const &[key, val] : slide.params) {
 					if (!key_vals.count(key))
-						key_vals[key] = std::unordered_set<var_t>();
+						key_vals[key] = std::set<var_t>();
 					
 					key_vals[key].insert(val);
 				}
@@ -606,14 +605,14 @@ class DataFrame {
 			}
 		}
 
-		std::unordered_set<uint32_t> compatible_inds(const Params& constraints) {
+		std::set<uint32_t> compatible_inds(const Params& constraints) {
 			if (!qtable_initialized)
 				init_qtable();
 
 			// Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
 			for (auto const &[key, val] : constraints) {
 				if (params.count(key) && params[key] != val)
-					return std::unordered_set<uint32_t>();
+					return std::set<uint32_t>();
 			}
 
 			// Determine which constraints are relevant, i.e. correspond to existing Slide-level parameters
@@ -623,12 +622,12 @@ class DataFrame {
 					relevant_constraints[key] = val;
 			}
 
-			std::unordered_set<uint32_t> inds;
+			std::set<uint32_t> inds;
 			for (uint32_t i = 0; i < slides.size(); i++) inds.insert(i);
 	
 			for (auto const &[key, val] : relevant_constraints) {
 				// Take set intersection
-				std::unordered_set<uint32_t> tmp;
+				std::set<uint32_t> tmp;
 				for (auto const i : qtable[key][val]) {
 					if (inds.count(i))
 						tmp.insert(i);
@@ -841,10 +840,6 @@ class DataFrame {
 
 			// Determine indices of slides which respect the given constraints
 			auto inds = compatible_inds(constraints);
-			std::cout << "compatible inds: \n";
-			for (auto i : inds)
-				std::cout << i << " ";
-			std::cout << "\n";
 			
 			// Constraints yield no valid slides, so return nothing
 			if (inds.empty())
@@ -857,7 +852,7 @@ class DataFrame {
 				query_t key_result;
 				if (params.count(key)) {
 					key_result = query_t{params[key]};
-				} else if (slides[0].params.count(key)) {
+				} else if (slides[*inds.begin()].params.count(key)) {
 					std::vector<var_t> param_vals;
 					for (auto const i : inds)
 						param_vals.push_back(slides[i].params[key]);
@@ -884,13 +879,13 @@ class DataFrame {
 
 			std::vector<DataSlide> new_slides;
 
-			std::unordered_set<uint32_t> reduced;
+			std::set<uint32_t> reduced;
 			for (uint32_t i = 0; i < slides.size(); i++) {
 				if (reduced.count(i))
 					continue;
 
 				DataSlide slide(slides[i]);
-				std::unordered_set<uint32_t> inds = compatible_inds(slide.params);
+				auto inds = compatible_inds(slide.params);
 				for (auto const j : inds) {
 					if (i == j) continue;
 					slide = slide.combine(slides[j]);
@@ -908,29 +903,29 @@ class DataFrame {
 			else if (other.params.empty() && other.slides.empty())
 				return DataFrame(*this);
 			
-			std::unordered_set<std::string> self_frame_params;
+			std::set<std::string> self_frame_params;
 			for (auto const& [k, _] : params)
 				self_frame_params.insert(k);
 
-			std::unordered_set<std::string> other_frame_params;
+			std::set<std::string> other_frame_params;
 			for (auto const& [k, _] : other.params)
 				other_frame_params.insert(k);
 
 			// both_frame_params is the intersection of keys of params and other.params
-			std::unordered_set<std::string> both_frame_params;
+			std::set<std::string> both_frame_params;
 			for (auto const& k : self_frame_params) {
 				if (other_frame_params.count(k))
 					both_frame_params.insert(k);
 			}
 
 			// Erase keys which appear in both frame params
-			std::unordered_set<std::string> to_erase1;
+			std::set<std::string> to_erase1;
 			for (auto const& k : self_frame_params) {
 				if (other_frame_params.count(k))
 					to_erase1.insert(k);
 			}
 
-			std::unordered_set<std::string> to_erase2;
+			std::set<std::string> to_erase2;
 			for (auto const& k : other_frame_params) {
 				if (self_frame_params.count(k))
 					to_erase2.insert(k);
@@ -1243,7 +1238,6 @@ class ParallelCompute {
 			df.add_metadata("num_threads", (int) num_threads);
 			df.add_metadata("num_jobs", (int) total_configs.size());
 			df.add_metadata("total_time", (int) duration.count());
-			df.promote_params();
 
 			serialize_df.add_metadata("num_threads", (int) num_threads);
 			serialize_df.add_metadata("num_jobs", (int) total_configs.size());
@@ -1253,36 +1247,7 @@ class ParallelCompute {
 			for (auto &slide : serialize_df.slides)
 				slide.add_param("num_runs", 1);
 
-			// Combine congruent slides
-			uint32_t counted = 0;
-			std::vector<std::vector<uint32_t>> partitions;
-			uint32_t num_slides = df.slides.size();
-
-			std::vector<uint32_t> indices_v(num_slides);
-			std::iota(indices_v.begin(), indices_v.end(), 0);
-			std::set<uint32_t> indices(indices_v.begin(), indices_v.end());
-			while (counted < num_slides) {
-				uint32_t i = *indices.begin();
-				auto compatible_inds = df.compatible_inds(df.slides[i].params);
-
-				partitions.push_back(std::vector<uint32_t>(compatible_inds.begin(), compatible_inds.end()));
-
-				for (auto j : compatible_inds)
-					indices.erase(j);
-			
-				counted += compatible_inds.size();
-			}
-
-			std::vector<DataSlide> slides;
-			for (uint32_t i = 0; i < partitions.size(); i++) {
-				DataSlide slide = df.slides[partitions[i][0]];
-				for (uint32_t j = 1; j < partitions[i].size(); j++)
-					slide = slide.combine(df.slides[partitions[i][j]]);
-
-				slides.push_back(slide);
-			}
-
-			df.slides = slides;
+			df.reduce();
 
 			if (verbose)
 				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
