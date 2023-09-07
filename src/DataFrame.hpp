@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <variant>
+#include <optional>
 #include <unordered_set>
 #include <set>
 #include <nlohmann/json.hpp>
@@ -840,6 +841,10 @@ class DataFrame {
 
 			// Determine indices of slides which respect the given constraints
 			auto inds = compatible_inds(constraints);
+			std::cout << "compatible inds: \n";
+			for (auto i : inds)
+				std::cout << i << " ";
+			std::cout << "\n";
 			
 			// Constraints yield no valid slides, so return nothing
 			if (inds.empty())
