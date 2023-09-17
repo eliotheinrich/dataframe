@@ -109,8 +109,8 @@ class DataFrame:
     def promote_params(self):
         self._dataframe.promote_params()
     
-    def filter(self, constraints: dict):
-        return DataFrame(self._dataframe.filter(constraints))
+    def filter(self, constraints: dict, invert: bool = False):
+        return DataFrame(self._dataframe.filter(constraints, invert))
     
     def modify_slides(self, func):
         for slide in self._dataframe.slides:

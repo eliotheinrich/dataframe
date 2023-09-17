@@ -815,14 +815,46 @@ class DataFrame {
 
 			std::vector<std::string> keys;
 			for (auto const &[key, _] : first_slide.params) keys.push_back(key);
-			for (auto key : keys) {
+			for (auto key : keys)
 				if (field_congruent(key)) promote_field(key);
-			}
 		}
 
-		DataFrame filter(const Params& constraints) {
-			auto inds = compatible_inds(constraints);
+		DataFrame filter(const std::vector<Params>& constraints, bool invert = false) {
+			std::set<uint32_t> inds;
+			for (auto const &constraint : constraints) {
+				auto c_inds = compatible_inds(constraint);
+				std::set<uint32_t> ind_union;
 
+				std::set_union(
+					inds.begin(), inds.end(),
+					c_inds.begin(), c_inds.end(),
+					std::inserter(ind_union, ind_union.begin())
+				);
+
+				inds = ind_union;
+			}
+
+			std::cout << "Before invert: \n";
+			for (auto i : inds) std::cout << i << " ";
+			std::cout << "\n";
+
+			if (invert) {
+				std::vector<uint32_t> all_inds(this->slides.size());
+				std::iota(all_inds.begin(), all_inds.end(), 0);
+
+				std::set<uint32_t> all_inds_set(all_inds.begin(), all_inds.end());
+
+				std::set<uint32_t> set_sd;
+				std::set_symmetric_difference(
+					inds.begin(), inds.end(),
+					all_inds_set.begin(), all_inds_set.end(),
+					std::inserter(set_sd, set_sd.begin())
+				);
+			}
+
+			std::cout << "After invert: \n";
+			for (auto i : inds) std::cout << i << " ";
+			std::cout << "\n";
 			std::vector<DataSlide> slides;
 			for (uint32_t i = 0; i < this->slides.size(); i++) {
 				if (!inds.count(i))
