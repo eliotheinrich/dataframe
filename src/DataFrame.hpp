@@ -830,13 +830,8 @@ class DataFrame {
 					c_inds.begin(), c_inds.end(),
 					std::inserter(ind_union, ind_union.begin())
 				);
-
 				inds = ind_union;
 			}
-
-			std::cout << "Before invert: \n";
-			for (auto i : inds) std::cout << i << " ";
-			std::cout << "\n";
 
 			if (invert) {
 				std::vector<uint32_t> all_inds(this->slides.size());
@@ -850,16 +845,12 @@ class DataFrame {
 					all_inds_set.begin(), all_inds_set.end(),
 					std::inserter(set_sd, set_sd.begin())
 				);
+				inds = set_sd;
 			}
-
-			std::cout << "After invert: \n";
-			for (auto i : inds) std::cout << i << " ";
-			std::cout << "\n";
+			
 			std::vector<DataSlide> slides;
-			for (uint32_t i = 0; i < this->slides.size(); i++) {
-				if (!inds.count(i))
-					slides.push_back(this->slides[i]);
-			}
+			for (auto i : inds)
+				slides.push_back(this->slides[i]);
 			
 			return DataFrame(params, slides);
 		}
