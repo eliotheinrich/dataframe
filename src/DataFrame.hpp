@@ -9,6 +9,7 @@
 #include <cmath>
 #include <chrono>
 #include <assert.h>
+#include <exception>
 #include <stdio.h>
 #include <iostream>
 #include <variant>
@@ -168,10 +169,9 @@ static var_t parse_json_type(json_object p) {
 	} else if (p.type() == nlohmann::json::value_t::string) {
 		return var_t{std::string(p)};
 	} else {
-		std::cout << "Invalid json item type on " << p << "; aborting.\n";
-		assert(false);
-
-		return var_t{0};
+		std::stringstream ss;
+		ss << "Invalid json item type on " << p << "; aborting.\n";
+		throw std::invalid_argument(ss.str());
 	}
 }
 
@@ -228,8 +228,9 @@ static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose
 			zparams.push_back(std::map<std::string, var_t>());
 			for (auto const &[key, val] : data[zparam_key][i].items()) {
 				if (data.contains(key)) {
-					std::cout << "Key " << key << " passed as a zipped parameter and an unzipped parameter; aborting.\n";
-					assert(false);
+					std::stringstream ss;
+					ss << "Key " << key << " passed as a zipped parameter and an unzipped parameter; aborting.\n";
+					throw std::invalid_argument(ss.str());
 				}
 				zparams[i][key] = parse_json_type(val);
 			}
@@ -543,9 +544,10 @@ class DataSlide {
 
 		DataSlide combine(const DataSlide &ds) {
 			if (!congruent(ds)) {
-				std::cout << "DataSlides not congruent.\n"; 
-				std::cout << to_string() << "\n\n\n" << ds.to_string() << std::endl;
-				assert(false);
+				std::stringstream ss;
+				ss << "DataSlides not congruent.\n"; 
+				ss << to_string() << "\n\n\n" << ds.to_string() << std::endl;
+				throw std::invalid_argument(ss.str());
 			}
 
 			DataSlide dn(params); 
@@ -1156,7 +1158,7 @@ class ParallelCompute {
 
 
 			std::vector<DataSlide> slides(total_runs);
-			BS::thread_pool threads(num_threads);
+			BS::thread_pool threads(num_threads/num_threads_per_task);
 			std::vector<std::future<compute_result_t>> futures(total_runs);
 			std::vector<compute_result_t> results(total_runs);
 
