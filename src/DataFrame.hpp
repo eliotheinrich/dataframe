@@ -1229,6 +1229,10 @@ class ParallelCompute {
 #else
 			auto results = compute_bspl(total_configs, verbose);
 #endif
+
+			if (verbose)
+				std::cout << "\n";
+			
 			uint32_t idx = 0;
 			for (uint32_t i = 0; i < num_configs; i++) {
 				auto [slide, serialization] = results[idx];
@@ -1297,6 +1301,18 @@ static std::string join(const std::vector<std::string> &v, const std::string &de
         s += i;
     }
     return s;
+}
+
+static std::string strip(const std::string &input) {
+	std::string whitespace = " \t\n";
+	size_t start = input.find_first_not_of(whitespace);
+	size_t end = input.find_last_not_of(whitespace);
+
+	if (start != std::string::npos && end != std::string::npos) {
+		return input.substr(start, end - start + 1);
+	} else {
+		return "";
+	}
 }
 
 static std::vector<std::string> split(const std::string &s, const std::string &delim) {
