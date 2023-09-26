@@ -41,7 +41,7 @@ static void escape_sequences(std::string &);
 // --- DEFINING VALID PARAMETER VALUES ---
 typedef std::variant<int, double, std::string> var_t;
 
-std::string to_string_with_precision(const double d, const int n) {
+static std::string to_string_with_precision(const double d, const int n) {
 	std::ostringstream out;
 	out.precision(n);
 	out << std::fixed << d;
@@ -57,7 +57,7 @@ struct var_t_to_string {
 				return to_string_with_precision(f, exp);
 		}
 
-		return "0.000000"
+		return "0.000000";
 	}
 	std::string operator()(const std::string& s) const {
 		std::string tmp = s;
@@ -1274,6 +1274,9 @@ class ParallelCompute {
 		uint32_t num_threads;
 		uint32_t num_threads_per_task;
 
+		double atol;
+		double rtol;
+
 
 		bool serialize;
 
@@ -1282,7 +1285,7 @@ class ParallelCompute {
 			uint32_t num_threads, 
 			uint32_t num_threads_per_task,
 			bool serialize
-		) : configs(configs), num_threads(num_threads), num_threads_per_task(num_threads_per_task), serialize(serialize) {}
+		) : configs(configs), num_threads(num_threads), num_threads_per_task(num_threads_per_task), serialize(serialize), atol(1e-6), rtol(1e-6) {}
 
 
 		ParallelCompute(
@@ -1294,6 +1297,12 @@ class ParallelCompute {
 
 		void compute(bool verbose=false) {
 			auto start = std::chrono::high_resolution_clock::now();
+
+			df.atol = atol;
+			df.rtol = rtol;
+
+			serialize_df.atol = atol;
+			serialize_df.rtol = rtol;
 
 			uint32_t num_configs = configs.size();
 
@@ -1348,10 +1357,14 @@ class ParallelCompute {
 			df.add_metadata("num_threads", (int) num_threads);
 			df.add_metadata("num_jobs", (int) total_configs.size());
 			df.add_metadata("total_time", (int) duration.count());
+			df.add_metadata("atol", atol);
+			df.add_metadata("rtol", rtol);
 
 			serialize_df.add_metadata("num_threads", (int) num_threads);
 			serialize_df.add_metadata("num_jobs", (int) total_configs.size());
 			serialize_df.add_metadata("total_time", (int) duration.count());
+			serialize_df.add_metadata("atol", atol);
+			serialize_df.add_metadata("rtol", rtol);
 			// A little hacky; need to set num_runs = 1 so that configs are not duplicated when a run is
 			// started from serialized data
 			for (auto &slide : serialize_df.slides)
