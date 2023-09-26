@@ -41,8 +41,6 @@ static void escape_sequences(std::string &);
 // --- DEFINING VALID PARAMETER VALUES ---
 typedef std::variant<int, double, std::string> var_t;
 
-#define VAR_T_EPS 0.00001
-
 struct var_t_to_string {
 	std::string operator()(const int& i) const { return std::to_string(i); }
 	std::string operator()(const double& f) const { return std::to_string(f); }
@@ -53,17 +51,38 @@ struct var_t_to_string {
 	}
 };
 
-static bool operator==(const var_t& v, const var_t& t) {
-	if (v.index() != t.index()) return false;
+struct var_t_eq {
+	double atol;
+	double rtol;
 
-	if (v.index() == 0) return std::get<int>(v) == std::get<int>(t);
-	else if (v.index() == 1) return std::abs(std::get<double>(v) - std::get<double>(t)) < VAR_T_EPS;
-	else return std::get<std::string>(v) == std::get<std::string>(t);
-}
+	var_t_eq(double atol=1e-5, double rtol=1e-6) : atol(atol), rtol(rtol) {}
 
-static bool operator!=(const var_t& v, const var_t& t) {
-	return !(v == t);
-}
+	bool operator()(const var_t& v, const var_t& t) const {
+		if (v.index() != t.index()) return false;
+
+		if (v.index() == 0) {
+			return std::get<int>(v) == std::get<int>(t);
+		} else if (v.index() == 1) { // comparing doubles is the tricky part
+			double vd = std::get<double>(v);
+			double vt = std::get<double>(t);
+
+			// check absolute tolerance first
+			if (std::abs(vd - vt) < atol)
+				return true;
+
+			double max_val = std::max(std::abs(vd), std::abs(vt));
+
+			// both numbers are very small; use absolute comparison
+			if (max_val < std::numeric_limits<double>::epsilon())
+				return std::abs(vd - vt) < atol;
+
+			// resort to relative tolerance
+			return std::abs(vd - vt)/max_val < rtol;
+		} else {
+			return std::get<std::string>(v) == std::get<std::string>(t);
+		}
+	}
+};
 
 static bool operator<(const var_t& lhs, const var_t& rhs) {
 	if (lhs.index() == 2 && rhs.index() == 2) return std::get<std::string>(lhs) < std::get<std::string>(rhs);
@@ -86,24 +105,6 @@ typedef std::map<std::string, var_t> Params;
 
 // --- DEFINING VALID QUERY RESULTS ---
 typedef std::variant<var_t, std::vector<var_t>, std::vector<std::vector<double>>> query_t;
-
-struct make_query_t_unique {
-	query_t operator()(const var_t& v) const { return std::vector<var_t>{v}; }
-	query_t operator()(const std::vector<std::vector<double>>& data) const { return data; }
-
-	query_t operator()(const std::vector<var_t>& vec) const { 
-		std::vector<var_t> return_vals;
-
-		for (auto const &val : vec) {
-			if (std::find(return_vals.begin(), return_vals.end(), val) == return_vals.end())
-				return_vals.push_back(val);
-		}
-
-		std::sort(return_vals.begin(), return_vals.end());
-
-		return return_vals;
-	}
-};
 
 struct query_t_to_string {
 	std::string operator()(const var_t& v) { return std::visit(var_t_to_string(), v); }
@@ -143,15 +144,50 @@ struct query_to_string {
 	}
 };
 
+struct make_query_t_unique {
+	var_t_eq var_visitor;
+
+	make_query_t_unique(double atol=1e-5, double rtol=1e-5) {
+		var_visitor = var_t_eq{atol, rtol};
+	}
+
+	query_t operator()(const var_t& v) const { return std::vector<var_t>{v}; }
+	query_t operator()(const std::vector<std::vector<double>>& data) const { return data; }
+
+	query_t operator()(const std::vector<var_t>& vec) const { 
+		std::vector<var_t> return_vals;
+
+		for (auto const &tar_val : vec) {
+			auto result = std::find_if(return_vals.begin(), return_vals.end(), [tar_val, &var_visitor=var_visitor](const var_t& val) {
+				return var_visitor(tar_val, val);
+			});
+
+			if (result == return_vals.end())
+				return_vals.push_back(tar_val);
+		}
+
+		std::sort(return_vals.begin(), return_vals.end());
+
+		return return_vals;
+	}
+};
+
+
 struct make_query_unique {
+	make_query_t_unique query_t_visitor;
+
+	make_query_unique(double atol=1e-5, double rtol=1e-5) {
+		query_t_visitor = make_query_t_unique{atol, rtol};
+	}
+
 	query_result operator()(const query_t& q) {
-		return std::visit(make_query_t_unique(), q);
+		return std::visit(query_t_visitor, q);
 	}
 
 	query_result operator()(const std::vector<query_t>& results) {
 		std::vector<query_t> new_results(results.size());
 		std::transform(results.begin(), results.end(), std::back_inserter(new_results),
-			[](const query_t& q) { return std::visit(make_query_t_unique(), q); }
+			[&query_t_visitor=query_t_visitor](const query_t& q) { return std::visit(query_t_visitor, q); }
 		);
 
 		return new_results;
@@ -569,15 +605,16 @@ class DataFrame {
 	private:
 		bool qtable_initialized;
 		// qtable stores a list of key: {val: corresponding_slide_indices}
-		std::map<std::string, std::map<var_t, std::vector<uint32_t>>> qtable;
+		std::map<std::string, std::map<var_t, std::vector<uint32_t>, var_t_eq>> qtable;
 
 		void init_qtable() {
-			std::map<std::string, std::set<var_t>> key_vals;
+			var_t_eq equality_comparator(atol, rtol);
+			std::map<std::string, std::set<var_t, var_t_eq>> key_vals;
 
 			for (auto const &slide : slides) {
 				for (auto const &[key, val] : slide.params) {
 					if (!key_vals.count(key))
-						key_vals[key] = std::set<var_t>();
+						key_vals[key] = std::set<var_t, var_t_eq>(equality_comparator);
 					
 					key_vals[key].insert(val);
 				}
@@ -585,7 +622,7 @@ class DataFrame {
 
 			// Setting up keys of qtable
 			for (auto const &[key, vals] : key_vals) {
-				qtable[key] = std::map<var_t, std::vector<uint32_t>>();
+				qtable[key] = std::map<var_t, std::vector<uint32_t>, var_t_eq>(equality_comparator);
 				for (auto const &val : vals) {
 					qtable[key][val] = std::vector<uint32_t>();
 				}
@@ -612,8 +649,9 @@ class DataFrame {
 				init_qtable();
 
 			// Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
+			var_t_eq equality_comparator(atol, rtol);
 			for (auto const &[key, val] : constraints) {
-				if (params.count(key) && params[key] != val)
+				if (params.count(key) && !(equality_comparator(params[key], val)))
 					return std::set<uint32_t>();
 			}
 
@@ -643,24 +681,27 @@ class DataFrame {
 
 
 	public:
+		double atol;
+		double rtol;
+
 		Params params;
 		Params metadata;
 		std::vector<DataSlide> slides;
 
 		friend class ParallelCompute;
 		
-		DataFrame() {}
+		DataFrame() : atol(1e-6), rtol(1e-5) {}
 
-		DataFrame(const std::vector<DataSlide>& slides) {
+		DataFrame(const std::vector<DataSlide>& slides) : atol(1e-6), rtol(1e-5) {
 			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
 		}
 
-		DataFrame(const Params& params, const std::vector<DataSlide>& slides) {
+		DataFrame(const Params& params, const std::vector<DataSlide>& slides) : atol(1e-6), rtol(1e-5) {
 			add_param(params);
 			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
 		}
 
-		DataFrame(const std::string& s) {
+		DataFrame(const std::string& s) : atol(1e-6), rtol(1e-5) {
 			nlohmann::json data = nlohmann::json::parse(s);
 			for (auto const &[key, val] : data["params"].items())
 				params[key] = parse_json_type(val);
@@ -675,7 +716,7 @@ class DataFrame {
 			}
 		}
 
-		DataFrame(const DataFrame& other) {
+		DataFrame(const DataFrame& other) : atol(1e-6), rtol(1e-5) {
 			for (auto const& [key, val] : other.params)
 				params[key] = val;
 			
@@ -860,7 +901,7 @@ class DataFrame {
 		query_result query(const std::vector<std::string>& keys, const Params& constraints, bool unique = false) {
 			if (unique) {
 				auto result = query(keys, constraints, false);
-				return std::visit(make_query_unique(), result);
+				return std::visit(make_query_unique(atol, rtol), result);
 			}
 
 			// Determine indices of slides which respect the given constraints
@@ -968,8 +1009,9 @@ class DataFrame {
 			Params self_slide_params;
 			Params other_slide_params;
 
+			var_t_eq equality_comparator(atol, rtol);
 			for (auto const& k : both_frame_params) {
-				if (params.at(k) == other.params.at(k))
+				if (equality_comparator(params.at(k), other.params.at(k)))
 					df.add_param(k, params.at(k));
 				else {
 					self_slide_params[k] = params.at(k);

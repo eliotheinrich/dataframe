@@ -69,10 +69,26 @@ class DataFrame:
     @property
     def params(self):
         return self._dataframe.params
-    
+     
     @property
     def slides(self):
         return self._slides
+
+    @property
+    def atol(self):
+        return self._dataframe.atol
+
+    @atol.setter
+    def atol(self, atol: float):
+        self._dataframe.atol = atol
+
+    @property
+    def rtol(self):
+        return self._dataframe.rtol
+
+    @rtol.setter
+    def rtol(self, rtol: float):
+        self._dataframe.rtol = rtol
         
     def add_slide(self, slide):
         self._dataframe.add_slide(slide._dataslide)
