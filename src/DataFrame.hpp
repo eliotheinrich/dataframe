@@ -51,36 +51,38 @@ struct var_t_to_string {
 	}
 };
 
-static bool var_t_eq(const var_t& v, const var_t& t, double atol=1e-6, double rtol=1e-5) {
-	if (v.index() != t.index()) return false;
+struct var_t_eq {
+	double atol;
+	double rtol;
 
-	if (v.index() == 0) {
-		return std::get<int>(v) == std::get<int>(t);
-	} else if (v.index() == 1) { // comparing doubles is the tricky part
-		double vd = std::get<double>(v);
-		double vt = std::get<double>(t);
+	var_t_eq(double atol=1e-5, double rtol=1e-6) : atol(atol), rtol(rtol) {}
 
-		// check absolute tolerance first
-		if (std::abs(vd - vt) < atol)
-			return true;
+	bool operator()(const var_t& v, const var_t& t) const {
+		if (v.index() != t.index()) return false;
 
-		double max_val = std::max(std::abs(vd), std::abs(vt));
+		if (v.index() == 0) {
+			return std::get<int>(v) == std::get<int>(t);
+		} else if (v.index() == 1) { // comparing doubles is the tricky part
+			double vd = std::get<double>(v);
+			double vt = std::get<double>(t);
 
-		// both numbers are very small; use absolute comparison
-		if (max_val < std::numeric_limits<double>::epsilon())
-			return std::abs(vd - vt) < atol;
+			// check absolute tolerance first
+			if (std::abs(vd - vt) < atol)
+				return true;
 
-		// resort to relative tolerance
-		return std::abs(vd - vt)/max_val < rtol;
-	} else {
-		return std::get<std::string>(v) == std::get<std::string>(t);
+			double max_val = std::max(std::abs(vd), std::abs(vt));
+
+			// both numbers are very small; use absolute comparison
+			if (max_val < std::numeric_limits<double>::epsilon())
+				return std::abs(vd - vt) < atol;
+
+			// resort to relative tolerance
+			return std::abs(vd - vt)/max_val < rtol;
+		} else {
+			return std::get<std::string>(v) == std::get<std::string>(t);
+		}
 	}
-
-}
-
-static bool operator!=(const var_t& v, const var_t& t) {
-	return !(v == t);
-}
+};
 
 static bool operator<(const var_t& lhs, const var_t& rhs) {
 	if (lhs.index() == 2 && rhs.index() == 2) return std::get<std::string>(lhs) < std::get<std::string>(rhs);
@@ -143,10 +145,11 @@ struct query_to_string {
 };
 
 struct make_query_t_unique {
-	double atol;
-	double rtol;
+	var_t_eq var_visitor;
 
-	make_query_t_unique(double atol=1e-5, double rtol=1e-5) : atol(atol), rtol(rtol) {}
+	make_query_t_unique(double atol=1e-5, double rtol=1e-5) {
+		var_visitor = var_t_eq{atol, rtol};
+	}
 
 	query_t operator()(const var_t& v) const { return std::vector<var_t>{v}; }
 	query_t operator()(const std::vector<std::vector<double>>& data) const { return data; }
@@ -155,8 +158,8 @@ struct make_query_t_unique {
 		std::vector<var_t> return_vals;
 
 		for (auto const &tar_val : vec) {
-			auto result = std::find_if(return_vals.begin(), return_vals.end(), [tar_val, atol=atol, rtol=rtol](const var_t& val) {
-				return var_t_eq(tar_val, val, atol, rtol);
+			auto result = std::find_if(return_vals.begin(), return_vals.end(), [tar_val, &var_visitor=var_visitor](const var_t& val) {
+				return var_visitor(tar_val, val);
 			});
 
 			if (result == return_vals.end())
@@ -602,15 +605,16 @@ class DataFrame {
 	private:
 		bool qtable_initialized;
 		// qtable stores a list of key: {val: corresponding_slide_indices}
-		std::map<std::string, std::map<var_t, std::vector<uint32_t>>> qtable;
+		std::map<std::string, std::map<var_t, std::vector<uint32_t>, var_t_eq>> qtable;
 
 		void init_qtable() {
-			std::map<std::string, std::set<var_t>> key_vals;
+			var_t_eq equality_comparator(atol, rtol);
+			std::map<std::string, std::set<var_t, var_t_eq>> key_vals;
 
 			for (auto const &slide : slides) {
 				for (auto const &[key, val] : slide.params) {
 					if (!key_vals.count(key))
-						key_vals[key] = std::set<var_t>();
+						key_vals[key] = std::set<var_t, var_t_eq>(equality_comparator);
 					
 					key_vals[key].insert(val);
 				}
@@ -618,7 +622,7 @@ class DataFrame {
 
 			// Setting up keys of qtable
 			for (auto const &[key, vals] : key_vals) {
-				qtable[key] = std::map<var_t, std::vector<uint32_t>>();
+				qtable[key] = std::map<var_t, std::vector<uint32_t>, var_t_eq>(equality_comparator);
 				for (auto const &val : vals) {
 					qtable[key][val] = std::vector<uint32_t>();
 				}
@@ -645,8 +649,9 @@ class DataFrame {
 				init_qtable();
 
 			// Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
+			var_t_eq equality_comparator(atol, rtol);
 			for (auto const &[key, val] : constraints) {
-				if (params.count(key) && params[key] != val)
+				if (params.count(key) && !(equality_comparator(params[key], val)))
 					return std::set<uint32_t>();
 			}
 
@@ -1004,8 +1009,9 @@ class DataFrame {
 			Params self_slide_params;
 			Params other_slide_params;
 
+			var_t_eq equality_comparator(atol, rtol);
 			for (auto const& k : both_frame_params) {
-				if (var_t_eq(params.at(k), other.params.at(k)))
+				if (equality_comparator(params.at(k), other.params.at(k)))
 					df.add_param(k, params.at(k));
 				else {
 					self_slide_params[k] = params.at(k);
