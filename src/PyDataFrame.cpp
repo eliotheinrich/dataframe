@@ -91,6 +91,8 @@ void init_dataframe(nb::module_ &m) {
 		.def(nb::init<const DataFrame&>())
 		.def_rw("params", &DataFrame::params)
 		.def_rw("slides", &DataFrame::slides)
+		.def_rw("atol", &DataFrame::atol)
+		.def_rw("rtol", &DataFrame::rtol)
 		.def("add_slide", &DataFrame::add_slide)
 		.def("add_param", df_add_param1)
 		.def("add_param", df_add_param2)
