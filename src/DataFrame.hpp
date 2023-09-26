@@ -41,7 +41,7 @@ static void escape_sequences(std::string &);
 // --- DEFINING VALID PARAMETER VALUES ---
 typedef std::variant<int, double, std::string> var_t;
 
-std::string to_string_with_precision(const double d, const int n) {
+static std::string to_string_with_precision(const double d, const int n) {
 	std::ostringstream out;
 	out.precision(n);
 	out << std::fixed << d;
@@ -57,7 +57,7 @@ struct var_t_to_string {
 				return to_string_with_precision(f, exp);
 		}
 
-		return "0.000000"
+		return "0.000000";
 	}
 	std::string operator()(const std::string& s) const {
 		std::string tmp = s;
