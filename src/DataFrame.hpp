@@ -605,33 +605,54 @@ class DataFrame {
 	private:
 		bool qtable_initialized;
 		// qtable stores a list of key: {val: corresponding_slide_indices}
-		std::map<std::string, std::map<var_t, std::vector<uint32_t>, var_t_eq>> qtable;
+		//std::map<std::string, std::map<var_t, std::vector<uint32_t>, var_t_eq>> qtable;
+		std::map<std::string, std::vector<std::vector<uint32_t>>> qtable;
+		std::map<std::string, std::vector<var_t>> key_vals;
+
+		uint32_t corresponding_ind(const var_t& v, const std::vector<var_t>& vals, const std::optional<var_t_eq>& comp = std::nullopt) {
+			var_t_eq equality_comparator = comp.value_or(var_t_eq{atol, rtol});
+
+			for (uint32_t i = 0; i < vals.size(); i++) {
+				if (equality_comparator(v, vals[i]))
+					return i;
+			}
+
+			return -1;
+		}
+
 
 		void init_qtable() {
 			var_t_eq equality_comparator(atol, rtol);
-			std::map<std::string, std::set<var_t, var_t_eq>> key_vals;
+			key_vals = std::map<std::string, std::vector<var_t>>();
 
 			for (auto const &slide : slides) {
-				for (auto const &[key, val] : slide.params) {
+				for (auto const &[key, tar_val] : slide.params) {
 					if (!key_vals.count(key))
-						key_vals[key] = std::set<var_t, var_t_eq>(equality_comparator);
+						key_vals[key] = std::vector<var_t>();
 					
-					key_vals[key].insert(val);
+					auto result = std::find_if(key_vals[key].begin(), key_vals[key].end(), [tar_val, &equality_comparator](const var_t& val) {
+						return equality_comparator(tar_val, val);
+					});
+
+					if (result == key_vals[key].end())
+						key_vals[key].push_back(tar_val);
 				}
 			}
 
-			// Setting up keys of qtable
-			for (auto const &[key, vals] : key_vals) {
-				qtable[key] = std::map<var_t, std::vector<uint32_t>, var_t_eq>(equality_comparator);
-				for (auto const &val : vals) {
-					qtable[key][val] = std::vector<uint32_t>();
-				}
-			}
+			// Setting up qtable indices
+			for (auto const &[key, vals] : key_vals)
+				qtable[key] = std::vector<std::vector<uint32_t>>(vals.size());
 
 			for (uint32_t n = 0; n < slides.size(); n++) {
 				auto slide = slides[n];
-				for (auto const &[key, _] : key_vals)
-					qtable[key][slide.params[key]].push_back(n);
+				for (auto const &[key, vals] : key_vals) {
+					var_t val = slide.params[key];
+					uint32_t idx = corresponding_ind(val, vals, equality_comparator);
+					if (idx == -1)
+						throw std::invalid_argument("Error in init_qtable.");
+
+					qtable[key][idx].push_back(n);
+				}
 			}
 
 			qtable_initialized = true;
@@ -639,9 +660,8 @@ class DataFrame {
 
 		void promote_field(const std::string& s) {
 			add_param(s, slides.begin()->get_param(s));
-			for (auto &slide : slides) {
+			for (auto &slide : slides)
 				slide.remove(s);
-			}
 		}
 
 		std::set<uint32_t> compatible_inds(const Params& constraints) {
@@ -668,7 +688,11 @@ class DataFrame {
 			for (auto const &[key, val] : relevant_constraints) {
 				// Take set intersection
 				std::set<uint32_t> tmp;
-				for (auto const i : qtable[key][val]) {
+				uint32_t idx = corresponding_ind(val, key_vals[key], equality_comparator);
+				if (idx == -1)
+					continue;
+
+				for (auto const i : qtable[key][idx]) {
 					if (inds.count(i))
 						tmp.insert(i);
 				}
