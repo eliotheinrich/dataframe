@@ -113,7 +113,7 @@ void init_dataframe(nb::module_ &m) {
 		.def(nb::init<Params&, std::vector<std::shared_ptr<Config>>>())
 		.def_rw("dataframe", &ParallelCompute::df)
 		.def_rw("atol", &ParallelCompute::atol)
-		.def_rw("rtol", &ParallelCompute::atol)
+		.def_rw("rtol", &ParallelCompute::rtol)
 		.def("compute", &ParallelCompute::compute, "verbose"_a = false)
 		.def("write_json", &ParallelCompute::write_json)
 		.def("write_serialize_json", &ParallelCompute::write_serialize_json);

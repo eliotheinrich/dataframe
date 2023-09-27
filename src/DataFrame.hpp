@@ -31,6 +31,8 @@ static std::string join(const std::vector<std::string> &, const std::string &);
 static std::vector<std::string> split(const std::string &, const std::string &);
 static void escape_sequences(std::string &);
 
+#define ATOL 1e-6
+#define RTOL 1e-5
 
 // --- DEFINING VALID PARAMETER VALUES ---
 typedef std::variant<int, double, std::string> var_t;
@@ -64,7 +66,7 @@ struct var_t_eq {
 	double atol;
 	double rtol;
 
-	var_t_eq(double atol=1e-5, double rtol=1e-6) : atol(atol), rtol(rtol) {}
+	var_t_eq(double atol=ATOL, double rtol=RTOL) : atol(atol), rtol(rtol) {}
 
 	bool operator()(const var_t& v, const var_t& t) const {
 		if (v.index() != t.index()) return false;
@@ -194,7 +196,7 @@ struct query_to_string {
 struct make_query_t_unique {
 	var_t_eq var_visitor;
 
-	make_query_t_unique(double atol=1e-5, double rtol=1e-5) {
+	make_query_t_unique(double atol=ATOL, double rtol=RTOL) {
 		var_visitor = var_t_eq{atol, rtol};
 	}
 
@@ -223,7 +225,7 @@ struct make_query_t_unique {
 struct make_query_unique {
 	make_query_t_unique query_t_visitor;
 
-	make_query_unique(double atol=1e-5, double rtol=1e-5) {
+	make_query_unique(double atol=ATOL, double rtol=RTOL) {
 		query_t_visitor = make_query_t_unique{atol, rtol};
 	}
 
@@ -662,7 +664,6 @@ class DataFrame {
 	private:
 		bool qtable_initialized;
 		// qtable stores a list of key: {val: corresponding_slide_indices}
-		//std::map<std::string, std::map<var_t, std::vector<uint32_t>, var_t_eq>> qtable;
 		std::map<std::string, std::vector<std::vector<uint32_t>>> qtable;
 		std::map<std::string, std::vector<var_t>> key_vals;
 
@@ -771,18 +772,18 @@ class DataFrame {
 
 		friend class ParallelCompute;
 		
-		DataFrame() : atol(1e-6), rtol(1e-5) {}
+		DataFrame() : atol(ATOL), rtol(RTOL) {}
 
-		DataFrame(const std::vector<DataSlide>& slides) : atol(1e-6), rtol(1e-5) {
+		DataFrame(const std::vector<DataSlide>& slides) : atol(ATOL), rtol(RTOL) {
 			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
 		}
 
-		DataFrame(const Params& params, const std::vector<DataSlide>& slides) : atol(1e-6), rtol(1e-5) {
+		DataFrame(const Params& params, const std::vector<DataSlide>& slides) : atol(ATOL), rtol(RTOL) {
 			add_param(params);
 			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
 		}
 
-		DataFrame(const std::string& s) : atol(1e-6), rtol(1e-5) {
+		DataFrame(const std::string& s) {
 			nlohmann::json data = nlohmann::json::parse(s);
 			for (auto const &[key, val] : data["params"].items())
 				params[key] = parse_json_type(val);
@@ -791,13 +792,23 @@ class DataFrame {
 				for (auto const &[key, val] : data["metadata"].items())
 					metadata[key] = parse_json_type(val);
 			}
+
+			// TODO use get<T>
+			if (metadata.count("atol"))
+				atol = std::get<double>(metadata.at("atol"));
+			else
+				atol = ATOL;
+
+			if (metadata.count("rtol"))
+				rtol = std::get<double>(metadata.at("rtol"));
+			else
+				rtol = RTOL;
 		
-			for (auto const &slide_str : data["slides"]) {
+			for (auto const &slide_str : data["slides"])
 				add_slide(DataSlide(slide_str.dump()));
-			}
 		}
 
-		DataFrame(const DataFrame& other) : atol(1e-6), rtol(1e-5) {
+		DataFrame(const DataFrame& other) : atol(other.atol), rtol(other.rtol) {
 			for (auto const& [key, val] : other.params)
 				params[key] = val;
 			
@@ -983,7 +994,6 @@ class DataFrame {
 		}
 
 		query_result query(const std::vector<std::string>& keys, const Params& constraints, bool unique = false) {
-			std::cout << "From query: " << atol << " " << rtol << std::endl;
 			if (unique) {
 				auto result = query(keys, constraints, false);
 				return std::visit(make_query_unique(atol, rtol), result);
@@ -1334,17 +1344,14 @@ class ParallelCompute {
 
 			serialize = get<int>(metaparams, "serialize", false);
 
-			atol = get<double>(metaparams, "atol", 1e-5);
-			rtol = get<double>(metaparams, "rtol", 1e-5);
+			atol = get<double>(metaparams, "atol", ATOL);
+			rtol = get<double>(metaparams, "rtol", RTOL);
 
 			average_congruent_runs = get<int>(metaparams, "average_congruent_runs", true);
 
-			std::cout << "Initializing pc: " << atol << " " << rtol << std::endl;
 			df.add_metadata(metaparams);
 			df.atol = atol;
 			df.rtol = rtol;
-
-			std::cout << "Initializing df: " << df.atol << " " << df.rtol << std::endl;
 
 			serialize_df.add_metadata(metaparams);
 			serialize_df.atol = atol;
@@ -1428,8 +1435,6 @@ class ParallelCompute {
 
 			if (verbose)
 				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
-
-			std::cout << "End of compute: " << df.atol << " " << df.rtol << std::endl;
 		}
 
 		void write_json(std::string filename) const {
