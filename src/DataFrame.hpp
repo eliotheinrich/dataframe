@@ -45,8 +45,8 @@ static std::string to_string_with_precision(const double d, const int n) {
 struct var_t_to_string {
 	std::string operator()(const int& i) const { return std::to_string(i); }
 	std::string operator()(const double& f) const {
-		for (uint32_t exp = 6; exp <= 30; exp += 6) {
-			double threshold = std::pow(10, -exp);
+		for (int exp = 6; exp <= 30; exp += 6) {
+			double threshold = std::pow(10.0, -static_cast<double>(exp));
 			if (f > threshold)
 				return to_string_with_precision(f, exp);
 		}
