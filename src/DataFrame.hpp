@@ -1026,7 +1026,6 @@ class DataFrame {
 
 		void reduce() {
 			var_t_eq equality_comparator(atol, rtol);
-			promote_params();
 
 			std::vector<DataSlide> new_slides;
 
@@ -1126,6 +1125,7 @@ class DataFrame {
 				df.add_slide(ds);
 			}
 
+			df.promote_params();
 			df.reduce();
 
 			return df;
@@ -1418,7 +1418,9 @@ class ParallelCompute {
 			for (auto &slide : serialize_df.slides)
 				slide.add_param("num_runs", 1);
 
-			df.reduce();
+			df.promote_params();
+			if (average_congruent_runs)
+				df.reduce();
 
 			if (verbose)
 				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
