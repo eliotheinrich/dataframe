@@ -168,7 +168,7 @@ struct query_t_to_string {
 		for (auto const& row : v) {
 			std::vector<std::string> buffer2;
 			for (auto const d : row)
-				buffer2.push_back(std::to_string(d));
+				buffer2.push_back(std::visit(var_t_to_string(), var_t{d}));
 			buffer1.push_back("[" + join(buffer2, ", ") + "]");
 		}
 		return "[" + join(buffer1, "\n") + "]";
