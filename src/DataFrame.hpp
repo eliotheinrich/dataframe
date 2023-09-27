@@ -983,6 +983,7 @@ class DataFrame {
 		}
 
 		query_result query(const std::vector<std::string>& keys, const Params& constraints, bool unique = false) {
+			std::cout << "From query: " << atol << " " << rtol << std::endl;
 			if (unique) {
 				auto result = query(keys, constraints, false);
 				return std::visit(make_query_unique(atol, rtol), result);
@@ -1338,9 +1339,12 @@ class ParallelCompute {
 
 			average_congruent_runs = get<int>(metaparams, "average_congruent_runs", true);
 
+			std::cout << "Initializing pc: " << atol << " " << rtol << std::endl;
 			df.add_metadata(metaparams);
 			df.atol = atol;
 			df.rtol = rtol;
+
+			std::cout << "Initializing df: " << df.atol << " " << df.rtol << std::endl;
 
 			serialize_df.add_metadata(metaparams);
 			serialize_df.atol = atol;
@@ -1424,6 +1428,8 @@ class ParallelCompute {
 
 			if (verbose)
 				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
+
+			std::cout << "End of compute: " << df.atol << " " << df.rtol << std::endl;
 		}
 
 		void write_json(std::string filename) const {
