@@ -33,8 +33,12 @@ class Simulator {
 
         Simulator(Params &params) {
             seed = get<int>(params, "random_seed", DEFAULT_RANDOM_SEED);
-            if (seed == -1) rng = std::minstd_rand(std::rand());
-            else rng = std::minstd_rand(seed);
+            if (seed == -1) {
+                thread_local std::random_device rd;
+                rng.seed(rd());
+            } else {
+                rng.seed(seed);
+            }
         }
 
         virtual ~Simulator() {}
