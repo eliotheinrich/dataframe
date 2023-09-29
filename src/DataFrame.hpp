@@ -17,12 +17,6 @@
 #include <set>
 #include <nlohmann/json.hpp>
 
-#ifdef DEBUG
-#define LOG(x) std::cout << x
-#else
-#define LOG(x)
-#endif
-
 #ifndef SERIAL
 #include <BS_thread_pool.hpp>
 #endif
@@ -37,6 +31,8 @@ static std::string join(const std::vector<std::string> &, const std::string &);
 static std::vector<std::string> split(const std::string &, const std::string &);
 static void escape_sequences(std::string &);
 
+#define ATOL 1e-6
+#define RTOL 1e-5
 
 // --- DEFINING VALID PARAMETER VALUES ---
 typedef std::variant<int, double, std::string> var_t;
@@ -51,8 +47,8 @@ static std::string to_string_with_precision(const double d, const int n) {
 struct var_t_to_string {
 	std::string operator()(const int& i) const { return std::to_string(i); }
 	std::string operator()(const double& f) const {
-		for (uint32_t exp = 6; exp <= 30; exp += 6) {
-			double threshold = std::pow(10, -exp);
+		for (int exp = 6; exp <= 30; exp += 6) {
+			double threshold = std::pow(10.0, -static_cast<double>(exp));
 			if (f > threshold)
 				return to_string_with_precision(f, exp);
 		}
@@ -70,7 +66,7 @@ struct var_t_eq {
 	double atol;
 	double rtol;
 
-	var_t_eq(double atol=1e-5, double rtol=1e-6) : atol(atol), rtol(rtol) {}
+	var_t_eq(double atol=ATOL, double rtol=RTOL) : atol(atol), rtol(rtol) {}
 
 	bool operator()(const var_t& v, const var_t& t) const {
 		if (v.index() != t.index()) return false;
@@ -118,6 +114,44 @@ static bool operator<(const var_t& lhs, const var_t& rhs) {
 typedef std::map<std::string, Sample> data_t;
 typedef std::map<std::string, var_t> Params;
 
+static bool params_eq(const Params& lhs, const Params& rhs, const var_t_eq& equality_comparator) {
+	if (lhs.size() != rhs.size()) {
+		std::cout << "params unequal size\n";
+		return false;
+	}
+	
+	for (auto const &[key, val] : lhs) {
+		if (rhs.count(key)) {
+			if (!equality_comparator(rhs.at(key), val)) {
+				std::cout << key << " not congruent\n";
+				return false;
+			}
+		} else {
+			std::cout << key << " not congruent\n";
+			return false;
+		}
+	}
+
+	return true;
+}
+
+// Debug traps; these should never be called.
+static bool operator==(const var_t&, const var_t&) {
+	throw std::invalid_argument("Called operator==(var_t, var_t)!");
+}
+
+static bool operator!=(const var_t&, const var_t&) {
+	throw std::invalid_argument("Called operator!=(var_t, var_t)!");
+}
+
+static bool operator==(const Params&, const Params&) {
+	throw std::invalid_argument("Called operator==(Params, Params)!");
+}
+
+static bool operator!=(const Params&, const Params&) {
+	throw std::invalid_argument("Called operator!=(Params, Params)!");
+}
+
 // --- DEFINING VALID QUERY RESULTS ---
 typedef std::variant<var_t, std::vector<var_t>, std::vector<std::vector<double>>> query_t;
 
@@ -136,7 +170,7 @@ struct query_t_to_string {
 		for (auto const& row : v) {
 			std::vector<std::string> buffer2;
 			for (auto const d : row)
-				buffer2.push_back(std::to_string(d));
+				buffer2.push_back(std::visit(var_t_to_string(), var_t{d}));
 			buffer1.push_back("[" + join(buffer2, ", ") + "]");
 		}
 		return "[" + join(buffer1, "\n") + "]";
@@ -162,7 +196,7 @@ struct query_to_string {
 struct make_query_t_unique {
 	var_t_eq var_visitor;
 
-	make_query_t_unique(double atol=1e-5, double rtol=1e-5) {
+	make_query_t_unique(double atol=ATOL, double rtol=RTOL) {
 		var_visitor = var_t_eq{atol, rtol};
 	}
 
@@ -191,7 +225,7 @@ struct make_query_t_unique {
 struct make_query_unique {
 	make_query_t_unique query_t_visitor;
 
-	make_query_unique(double atol=1e-5, double rtol=1e-5) {
+	make_query_unique(double atol=ATOL, double rtol=RTOL) {
 		query_t_visitor = make_query_t_unique{atol, rtol};
 	}
 
@@ -579,22 +613,33 @@ class DataSlide {
 			return s;
 		}
 
-		bool congruent(const DataSlide &ds) {
-			if (params != ds.params) return false;
+		bool congruent(const DataSlide &ds, const var_t_eq& equality_comparator) {
+			if (!params_eq(params, ds.params, equality_comparator)) {
+				return false;
+			}
 
 			for (auto const &[key, samples] : data) {
-				if (!ds.data.count(key)) return false;
-				if (ds.data.at(key).size() != data.at(key).size()) return false;
+				if (!ds.data.count(key)) {
+					std::cout << key << " not congruent.\n";
+					return false;
+				}
+				if (ds.data.at(key).size() != data.at(key).size()) {
+					std::cout << key << " not congruent.\n";
+					return false;
+				}
 			}
 			for (auto const &[key, val] : ds.data) {
-				if (!data.count(key)) return false;
+				if (!data.count(key)) {
+					std::cout << key << " not congruent.\n";
+					return false;
+				}
 			}
 
 			return true;
 		}
 
-		DataSlide combine(const DataSlide &ds) {
-			if (!congruent(ds)) {
+		DataSlide combine(const DataSlide &ds, const var_t_eq& equality_comparator) {
+			if (!congruent(ds, equality_comparator)) {
 				std::stringstream ss;
 				ss << "DataSlides not congruent.\n"; 
 				ss << to_string() << "\n\n\n" << ds.to_string() << std::endl;
@@ -605,9 +650,8 @@ class DataSlide {
 
 			for (auto const &[key, samples] : data) {
 				dn.add_data(key);
-				for (uint32_t i = 0; i < samples.size(); i++) {
+				for (uint32_t i = 0; i < samples.size(); i++)
 					dn.push_data(key, samples[i].combine(ds.data.at(key)[i]));
-				}
 			}
 
 			return dn;
@@ -620,7 +664,6 @@ class DataFrame {
 	private:
 		bool qtable_initialized;
 		// qtable stores a list of key: {val: corresponding_slide_indices}
-		//std::map<std::string, std::map<var_t, std::vector<uint32_t>, var_t_eq>> qtable;
 		std::map<std::string, std::vector<std::vector<uint32_t>>> qtable;
 		std::map<std::string, std::vector<var_t>> key_vals;
 
@@ -663,7 +706,7 @@ class DataFrame {
 				for (auto const &[key, vals] : key_vals) {
 					var_t val = slide.params[key];
 					uint32_t idx = corresponding_ind(val, vals, equality_comparator);
-					if (idx == -1)
+					if (idx == (uint32_t) -1)
 						throw std::invalid_argument("Error in init_qtable.");
 
 					qtable[key][idx].push_back(n);
@@ -704,7 +747,7 @@ class DataFrame {
 				// Take set intersection
 				std::set<uint32_t> tmp;
 				uint32_t idx = corresponding_ind(val, key_vals[key], equality_comparator);
-				if (idx == -1)
+				if (idx == (uint32_t) -1)
 					continue;
 
 				for (auto const i : qtable[key][idx]) {
@@ -729,18 +772,18 @@ class DataFrame {
 
 		friend class ParallelCompute;
 		
-		DataFrame() : atol(1e-6), rtol(1e-5) {}
+		DataFrame() : atol(ATOL), rtol(RTOL) {}
 
-		DataFrame(const std::vector<DataSlide>& slides) : atol(1e-6), rtol(1e-5) {
+		DataFrame(const std::vector<DataSlide>& slides) : atol(ATOL), rtol(RTOL) {
 			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
 		}
 
-		DataFrame(const Params& params, const std::vector<DataSlide>& slides) : atol(1e-6), rtol(1e-5) {
+		DataFrame(const Params& params, const std::vector<DataSlide>& slides) : atol(ATOL), rtol(RTOL) {
 			add_param(params);
 			for (uint32_t i = 0; i < slides.size(); i++) add_slide(slides[i]); 
 		}
 
-		DataFrame(const std::string& s) : atol(1e-6), rtol(1e-5) {
+		DataFrame(const std::string& s) {
 			nlohmann::json data = nlohmann::json::parse(s);
 			for (auto const &[key, val] : data["params"].items())
 				params[key] = parse_json_type(val);
@@ -749,13 +792,23 @@ class DataFrame {
 				for (auto const &[key, val] : data["metadata"].items())
 					metadata[key] = parse_json_type(val);
 			}
+
+			// TODO use get<T>
+			if (metadata.count("atol"))
+				atol = std::get<double>(metadata.at("atol"));
+			else
+				atol = ATOL;
+
+			if (metadata.count("rtol"))
+				rtol = std::get<double>(metadata.at("rtol"));
+			else
+				rtol = RTOL;
 		
-			for (auto const &slide_str : data["slides"]) {
+			for (auto const &slide_str : data["slides"])
 				add_slide(DataSlide(slide_str.dump()));
-			}
 		}
 
-		DataFrame(const DataFrame& other) : atol(1e-6), rtol(1e-5) {
+		DataFrame(const DataFrame& other) : atol(other.atol), rtol(other.rtol) {
 			for (auto const& [key, val] : other.params)
 				params[key] = val;
 			
@@ -781,27 +834,28 @@ class DataFrame {
 		}
 
 		template <typename T>
+		void add_metadata(const std::string& s, const T & t) {
+			metadata[s] = t;
+		}
+
+		void add_metadata(const Params &params) {
+			for (auto const &[key, field] : params)
+				add_metadata(key, field);
+		}
+
+		template <typename T>
 		void add_param(const std::string& s, const T & t) { 
 			params[s] = t; 
 
 			qtable_initialized = false;
 		}
 
-		template <typename T>
-		void add_metadata(const std::string& s, const T & t) {
-			metadata[s] = t;
-		}
 
 		void add_param(const Params &params) {
 			for (auto const &[key, field] : params)
 				add_param(key, field);
 
 			qtable_initialized = false;
-		}
-
-		void add_metadata(const Params &params) {
-			for (auto const &[key, field] : metadata)
-				add_metadata(key, field);
 		}
 
 		bool contains(const std::string& s) const {
@@ -882,15 +936,17 @@ class DataFrame {
 
 			var_t first_slide_val = first_slide.get_param(s);
 
+			var_t_eq equality_comparator(atol, rtol);
 			for (auto slide : slides) {
 				if (!slide.contains(s)) return false;
-				if (slide.get_param(s) != first_slide_val) return false;
+				if (!equality_comparator(slide.get_param(s), first_slide_val)) return false;
 			}
 
 			return true;
 		}
 
 		void promote_params() {
+			var_t_eq equality_comparator(atol, rtol);
 			if (slides.size() == 0) return;
 
 			DataSlide first_slide = slides[0];
@@ -980,7 +1036,7 @@ class DataFrame {
 		}
 
 		void reduce() {
-			promote_params();
+			var_t_eq equality_comparator(atol, rtol);
 
 			std::vector<DataSlide> new_slides;
 
@@ -993,7 +1049,7 @@ class DataFrame {
 				auto inds = compatible_inds(slide.params);
 				for (auto const j : inds) {
 					if (i == j) continue;
-					slide = slide.combine(slides[j]);
+					slide = slide.combine(slides[j], equality_comparator);
 					reduced.insert(j);
 				} 
 				new_slides.push_back(slide);
@@ -1080,6 +1136,7 @@ class DataFrame {
 				df.add_slide(ds);
 			}
 
+			df.promote_params();
 			df.reduce();
 
 			return df;
@@ -1279,32 +1336,32 @@ class ParallelCompute {
 		double atol;
 		double rtol;
 
-
+		bool average_congruent_runs;
 		bool serialize;
 
-		ParallelCompute(
-			std::vector<std::shared_ptr<Config>> configs, 
-			uint32_t num_threads, 
-			uint32_t num_threads_per_task,
-			bool serialize
-		) : configs(configs), num_threads(num_threads), num_threads_per_task(num_threads_per_task), serialize(serialize), atol(1e-6), rtol(1e-6) {}
 
+		ParallelCompute(Params& metaparams, std::vector<std::shared_ptr<Config>> configs) : configs(configs) {
+			num_threads = get<int>(metaparams, "num_threads", 1);
+			num_threads_per_task = get<int>(metaparams, "num_threads_per_task", 1);
 
-		ParallelCompute(
-			std::vector<std::shared_ptr<Config>> configs, 
-			uint32_t num_threads, 
-			uint32_t num_threads_per_task
-		) : ParallelCompute(configs, num_threads, num_threads_per_task, false) {}
+			serialize = get<int>(metaparams, "serialize", false);
 
+			atol = get<double>(metaparams, "atol", ATOL);
+			rtol = get<double>(metaparams, "rtol", RTOL);
 
-		void compute(bool verbose=false) {
-			auto start = std::chrono::high_resolution_clock::now();
+			average_congruent_runs = get<int>(metaparams, "average_congruent_runs", true);
 
+			df.add_metadata(metaparams);
 			df.atol = atol;
 			df.rtol = rtol;
 
+			serialize_df.add_metadata(metaparams);
 			serialize_df.atol = atol;
 			serialize_df.rtol = rtol;
+		}
+
+		void compute(bool verbose=false) {
+			auto start = std::chrono::high_resolution_clock::now();
 
 			uint32_t num_configs = configs.size();
 
@@ -1327,6 +1384,7 @@ class ParallelCompute {
 			if (verbose)
 				std::cout << "\n";
 			
+			var_t_eq equality_comparator(atol, rtol);
 			uint32_t idx = 0;
 			for (uint32_t i = 0; i < num_configs; i++) {
 				auto [slide, serialization] = results[idx];
@@ -1338,16 +1396,21 @@ class ParallelCompute {
 				for (uint32_t j = 1; j < nruns; j++) {
 					idx++;
 					auto [slide_tmp, serialization] = results[idx];
-					slide = slide.combine(slide_tmp);
+
+					if (average_congruent_runs) {
+						slide = slide.combine(slide_tmp, equality_comparator);
+					} else {
+						df.add_slide(slide_tmp);
+					}
 
 					slide_serializations.push_back(serialization);
 				}
 				idx++;
 
 				df.add_slide(slide);	
-				DataSlide serialize_ds = DataSlide::copy_params(slide);
 
 				// Add serializations
+				DataSlide serialize_ds = DataSlide::copy_params(slide);
 				for (uint32_t j = 0; j < nruns; j++) {
 					if (slide_serializations[j].has_value())
 						serialize_ds.add_param("serialization_" + std::to_string(j), slide_serializations[j].value());
@@ -1374,7 +1437,9 @@ class ParallelCompute {
 			for (auto &slide : serialize_df.slides)
 				slide.add_param("num_runs", 1);
 
-			df.reduce();
+			df.promote_params();
+			if (average_congruent_runs)
+				df.reduce();
 
 			if (verbose)
 				std::cout << "Total runtime: " << (int) duration.count() << std::endl;

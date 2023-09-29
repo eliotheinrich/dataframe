@@ -147,20 +147,26 @@ class DataFrame:
 class ParallelCompute:
     def __init__(self, configs, num_threads: int = 1):
         self._pc = _df.ParallelCompute(configs, num_threads)
-    
-    def set_serialize(self, serialize: bool):
-        self._pc = serialize
-    
-    def get_serialize(self) -> bool:
-        return self._pc.serialize
+
+    @property
+    def atol(self):
+        return self._pc.atol
+
+    @atol.setter
+    def atol(self, atol: float):
+        self._pc.atol = atol
+
+    @property
+    def rtol(self):
+        return self._pc.rtol
+
+    @rtol.setter
+    def rtol(self, rtol: float):
+        self._pc.rtol = rtol
     
     @property
     def dataframe(self):
         return self._pc.dataframe
-    
-    @property
-    def serialize(self):
-        return self._pc.serialize
     
     def compute(self, verbose: bool = False):
         self._pc.compute(verbose)
