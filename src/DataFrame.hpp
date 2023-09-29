@@ -1229,7 +1229,7 @@ class ParallelCompute {
 		typedef std::pair<DataSlide, std::optional<std::string>> compute_result_t;
 
 		// Static so that can be passed to threadpool without memory sharing issues
-		static compute_result_t thread_compute(std::shared_ptr<Config>& config, uint32_t num_threads) {
+		static compute_result_t thread_compute(std::shared_ptr<Config> config, uint32_t num_threads) {
 			DataSlide slide = config->compute(num_threads);
 
 			std::optional<std::string> serialize_result = std::nullopt;
@@ -1237,7 +1237,6 @@ class ParallelCompute {
 				serialize_result = config->write_serialize();
 
 			slide.add_param(config->params);
-			config.reset();
 
 			return std::make_pair(slide, serialize_result);
 		}
