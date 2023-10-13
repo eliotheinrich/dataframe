@@ -1280,6 +1280,7 @@ class ParallelCompute {
 			return results;
 		}
 
+#ifndef SERIAL
 		// Return a pair of slides and corresponding state (optional) serializations
 		std::vector<compute_result_t> compute_bspl(
 			std::vector<std::shared_ptr<Config>> total_configs, 
@@ -1326,6 +1327,7 @@ class ParallelCompute {
 
 			return results;
 		}
+#endif
 
 	public:
 		DataFrame df;
