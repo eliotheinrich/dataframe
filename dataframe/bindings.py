@@ -119,8 +119,8 @@ class DataFrame:
         new._dataframe = self._dataframe + other._dataframe
         return new
 
-    def write_json(self, filename: str):
-        self._dataframe.write_json(filename)
+    def write_json(self, filename: str, record_error: bool = False):
+        self._dataframe.write_json(filename, record_error)
     
     def promote_params(self):
         self._dataframe.promote_params()
@@ -134,12 +134,12 @@ class DataFrame:
 
         self._dataframe = _df.DataFrame(self.params, self._dataframe.slides) 
     
-    def query(self, keys: list | str, constraints: dict | None = None, unique: bool = False) -> list:
+    def query(self, keys: list | str, constraints: dict | None = None, unique: bool = False, error: bool = False) -> list:
         if isinstance(keys, str):
             keys = [keys]
         if constraints is None:
             constraints = {}
-        return self._dataframe.query(keys, constraints, unique)
+        return self._dataframe.query(keys, constraints, unique, error)
           
     def query_unique(self, keys: list | str, constraints: dict | None = None) -> list:
         return self.query(keys, constraints, unique=True)

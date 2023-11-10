@@ -107,7 +107,7 @@ void init_dataframe(nb::module_ &m) {
 		.def("write_json", &DataFrame::write_json)
 		.def("promote_params", &DataFrame::promote_params)
 		.def("filter", &DataFrame::filter)
-		.def("query", &DataFrame::query, "keys"_a, "constraints"_a, "unique"_a = false);
+		.def("query", &DataFrame::query, "keys"_a, "constraints"_a, "unique"_a = false, "error"_a = false);
 	
 	nb::class_<ParallelCompute>(m, "ParallelCompute")
 		.def(nb::init<Params&, std::vector<std::shared_ptr<Config>>>())

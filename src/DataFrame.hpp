@@ -21,6 +21,10 @@
 #include <BS_thread_pool.hpp>
 #endif
 
+#ifdef OPENMP
+#include <omp.h>
+#endif
+
 class Sample;
 class DataSlide;
 class DataFrame;
@@ -33,6 +37,16 @@ static void escape_sequences(std::string &);
 
 #define ATOL 1e-6
 #define RTOL 1e-5
+
+#define THREADPOOL 0
+#define OPENMP 1
+#define SERIAL 2
+
+enum parallelization_t {
+	threadpool,
+	openmp,
+	serial,
+};
 
 // --- DEFINING VALID PARAMETER VALUES ---
 typedef std::variant<int, double, std::string> var_t;
@@ -566,14 +580,25 @@ class DataSlide {
 			data[s].push_back(Sample(d, std, num_samples));
 		}
 
-		std::vector<double> get_data(const std::string& s) {
+		std::vector<double> get_data(const std::string& s) const {
 			if (!data.count(s))
 				return std::vector<double>();
 
 			std::vector<double> d;
-			for (auto const &s : data[s])
+			for (auto const &s : data.at(s))
 				d.push_back(s.get_mean());
 			
+			return d;
+		}
+
+		std::vector<double> get_std(const std::string& s) const {
+			if (!data.count(s))
+				return std::vector<double>();
+
+			std::vector<double> d;
+			for (auto const &s : data.at(s))
+				d.push_back(s.get_std());
+
 			return d;
 		}
 
@@ -587,7 +612,7 @@ class DataSlide {
 			return false;
 		}
 
-		std::string to_string(uint32_t indentation=0, bool pretty=true, bool save_full_sample=false) const {
+		std::string to_string(uint32_t indentation=0, bool pretty=true, bool record_error=false) const {
 			std::string tab = pretty ? "\t" : "";
 			std::string nline = pretty ? "\n" : "";
 			std::string tabs = "";
@@ -603,7 +628,7 @@ class DataSlide {
 			for (auto const &[key, samples] : data) {
 				std::vector<std::string> sample_buffer;
 				for (auto sample : samples) {
-					sample_buffer.push_back(sample.to_string(save_full_sample));
+					sample_buffer.push_back(sample.to_string(record_error));
 				}
 
 				buffer.push_back("\"" + key + "\": [" + join(sample_buffer, ", ") + "]");
@@ -793,7 +818,6 @@ class DataFrame {
 					metadata[key] = parse_json_type(val);
 			}
 
-			// TODO use get<T>
 			if (metadata.count("atol"))
 				atol = std::get<double>(metadata.at("atol"));
 			else
@@ -889,7 +913,7 @@ class DataFrame {
 			return metadata.erase(s);
 		}
 
-		std::string to_string() const {
+		std::string to_string(bool record_error=false) const {
 			std::string s = "";
 
 			s += "{\n\t\"params\": {\n";
@@ -904,9 +928,8 @@ class DataFrame {
 
 			int num_slides = slides.size();
 			std::vector<std::string> buffer;
-			for (int i = 0; i < num_slides; i++) {
-				buffer.push_back("\t\t{\n" + slides[i].to_string(3) + "\n\t\t}");
-			}
+			for (int i = 0; i < num_slides; i++)
+				buffer.push_back("\t\t{\n" + slides[i].to_string(3, true, record_error) + "\n\t\t}");
 
 			s += join(buffer, ",\n");
 
@@ -916,8 +939,8 @@ class DataFrame {
 		}
 
 		// TODO use nlohmann?
-		void write_json(std::string filename) const {
-			std::string s = to_string();
+		void write_json(std::string filename, bool record_error=false) const {
+			std::string s = to_string(record_error);
 
 			// Save to file
 			if (!std::remove(filename.c_str())) std::cout << "Deleting old data\n";
@@ -993,9 +1016,9 @@ class DataFrame {
 			return DataFrame(params, slides);
 		}
 
-		query_result query(const std::vector<std::string>& keys, const Params& constraints, bool unique = false) {
+		query_result query(const std::vector<std::string>& keys, const Params& constraints, bool unique=false, bool error=false) {
 			if (unique) {
-				auto result = query(keys, constraints, false);
+				auto result = query(keys, constraints);
 				return std::visit(make_query_unique(atol, rtol), result);
 			}
 
@@ -1020,8 +1043,13 @@ class DataFrame {
 					key_result = query_t{param_vals};
 				} else {
 					std::vector<std::vector<double>> data_vals;
-					for (auto const i : inds)
-						data_vals.push_back(slides[i].get_data(key));
+					if (error) {
+						for (auto const i : inds)
+							data_vals.push_back(slides[i].get_std(key));
+					} else {
+						for (auto const i : inds)
+							data_vals.push_back(slides[i].get_data(key));
+					}
 					key_result = query_t{data_vals};
 				}
 
@@ -1218,8 +1246,8 @@ class ParallelCompute {
 					uint32_t num_hours = num_minutes/60;
 					num_minutes -= num_hours*60;
 					time << std::setfill('0') << std::setw(2) << num_hours << ":" 
-						<< std::setfill('0') << std::setw(2) << num_minutes << ":" 
-						<< std::setfill('0') << std::setw(2) << num_seconds << " ] ";
+						 << std::setfill('0') << std::setw(2) << num_minutes << ":" 
+						 << std::setfill('0') << std::setw(2) << num_seconds << " ] ";
 				}
 				std::cout << "] " << int(progress * 100.0) << " %" << time.str()  << "\r";
 				std::cout.flush();
@@ -1241,7 +1269,6 @@ class ParallelCompute {
 			return std::make_pair(slide, serialize_result);
 		}
 
-
 		std::vector<compute_result_t> compute_serial(
 			std::vector<std::shared_ptr<Config>> total_configs,
 			bool verbose
@@ -1259,29 +1286,16 @@ class ParallelCompute {
 			std::vector<compute_result_t> results(total_runs);
 
 			auto run_start = std::chrono::high_resolution_clock::now();
-			uint32_t idx = 0;
-			for (uint32_t i = 0; i < num_configs; i++) {
-				// Cloning and discarding calls constructors which emplace default values into params of configs[i]
-				// This is a gross hack
-				// TODO fix
-				configs[i]->clone();
-				uint32_t nruns = configs[i]->get_nruns();
-				std::vector<std::string> serializations;
-				for (uint32_t j = 0; j < nruns; j++) {
-					std::shared_ptr<Config> cfg = configs[i]->clone();
-					results[idx] = ParallelCompute::thread_compute(cfg, num_threads_per_task);
-					idx++;
+			for (uint32_t i = 0; i < total_runs; i++) {
+				results[i] = ParallelCompute::thread_compute(total_configs[i], num_threads_per_task);
 
-					if (verbose)
-						print_progress(i, total_runs, run_start);
-				}
+				if (verbose)
+					print_progress(i, total_runs, run_start);
 			}
 
 			return results;
 		}
 
-#ifndef SERIAL
-		// Return a pair of slides and corresponding state (optional) serializations
 		std::vector<compute_result_t> compute_bspl(
 			std::vector<std::shared_ptr<Config>> total_configs, 
 			bool verbose
@@ -1296,7 +1310,6 @@ class ParallelCompute {
 				print_progress(0, total_runs);
 			}
 
-
 			std::vector<DataSlide> slides(total_runs);
 			BS::thread_pool threads(num_threads/num_threads_per_task);
 			std::vector<std::future<compute_result_t>> futures(total_runs);
@@ -1304,19 +1317,8 @@ class ParallelCompute {
 
 
 			auto run_start = std::chrono::high_resolution_clock::now();
-			uint32_t idx = 0;
-			for (uint32_t i = 0; i < num_configs; i++) {
-				// Cloning and discarding calls constructors which emplace default values into params of configs[i]
-				// This is a gross hack
-				// TODO fix
-				configs[i]->clone();
-				uint32_t nruns = configs[i]->get_nruns();
-				for (uint32_t j = 0; j < nruns; j++) {
-					std::shared_ptr<Config> cfg = configs[i]->clone();
-					futures[idx] = threads.submit(ParallelCompute::thread_compute, cfg, num_threads_per_task);
-					idx++;
-				}
-			}
+			for (uint32_t i = 0; i < total_runs; i++)
+				futures[i] = threads.submit(ParallelCompute::thread_compute, total_configs[i], num_threads_per_task);
 
 			for (uint32_t i = 0; i < total_runs; i++) {
 				results[i] = futures[i].get();
@@ -1327,7 +1329,39 @@ class ParallelCompute {
 
 			return results;
 		}
-#endif
+
+		std::vector<compute_result_t> compute_omp(
+			std::vector<std::shared_ptr<Config>> total_configs, 
+			bool verbose
+		) {
+			uint32_t total_runs = total_configs.size();
+			uint32_t num_configs = configs.size();
+
+			if (verbose) {
+				std::cout << "Computing with OpenMP. " << num_threads << " threads available.\n";
+				std::cout << "num_configs: " << num_configs << std::endl;
+				std::cout << "total_runs: " << total_runs << std::endl;
+				print_progress(0, total_runs);
+			}
+
+
+			std::vector<DataSlide> slides(total_runs);
+			std::vector<compute_result_t> results(total_runs);
+
+			auto run_start = std::chrono::high_resolution_clock::now();
+			uint32_t completed = 0;
+
+			#pragma omp parallel for num_threads(num_threads)
+			for (uint32_t i = 0; i < total_runs; i++) {
+				results[i] = ParallelCompute::thread_compute(total_configs[i], num_threads_per_task);
+				completed++;
+
+				if (verbose)
+					print_progress(completed, total_runs, run_start);
+			}
+
+			return results;
+		}
 
 	public:
 		DataFrame df;
@@ -1340,6 +1374,10 @@ class ParallelCompute {
 		bool average_congruent_runs;
 		bool serialize;
 
+		parallelization_t parallelization_type;
+
+		bool record_error;
+
 
 		ParallelCompute(Params& metaparams, std::vector<std::shared_ptr<Config>> configs) : configs(configs) {
 			num_threads = get<int>(metaparams, "num_threads", 1);
@@ -1351,6 +1389,10 @@ class ParallelCompute {
 			rtol = get<double>(metaparams, "rtol", RTOL);
 
 			average_congruent_runs = get<int>(metaparams, "average_congruent_runs", true);
+
+			parallelization_type = (parallelization_t) get<int>(metaparams, "parallelization_type", parallelization_t::threadpool);
+
+			record_error = get<int>(metaparams, "record_error", false);
 
 			df.add_metadata(metaparams);
 			df.atol = atol;
@@ -1376,11 +1418,21 @@ class ParallelCompute {
 
 			uint32_t num_jobs = total_configs.size();
 
-#ifdef SERIAL
-			auto results = compute_serial(total_configs, verbose);
-#else
-			auto results = compute_bspl(total_configs, verbose);
-#endif
+
+
+			std::vector<compute_result_t> results;
+
+			switch (parallelization_type) {
+			case parallelization_t::threadpool:
+				results = compute_bspl(total_configs, verbose);
+				break;
+			case parallelization_t::openmp:
+				results = compute_omp(total_configs, verbose);
+				break;
+			case parallelization_t::serial:
+				results = compute_serial(total_configs, verbose);
+				break;
+			}
 
 			if (verbose)
 				std::cout << "\n";
@@ -1447,12 +1499,12 @@ class ParallelCompute {
 		}
 
 		void write_json(std::string filename) const {
-			df.write_json(filename);
+			df.write_json(filename, record_error);
 		}
 
 		void write_serialize_json(std::string filename) const {
 			if (serialize)
-				serialize_df.write_json(filename);
+				serialize_df.write_json(filename, record_error);
 		}
 };
 
