@@ -1036,6 +1036,8 @@ class DataFrame {
 				query_t key_result;
 				if (params.count(key)) {
 					key_result = query_t{params[key]};
+				} else if (metadata.count(key)) {
+					key_result = query_t{metadata[key]};
 				} else if (slides[*inds.begin()].params.count(key)) {
 					std::vector<var_t> param_vals;
 					for (auto const i : inds)
