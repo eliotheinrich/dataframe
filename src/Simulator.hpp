@@ -63,6 +63,7 @@ class Simulator {
         }
 
         virtual void init_state(uint32_t num_threads)=0;
+        virtual void cleanup() {}
         
         virtual std::shared_ptr<Simulator> clone(Params &params)=0;
         virtual std::shared_ptr<Simulator> deserialize(Params &params, const std::string&) { return clone(params); }
@@ -241,6 +242,8 @@ class TimeConfig : public Config {
 			int duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time).count();
             slide.add_data("time");
             slide.push_data("time", duration);
+
+            simulator->cleanup();
 
             return slide;
         }
