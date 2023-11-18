@@ -47,11 +47,24 @@ include_directories(
     ${bspl_SOURCE_DIR}/include 
 )
 
+set(SRC_FILES 
+  src/utils.cpp 
+  src/Sample.cpp 
+  src/DataSlide.cpp 
+  src/DataFrame.cpp 
+  src/ParallelCompute.cpp
+  src/Config.hpp
+  src/Simulator.hpp
+  src/TimeConfig.cpp
+  src/PyDataFrame.hpp
+  src/PyDataFrameModule.cpp
+)
+
 nanobind_add_module(
   dataframe_bindings 
   STABLE_ABI
   NB_STATIC
-  src/PyDataFrameModule.cpp
+  ${SRC_FILES}
 )
 
 install(

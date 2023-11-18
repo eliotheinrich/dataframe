@@ -1,4 +1,5 @@
-#include "DataFrame.hpp"
+#include "Frame.h"
+
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/variant.h>
@@ -6,49 +7,12 @@
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/shared_ptr.h>
 
-namespace nb = nanobind;
-using namespace nb::literals;
+using namespace nanobind::literals;
+using namespace dataframe_utils;
 
-std::string write_config(const std::vector<Params>& params) {
-	std::set<std::string> keys;
-	std::map<std::string, std::set<var_t>> vals;
-	for (auto const &p : params) {
-		for (auto const &[k, v] : p) {
-			keys.insert(k);
-			if (!vals.count(k))
-				vals[k] = std::set<var_t>();
-			
-			vals[k].insert(v);
-		}
-	}
-
-	std::string s = "{\n";
-	std::vector<std::string> buffer1;
-	for (auto const &key : keys) {
-		std::string b1 = "\t\"" + key + "\": ";
-		if (vals[key].size() > 1) b1 += "[";
-
-		std::vector<std::string> buffer2;
-		std::vector<var_t> sorted_vals(vals[key].begin(), vals[key].end());
-		std::sort(sorted_vals.begin(), sorted_vals.end());
-		
-		for (auto val : sorted_vals)
-			buffer2.push_back(std::visit(var_t_to_string(), val));
-		
-		b1 += join(buffer2, ", ");
-		if (vals[key].size() > 1) b1 += "]";
-		buffer1.push_back(b1);
-	}
-
-	s += join(buffer1, ",\n");
-
-	s += "\n}";
-
-	return s;
-}
 
 // Provide this function to initialize dataframe in other projects
-void init_dataframe(nb::module_ &m) {
+void init_dataframe(nanobind::module_ &m) {
 	m.def("load_json", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&load_json), "data"_a, "verbose"_a = false);
 	m.def("write_config", &write_config);
 
@@ -59,11 +23,11 @@ void init_dataframe(nb::module_ &m) {
 	void (DataSlide::*push_data1)(const std::string&, double) = &DataSlide::push_data;
 	void (DataSlide::*push_data2)(const std::string&, double, double, uint32_t) = &DataSlide::push_data;
 
-	nb::class_<DataSlide>(m, "DataSlide")
-		.def(nb::init<>())
-		.def(nb::init<Params&>())
-		.def(nb::init<const std::string&>())
-		.def(nb::init<const DataSlide&>())
+	nanobind::class_<DataSlide>(m, "DataSlide")
+		.def(nanobind::init<>())
+		.def(nanobind::init<Params&>())
+		.def(nanobind::init<const std::string&>())
+		.def(nanobind::init<const DataSlide&>())
 		.def_rw("params", &DataSlide::params)
 		.def_rw("data", &DataSlide::data)
 		.def("add_param", ds_add_param1)
@@ -83,12 +47,12 @@ void init_dataframe(nb::module_ &m) {
 	void (DataFrame::*df_add_param2)(const std::string&, var_t const&) = &DataFrame::add_param;
 	void (DataFrame::*df_add_metadata1)(const Params&) = &DataFrame::add_metadata;
 	void (DataFrame::*df_add_metadata2)(const std::string&, var_t const&) = &DataFrame::add_metadata;
-	nb::class_<DataFrame>(m, "DataFrame")
-		.def(nb::init<>())
-		.def(nb::init<const std::vector<DataSlide>&>())
-		.def(nb::init<const Params&, const std::vector<DataSlide>&>())
-		.def(nb::init<const std::string&>())
-		.def(nb::init<const DataFrame&>())
+	nanobind::class_<DataFrame>(m, "DataFrame")
+		.def(nanobind::init<>())
+		.def(nanobind::init<const std::vector<DataSlide>&>())
+		.def(nanobind::init<const Params&, const std::vector<DataSlide>&>())
+		.def(nanobind::init<const std::string&>())
+		.def(nanobind::init<const DataFrame&>())
 		.def_rw("params", &DataFrame::params)
 		.def_rw("slides", &DataFrame::slides)
 		.def_rw("atol", &DataFrame::atol)
@@ -109,8 +73,8 @@ void init_dataframe(nb::module_ &m) {
 		.def("filter", &DataFrame::filter)
 		.def("query", &DataFrame::query, "keys"_a, "constraints"_a, "unique"_a = false, "error"_a = false);
 	
-	nb::class_<ParallelCompute>(m, "ParallelCompute")
-		.def(nb::init<Params&, std::vector<std::shared_ptr<Config>>>())
+	nanobind::class_<ParallelCompute>(m, "ParallelCompute")
+		.def(nanobind::init<Params&, std::vector<std::shared_ptr<Config>>>())
 		.def_rw("dataframe", &ParallelCompute::df)
 		.def_rw("atol", &ParallelCompute::atol)
 		.def_rw("rtol", &ParallelCompute::rtol)
