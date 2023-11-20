@@ -71,3 +71,9 @@ install(
   TARGETS dataframe_bindings
   LIBRARY DESTINATION dataframe
 )
+
+add_library(dataframe INTERFACE ${SRC_FILES})
+target_include_directories(dataframe INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
