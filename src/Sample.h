@@ -1,5 +1,7 @@
 #pragma once
 
+#include "utils.h"
+
 #include <vector>
 #include <string>
 #include <math.h>
@@ -53,9 +55,63 @@ class Sample {
 
         Sample combine(const Sample &other) const;
 
-		static Sample collapse(const std::vector<Sample> &samples);
-
 		static std::vector<double> get_means(const std::vector<Sample> &samples);
 
 		std::string to_string(bool full_sample = false) const;
+};
+
+std::vector<Sample> combine_samples(const std::vector<Sample>& samples1, const std::vector<Sample>& samples2);
+Sample collapse_samples(const std::vector<Sample>& samples);
+std::vector<Sample> collapse_samples(const std::vector<std::vector<Sample>>& samples);
+
+class data_t {
+    private:
+        std::map<std::string, std::vector<Sample>> data;
+    
+    public:
+        data_t()=default;
+
+        void emplace(const std::string &key, const std::vector<Sample> &samples) {
+            data.emplace(key, samples);
+        }
+
+        void emplace(const std::string &key, const std::vector<double> &doubles) {
+            size_t N = doubles.size();
+            std::vector<Sample> samples(N);
+            for (uint32_t i = 0; i < N; i++)
+                samples[i] = Sample(doubles[i]);
+
+            emplace(key, samples);
+        }
+
+        void emplace(const std::string &key, double d) {
+            std::vector<Sample> sample{Sample(d)};
+			emplace(key, sample);
+        }
+
+		void emplace(const std::string &key, Sample s) {
+			std::vector<Sample> sample{s};
+			emplace(key, sample);
+		}
+
+		auto begin() const {
+			return data.begin();
+		}
+
+		auto end() const {
+			return data.end();
+		}
+		
+		int count(const std::string &key) const {
+			return data.count(key);
+		}
+
+		const std::vector<Sample>& operator[](const std::string& key) const {
+        	return data.at(key);
+    	}
+
+		std::vector<Sample>& operator[](const std::string& key) {
+			return data[key];
+		}
+
 };

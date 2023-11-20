@@ -39,15 +39,6 @@ Sample Sample::combine(const Sample &other) const {
     return Sample(combined_mean, combined_std, combined_samples);
 }
 
-Sample Sample::collapse(const std::vector<Sample> &samples) {
-    Sample s = samples[0];
-    for (uint32_t i = 1; i < samples.size(); i++) {
-        s = s.combine(samples[i]);
-    }
-
-    return s;
-}
-
 std::vector<double> Sample::get_means(const std::vector<Sample> &samples) {
     std::vector<double> v;
     for (auto const &s : samples)
@@ -63,4 +54,46 @@ std::string Sample::to_string(bool full_sample) const {
     } else {
         return std::to_string(this->mean);
     }
+}
+
+std::vector<Sample> combine_samples(const std::vector<Sample>& samples1, const std::vector<Sample>& samples2) {
+	if (samples1.size() != samples2.size())
+		throw std::invalid_argument("Cannot combine samples; incongruent lentgh.");
+
+	std::vector<Sample> samples(samples1.size());
+	for (uint32_t i = 0; i < samples1.size(); i++)
+		samples[i] = samples1[i].combine(samples2[i]);
+
+	return samples;
+}
+
+Sample collapse_samples(const std::vector<Sample>& samples) {
+    size_t N = samples.size();
+	if (N == 0)
+		return Sample();
+
+    Sample s = samples[0];
+    for (uint32_t i = 1; i < samples.size(); i++)
+        s = s.combine(samples[i]);
+
+    return s;
+}
+
+std::vector<Sample> collapse_samples(const std::vector<std::vector<Sample>>& samples) {
+    size_t N = samples.size();
+	if (N == 0)
+		return std::vector<Sample>();
+
+    size_t M = samples[0].size();
+
+    std::vector<Sample> collapsed_samples(M);
+    for (uint32_t i = 0; i < M; i++) {
+        Sample s = samples[0][i];
+        for (uint32_t j = 0; j < N; j++)
+            s = s.combine(samples[j][i]);
+    
+        collapsed_samples[i] = s;
+    }
+
+    return collapsed_samples;
 }

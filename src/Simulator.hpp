@@ -49,9 +49,6 @@ class Simulator {
         virtual data_t take_samples() {
             return data_t();
         }
-        virtual std::map<std::string, std::vector<Sample>> take_vector_samples() {
-            return std::map<std::string, std::vector<Sample>>();
-        }
 
         virtual void init_state(uint32_t num_threads)=0;
         virtual void cleanup() {}

@@ -53,15 +53,15 @@ bool params_eq(const Params& lhs, const Params& rhs, const var_t_eq& equality_co
 //	throw std::invalid_argument("Called operator!=(Params, Params)!");
 //}
 
+query_t parse_get_data(const std::vector<std::vector<std::vector<double>>>& data);
+
 struct query_t_to_string {
 	std::string operator()(const var_t& v) const;
-
 	std::string operator()(const std::vector<var_t>& vec) const;
-
-	std::string operator()(const std::vector<std::vector<double>>& v) const;
+	std::string operator()(const nbarray& v) const;
 };
 
-typedef std::variant<query_t, std::vector<query_t>> query_result;
+//typedef std::variant<query_t, std::vector<query_t>> query_result;
 
 struct query_to_string {
 	std::string operator()(const query_t& q) { 
@@ -85,25 +85,11 @@ struct make_query_t_unique {
 	}
 
 	query_t operator()(const var_t& v) const { return std::vector<var_t>{v}; }
-	query_t operator()(const std::vector<std::vector<double>>& data) const { return data; }
-
 	query_t operator()(const std::vector<var_t>& vec) const;
+	query_t operator()(const nbarray& data) const { return data; }
 };
 
-
-struct make_query_unique {
-	make_query_t_unique query_t_visitor;
-
-	make_query_unique(double atol=ATOL, double rtol=RTOL) {
-		query_t_visitor = make_query_t_unique{atol, rtol};
-	}
-
-	query_result operator()(const query_t& q) {
-		return std::visit(query_t_visitor, q);
-	}
-
-	query_result operator()(const std::vector<query_t>& results);
-};
+std::vector<query_t> make_query_unique(const std::vector<query_t>& results, const make_query_t_unique& query_t_visitor);
 
 template <class json_object>
 static var_t parse_json_type(json_object p) {

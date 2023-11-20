@@ -38,6 +38,13 @@ void DataFrame::init_qtable() {
 		}
 	}
 
+	//for (auto [key, vals]: key_vals) {
+	//	std::cout << key << ": " << "[ ";
+	//	for (uint32_t i = 0; i < vals.size(); i++) {
+	//		std::cout << std::visit(var_t_to_string(), vals[i]) << " ";
+	//	} std::cout << "]\n";
+	//}
+
 	// Setting up qtable indices
 	for (auto const &[key, vals] : key_vals)
 		qtable[key] = std::vector<std::vector<uint32_t>>(vals.size());
@@ -253,10 +260,10 @@ DataFrame DataFrame::filter(const std::vector<Params>& constraints, bool invert)
 	return DataFrame(params, slides);
 }
 
-query_result DataFrame::query(const std::vector<std::string>& keys, const Params& constraints, bool unique, bool error) {
+std::vector<query_t> DataFrame::query(const std::vector<std::string>& keys, const Params& constraints, bool unique, bool error) {
 	if (unique) {
 		auto result = query(keys, constraints);
-		return std::visit(make_query_unique(atol, rtol), result);
+		return make_query_unique(result, make_query_t_unique(atol, rtol));
 	}
 
 	// Determine indices of slides which respect the given constraints
@@ -264,7 +271,7 @@ query_result DataFrame::query(const std::vector<std::string>& keys, const Params
 	
 	// Constraints yield no valid slides, so return nothing
 	if (inds.empty())
-		return query_result{std::vector<var_t>()};
+		return std::vector<query_t>();
 
 	// Compile result of query
 	std::vector<query_t> result;
@@ -281,7 +288,8 @@ query_result DataFrame::query(const std::vector<std::string>& keys, const Params
 				param_vals.push_back(slides[i].params[key]);
 			key_result = query_t{param_vals};
 		} else {
-			std::vector<std::vector<double>> data_vals;
+			std::vector<std::vector<std::vector<double>>> data_vals;
+
 			if (error) {
 				for (auto const i : inds)
 					data_vals.push_back(slides[i].get_std(key));
@@ -289,17 +297,14 @@ query_result DataFrame::query(const std::vector<std::string>& keys, const Params
 				for (auto const i : inds)
 					data_vals.push_back(slides[i].get_data(key));
 			}
-			key_result = query_t{data_vals};
+
+			key_result = parse_get_data(data_vals);
 		}
 
 		result.push_back(key_result);
 	}
 
-	if (result.size() == 1)
-		return query_result{result[0]};
-	else
-		return query_result{result};
-
+	return result;
 }
 
 void DataFrame::reduce() {

@@ -7,7 +7,7 @@
 class DataSlide {
 	public:
 		Params params;
-		std::map<std::string, std::vector<Sample>> data;
+		std::map<std::string, std::vector<std::vector<Sample>>> data;
 
 		DataSlide() {}
 
@@ -38,23 +38,21 @@ class DataSlide {
 			}
 		}
 
-		void add_data(const std::string& s) { data.emplace(s, std::vector<Sample>()); }
+		void add_data(const std::string& s) { 
+            data.emplace(s, std::vector<std::vector<Sample>>()); 
+        }
 
-		void push_data(const std::string& s, Sample sample) {
-			data[s].push_back(sample);
+		void push_data(const std::string& s, const std::vector<Sample>& samples) {
+            data[s].push_back(samples);
 		}
 
-		void push_data(const std::string& s, double d) {
-			data[s].push_back(Sample(d));
-		}
+        void push_data(const std::string& s, const Sample& sample) {
+			std::vector<Sample> sample_vec{sample};
+			push_data(s, sample_vec);
+        }
 
-		void push_data(const std::string& s, double d, double std, uint32_t num_samples) {
-			data[s].push_back(Sample(d, std, num_samples));
-		}
-
-		std::vector<double> get_data(const std::string& s) const;
-
-		std::vector<double> get_std(const std::string& s) const;
+		std::vector<std::vector<double>> get_data(const std::string& s) const;
+        std::vector<std::vector<double>> get_std(const std::string& s) const;
 
 		bool remove(const std::string& s);
 

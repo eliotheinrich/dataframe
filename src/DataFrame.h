@@ -112,7 +112,7 @@ class DataFrame {
 		void promote_params();
 
 		DataFrame filter(const std::vector<Params>& constraints, bool invert = false);
-		query_result query(const std::vector<std::string>& keys, const Params& constraints, bool unique=false, bool error=false);
+		std::vector<query_t> query(const std::vector<std::string>& keys, const Params& constraints, bool unique=false, bool error=false);
 		void reduce();
 		DataFrame combine(const DataFrame &other) const;
 };

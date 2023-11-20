@@ -158,24 +158,100 @@ bool params_eq(const Params& lhs, const Params& rhs, const var_t_eq& equality_co
 	return true;
 }
 
-std::string query_t_to_string::operator()(const var_t& v) const { return std::visit(var_t_to_string(), v); }
+std::string query_t_to_string::operator()(const var_t& v) const { 
+	return std::visit(var_t_to_string(), v); 
+}
 
 std::string query_t_to_string::operator()(const std::vector<var_t>& vec) const {
-    std::vector<std::string> buffer;
+    var_t_to_string vt;
+    std::vector<std::string> buffer(vec.size());
     for (auto const val : vec)
-        buffer.push_back(std::visit(var_t_to_string(), val));
+        buffer.push_back(std::visit(vt, val));
     return "[" + join(buffer, ", ") + "]";
 }
 
-std::string query_t_to_string::operator()(const std::vector<std::vector<double>>& v) const {
-    std::vector<std::string> buffer1;
-    for (auto const& row : v) {
-        std::vector<std::string> buffer2;
-        for (auto const d : row)
-            buffer2.push_back(std::visit(var_t_to_string(), var_t{d}));
-        buffer1.push_back("[" + join(buffer2, ", ") + "]");
-    }
-    return "[" + join(buffer1, "\n") + "]";
+//std::string query_t_to_string::operator()(const nbarray& arr) const {
+//    var_t_to_string vt;
+//
+//#ifdef PS_BUILDING_PYTHON
+//	if (arr.ndim() == 2) {
+//		std::vector<std::string> buffer1(arr.shape(0));
+//		for (size_t i = 0; i < arr.shape(0); i++) {
+//			std::vector<std::string> buffer2(arr.shape(1));
+//			for (size_t j = 0; j < arr.shape(1); j++) {
+//				double d = arr(i, j, 0);
+//				buffer2[j] = std::visit(vt, var_t{d});
+//			}
+//
+//			buffer1[i] = "[" + join(buffer2, ", ") + "]";
+//		}
+//
+//		return "[" + join(buffer1, "\n") + "]";
+//	} else {
+//		std::vector<std::string> buffer1(arr.shape(0));
+//		for (size_t i = 0; i < arr.shape(0); i++) {
+//			std::vector<std::string> buffer2(arr.shape(1));
+//			for (size_t j = 0; j < arr.shape(1); j++) {
+//				std::vector<std::string> buffer3(arr.shape(2));
+//				for (size_t k = 0; k < arr.shape(2); k++) {
+//					double d = arr(i, j, k);
+//					buffer3[k] = std::visit(vt, var_t{d});
+//				}
+//				buffer2[j] = "[" + join(buffer3, ", ") + "]";
+//			}
+//
+//			buffer1[i] = "[" + join(buffer2, ", ") + "]";
+//		}
+//
+//		return "[" + join(buffer1, "\n") + "]";
+//	}
+//#else
+//	size_t N = arr.size();
+//
+//	std::vector<std::string> buffer1(N);
+//	for (size_t i = 0; i < N; i++) {
+//		size_t M = arr[i].size();
+//		std::vector<std::string> buffer2(M);
+//		for (size_t j = 0; j < M; j++) {
+//			size_t K = arr[i][j].size();
+//			std::vector<std::string> buffer3(K);
+//			for (size_t k = 0; k < K; k++) {
+//				double d = arr[i][j][k];
+//				buffer3[k] = std::visit(vt, var_t{d});
+//			}
+//			buffer2[j] = "[" + join(buffer3, ", ") + "]";
+//		}
+//
+//		buffer1[i] = "[" + join(buffer2, ", ") + "]";
+//	}
+//
+//	return "[" + join(buffer1, "\n") + "]";
+//#endif
+//}
+
+std::string query_t_to_string::operator()(const nbarray& arr) const {
+    var_t_to_string vt;
+
+	size_t N = arr.size();
+
+	std::vector<std::string> buffer1(N);
+	for (size_t i = 0; i < N; i++) {
+		size_t M = arr[i].size();
+		std::vector<std::string> buffer2(M);
+		for (size_t j = 0; j < M; j++) {
+			size_t K = arr[i][j].size();
+			std::vector<std::string> buffer3(K);
+			for (size_t k = 0; k < K; k++) {
+				double d = arr[i][j][k];
+				buffer3[k] = std::visit(vt, var_t{d});
+			}
+			buffer2[j] = "[" + join(buffer3, ", ") + "]";
+		}
+
+		buffer1[i] = "[" + join(buffer2, ", ") + "]";
+	}
+
+	return "[" + join(buffer1, "\n") + "]";
 }
 
 query_t make_query_t_unique::operator()(const std::vector<var_t>& vec) const {
@@ -195,7 +271,47 @@ query_t make_query_t_unique::operator()(const std::vector<var_t>& vec) const {
     return return_vals;
 }
 
-query_result make_query_unique::operator()(const std::vector<query_t>& results) {
+//query_t parse_get_data(const std::vector<std::vector<std::vector<double>>>& data) {
+//    size_t N = data.size();
+//	if (N == 0)
+//        return query_t();
+//    
+//	size_t M = data[0].size();
+//	size_t K = data[0][0].size();
+//
+//#ifdef PS_BUILDING_PYTHON
+//	size_t shape[] = {N, M, K};
+//	std::vector<double> vec(N*M*K);
+//	nbarray nb_data(vec.data(), {N, M, K});
+//	auto v = nb_data.view();
+//
+//	for (uint32_t i = 0; i < N; i++) {
+//		for (uint32_t j = 0; j < M; j++) {
+//			for (uint32_t k = 0; k < K; k++) {
+//				v(i, j, k) = data[i][j][k];
+//			}
+//		}
+//	}
+//#else
+//	nbarray nb_data(N, std::vector<std::vector<double>>(M, std::vector<double>(K)));
+//	for (uint32_t i = 0; i < N; i++) {
+//		for (uint32_t j = 0; j < M; j++) {
+//			for (uint32_t k = 0; k < K; k++) {
+//				nb_data[i][j][k] = data[i][j][k];
+//			}
+//		}
+//	}
+//#endif
+//
+//	return query_t{nb_data};
+//}
+
+query_t parse_get_data(const std::vector<std::vector<std::vector<double>>>& data) {
+	return query_t{data};
+}
+
+
+std::vector<query_t> make_query_unique(const std::vector<query_t>& results, const make_query_t_unique& query_t_visitor) {
     std::vector<query_t> new_results(results.size());
     std::transform(results.begin(), results.end(), std::back_inserter(new_results),
         [&query_t_visitor=query_t_visitor](const query_t& q) { return std::visit(query_t_visitor, q); }
