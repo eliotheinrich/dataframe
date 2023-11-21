@@ -1,6 +1,6 @@
 #pragma once
 
-#include "utils.h"
+#include "utils.hpp"
 #include "Simulator.hpp"
-#include "TimeConfig.h"
-#include "ParallelCompute.h"
+#include "TimeConfig.hpp"
+#include "ParallelCompute.hpp"

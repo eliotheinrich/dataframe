@@ -1,29 +1,24 @@
 #pragma once
 
-#include "DataSlide.h"
-#include "types.h"
-#include "Sample.h"
+#include "DataSlide.hpp"
 
 #include <memory>
 #include <random>
+
+namespace dataframe {
 
 #define CLONE(A, B) virtual std::shared_ptr<A> clone(Params &params) override { return std::shared_ptr<A>(new B(params)); }
 
 #define DEFAULT_RANDOM_SEED -1
 
 class Simulator {
-    private:
-        int seed;
-        
-    protected:
-        std::minstd_rand rng;
-
     public:
+        // All simulators are equipeed with a random number generator
         int rand() { return rng(); }
-        float randf() { return float(rng())/float(RAND_MAX); }
+        double randf() { return double(rng())/double(RAND_MAX); }
 
         Simulator(Params &params) {
-            seed = dataframe_utils::get<int>(params, "random_seed", DEFAULT_RANDOM_SEED);
+            seed = utils::get<int>(params, "random_seed", DEFAULT_RANDOM_SEED);
             if (seed == -1) {
                 thread_local std::random_device rd;
                 rng.seed(rd());
@@ -55,4 +50,12 @@ class Simulator {
         
         virtual std::shared_ptr<Simulator> clone(Params &params)=0;
         virtual std::shared_ptr<Simulator> deserialize(Params &params, const std::string&) { return clone(params); }
+
+    private:
+        int seed;
+        
+    protected:
+        std::minstd_rand rng;
 };
+
+}

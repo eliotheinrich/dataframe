@@ -48,16 +48,17 @@ include_directories(
 )
 
 set(SRC_FILES 
-  src/utils.cpp 
-  src/Sample.cpp 
-  src/DataSlide.cpp 
-  src/DataFrame.cpp 
-  src/ParallelCompute.cpp
+  src/utils.hpp 
+  src/Sample.hpp 
+  src/DataSlide.hpp 
+  src/DataFrame.hpp 
+  src/ParallelCompute.hpp
   src/Config.hpp
   src/Simulator.hpp
-  src/TimeConfig.cpp
+  src/TimeConfig.hpp
   src/PyDataFrame.hpp
   src/PyDataFrameModule.cpp
+  src/types.h
 )
 
 nanobind_add_module(
@@ -70,10 +71,4 @@ nanobind_add_module(
 install(
   TARGETS dataframe_bindings
   LIBRARY DESTINATION dataframe
-)
-
-add_library(dataframe INTERFACE ${SRC_FILES})
-target_include_directories(dataframe INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
 )

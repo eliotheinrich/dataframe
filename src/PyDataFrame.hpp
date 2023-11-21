@@ -8,9 +8,10 @@
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/ndarray.h>
 
+// TODO remove this
 using namespace nanobind::literals;
-using namespace dataframe_utils;
 
+namespace dataframe {
 
 typedef nanobind::ndarray<nanobind::numpy, double, nanobind::ndim<3>> py_nbarray;
 typedef std::variant<var_t, std::vector<var_t>, py_nbarray> py_query_t;
@@ -132,8 +133,8 @@ struct query_t_to_py {
 
 // Provide this function to initialize dataframe in other projects
 void init_dataframe(nanobind::module_ &m) {
-	m.def("load_json", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&load_json), "data"_a, "verbose"_a = false);
-	m.def("write_config", &write_config);
+	m.def("load_json", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&utils::load_json), "data"_a, "verbose"_a = false);
+	m.def("write_config", &utils::write_config);
 
 	// Need to statically cast overloaded templated methods
 	void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
@@ -225,4 +226,6 @@ void init_dataframe(nanobind::module_ &m) {
 		.def("compute", &ParallelCompute::compute, "verbose"_a = false)
 		.def("write_json", &ParallelCompute::write_json)
 		.def("write_serialize_json", &ParallelCompute::write_serialize_json);
+}
+
 }
