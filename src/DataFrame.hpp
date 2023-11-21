@@ -54,7 +54,7 @@ class DataFrame {
 				add_slide(DataSlide(slide_str.dump()));
 		}
 
-		DataFrame(const DataFrame& other) {
+		DataFrame(const DataFrame& other) : atol(other.atol), rtol(other.rtol) {
 			for (auto const& [key, val] : other.params)
 				params[key] = val;
 			
@@ -438,7 +438,7 @@ class DataFrame {
 			//for (auto [key, vals]: key_vals) {
 			//	std::cout << key << ": " << "[ ";
 			//	for (uint32_t i = 0; i < vals.size(); i++) {
-			//		std::cout << std::visit(var_t_to_string(), vals[i]) << " ";
+			//		std::cout << std::visit(utils::var_t_to_string(), vals[i]) << " ";
 			//	} std::cout << "]\n";
 			//}
 

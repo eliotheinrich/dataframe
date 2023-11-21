@@ -28,26 +28,69 @@ class Sample {
 		}
 
 		Sample(const std::string &s) {
+			if (!Sample::is_valid(s)) {
+				std::string error_message = "Invalid string \"" + s + "\" provided to Sample(std::string).";
+				throw std::invalid_argument(error_message);
+			}
+
 			if (s.front() == '[' && s.back() == ']') {
 				std::string trimmed = s.substr(1, s.length() - 2);
-				std::vector<uint32_t> pos;
-				for (uint32_t i = 0; i < trimmed.length(); i++) {
-					if (trimmed[i] == ',')
-						pos.push_back(i);
-				}
 
-				if (pos.size() != 2)
-					throw std::invalid_argument("Invalid string provided to Sample(std::string).");
+				std::vector<std::string> elements = utils::split(trimmed, ",");
 
-				mean = std::stof(trimmed.substr(0, pos[0]));
-				std = std::stof(trimmed.substr(pos[0]+1, pos[1]));
-				num_samples = std::stoi(trimmed.substr(pos[1]+1, trimmed.length()-1));
+				mean = std::stof(elements[0]);
+				std = std::stof(elements[1]);
+				num_samples = std::stoi(elements[2]);
 			} else {
 				mean = std::stof(s);
 				std = 0.;
 				num_samples = 1;
 			}
 		}
+
+		static bool is_valid(const std::string& s) {
+			if (s.front() == '[' && s.back() == ']') {
+				std::string trimmed = s.substr(1, s.length() - 2);
+				std::vector<std::string> elements = utils::split(trimmed, ",");
+
+				return elements.size() == 3 && utils::is_float(elements[0]) && utils::is_float(elements[1]) & utils::is_integer(elements[2]);
+			} else {
+				return utils::is_float(s);
+			}
+		}
+
+	static std::vector<Sample> read_samples(const nlohmann::json& arr) {
+		if (!arr.is_array())
+			throw std::invalid_argument("Invalid value passed to read_samples.");
+
+		size_t num_elements = arr.size();
+
+		// Need to assume at least one element exists for the remainder
+		if (num_elements == 0)
+			return std::vector<Sample>();
+
+		std::string arr_str = arr.dump();
+
+		if (Sample::is_valid(arr_str))
+			return std::vector<Sample>{Sample(arr_str)};
+
+		std::vector<Sample> samples;
+		samples.reserve(num_elements);
+
+		for (auto const& el : arr) {
+			// Check that dimension is consistent
+			std::string s = el.dump();
+			if (!Sample::is_valid(s)) {
+				std::string error_message = "Invalid string " + s + " passed to read_samples.";
+				throw std::invalid_argument(error_message);
+			}
+
+			samples.push_back(Sample(s));
+		}
+
+		return samples;
+	}
+
 
         double get_mean() const {
 			return this->mean;

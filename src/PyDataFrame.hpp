@@ -197,7 +197,6 @@ void init_dataframe(nanobind::module_ &m) {
 		.def("write_json", &DataFrame::write_json)
 		.def("promote_params", &DataFrame::promote_params)
 		.def("filter", &DataFrame::filter)
-		//.def("query", &DataFrame::query, "keys"_a, "constraints"_a, "unique"_a = false, "error"_a = false); // DO CASTING HERE
 		.def("query", [](DataFrame& df, const std::vector<std::string>& keys, const Params& constraints, bool unique, bool error) {
 			std::vector<query_t> results = df.query(keys, constraints, unique, error);
 

@@ -7,7 +7,7 @@
 
 namespace dataframe {
 
-#define CLONE(A, B) virtual std::shared_ptr<A> clone(Params &params) override { return std::shared_ptr<A>(new B(params)); }
+#define CLONE(A, B) virtual std::shared_ptr<A> clone(dataframe::Params &params) override { return std::shared_ptr<A>(new B(params)); }
 
 #define DEFAULT_RANDOM_SEED -1
 

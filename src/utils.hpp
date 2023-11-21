@@ -15,8 +15,7 @@ namespace dataframe {
 
 namespace utils {
 
-
-std::string join(const std::vector<std::string>& v, const std::string& delim) {
+static std::string join(const std::vector<std::string>& v, const std::string& delim) {
     std::string s = "";
     for (const auto& i : v) {
         if (&i != &v[0]) {
@@ -28,7 +27,7 @@ std::string join(const std::vector<std::string>& v, const std::string& delim) {
     return s;
 }
 
-std::vector<std::string> split(const std::string& s, const std::string& delim) {
+static std::vector<std::string> split(const std::string& s, const std::string& delim) {
     size_t pos_start = 0, pos_end, delim_len = delim.length();
     std::string token;
     std::vector<std::string> res;
@@ -43,7 +42,7 @@ std::vector<std::string> split(const std::string& s, const std::string& delim) {
     return res;
 }
 
-std::string strip(const std::string& input) {
+static std::string strip(const std::string& input) {
 	std::string whitespace = " \t\n";
 	size_t start = input.find_first_not_of(whitespace);
 	size_t end = input.find_last_not_of(whitespace);
@@ -55,7 +54,7 @@ std::string strip(const std::string& input) {
 	}
 }
 
-void escape_sequences(std::string& str) {
+static void escape_sequences(std::string& str) {
 	std::pair<char, char> const sequences[] {
 		{ '\a', 'a' },
 		{ '\b', 'b' },
@@ -80,11 +79,31 @@ void escape_sequences(std::string& str) {
 	}
 }
 
-std::string to_string_with_precision(const double d, const int n) {
+static std::string to_string_with_precision(const double d, const int n) {
 	std::ostringstream out;
 	out.precision(n);
 	out << std::fixed << d;
 	return std::move(out).str();
+}
+
+static bool is_float(const std::string& s) {
+	try {
+		size_t pos;
+		std::stof(s, &pos);
+		return pos == s.length();
+	} catch (const std::exception& e) {
+		return false;
+	}
+}
+
+static bool is_integer(const std::string& str) {
+    try {
+        size_t pos = 0;
+        std::stoi(str, &pos);
+        return pos == str.length();
+    } catch (const std::exception& e) {
+        return false;
+    }
 }
 
 struct var_t_to_string {
@@ -142,7 +161,7 @@ struct var_t_eq {
 	}
 };
 
-bool operator<(const var_t& lhs, const var_t& rhs) {	
+static bool operator<(const var_t& lhs, const var_t& rhs) {	
 	if (lhs.index() == 2 && rhs.index() == 2) return std::get<std::string>(lhs) < std::get<std::string>(rhs);
 	else if (lhs.index() == 2 && rhs.index() != 2) return true;
 	else if (lhs.index() != 2 && rhs.index() == 2) return false;
@@ -156,48 +175,6 @@ bool operator<(const var_t& lhs, const var_t& rhs) {
 	else if (rhs.index() == 1) d2 = std::get<double>(rhs);
 
 	return d1 < d2;
-}
-
-bool params_eq(const Params& lhs, const Params& rhs, const var_t_eq& equality_comparator) {
-	if (lhs.size() != rhs.size()) {
-		std::cout << "params unequal size\n";
-		return false;
-	}
-	
-	for (auto const &[key, val] : lhs) {
-		if (rhs.count(key)) {
-			if (!equality_comparator(rhs.at(key), val)) {
-				std::cout << key << " not congruent\n";
-				return false;
-			}
-		} else {
-			std::cout << key << " not congruent\n";
-			return false;
-		}
-	}
-
-	return true;
-}
-
-// Debug traps; these should never be called.
-//bool operator==(const var_t&, const var_t&) {
-//	throw std::invalid_argument("Called operator==(var_t, var_t)!");
-//}
-//
-//bool operator!=(const var_t&, const var_t&) {
-//	throw std::invalid_argument("Called operator!=(var_t, var_t)!");
-//}
-//
-//bool operator==(const Params&, const Params&) {
-//	throw std::invalid_argument("Called operator==(Params, Params)!");
-//}
-//
-//bool operator!=(const Params&, const Params&) {
-//	throw std::invalid_argument("Called operator!=(Params, Params)!");
-//}
-
-query_t parse_get_data(const std::vector<std::vector<std::vector<double>>>& data) {
-	return query_t{data};
 }
 
 struct query_t_to_string {
@@ -238,8 +215,6 @@ struct query_t_to_string {
 		return "[" + join(buffer1, "\n") + "]";
 	}
 };
-
-//typedef std::variant<query_t, std::vector<query_t>> query_result;
 
 struct query_to_string {
 	std::string operator()(const query_t& q) { 
@@ -288,7 +263,7 @@ struct make_query_t_unique {
 	}
 };
 
-std::vector<query_t> make_query_unique(const std::vector<query_t>& results, const make_query_t_unique& query_t_visitor) {
+static std::vector<query_t> make_query_unique(const std::vector<query_t>& results, const make_query_t_unique& query_t_visitor) {
     std::vector<query_t> new_results(results.size());
     std::transform(results.begin(), results.end(), std::back_inserter(new_results),
         [&query_t_visitor=query_t_visitor](const query_t& q) { return std::visit(query_t_visitor, q); }
@@ -297,24 +272,28 @@ std::vector<query_t> make_query_unique(const std::vector<query_t>& results, cons
     return new_results;
 }
 
-template <class json_object>
-static var_t parse_json_type(json_object p) {
-	if ((p.type() == nlohmann::json::value_t::number_integer) || 
-		(p.type() == nlohmann::json::value_t::number_unsigned) ||
-		(p.type() == nlohmann::json::value_t::boolean)) {
-		return var_t{(int) p};
-	}  else if (p.type() == nlohmann::json::value_t::number_float) {
-		return var_t{(double) p};
-	} else if (p.type() == nlohmann::json::value_t::string) {
-		return var_t{std::string(p)};
-	} else {
-		std::stringstream ss;
-		ss << "Invalid json item type on " << p << "; aborting.\n";
-		throw std::invalid_argument(ss.str());
+static bool params_eq(const Params& lhs, const Params& rhs, const var_t_eq& equality_comparator) {
+	if (lhs.size() != rhs.size()) {
+		std::cout << "params unequal size\n";
+		return false;
 	}
+	
+	for (auto const &[key, val] : lhs) {
+		if (rhs.count(key)) {
+			if (!equality_comparator(rhs.at(key), val)) {
+				std::cout << key << " not congruent\n";
+				return false;
+			}
+		} else {
+			std::cout << key << " not congruent\n";
+			return false;
+		}
+	}
+
+	return true;
 }
 
-std::string params_to_string(const Params& params, uint32_t indentation=0) {
+static std::string params_to_string(const Params& params, uint32_t indentation=0) {
 	std::string s = "";
 	for (uint32_t i = 0; i < indentation; i++) s += "\t";
 	std::vector<std::string> buffer;
@@ -344,7 +323,27 @@ T get(Params &params, const std::string& key) {
 	return std::get<T>(params[key]);
 }
 
-std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose) {
+template <class json_object>
+static var_t parse_json_type(json_object p) {
+	if ((p.type() == nlohmann::json::value_t::number_integer) || 
+		(p.type() == nlohmann::json::value_t::number_unsigned) ||
+		(p.type() == nlohmann::json::value_t::boolean)) {
+			std::cout << "detected integer\n";
+		return var_t{(int) p};
+	}  else if (p.type() == nlohmann::json::value_t::number_float) {
+		std::cout << "detected float\n";
+		return var_t{(double) p};
+	} else if (p.type() == nlohmann::json::value_t::string) {
+		std::cout << "detected string\n";
+		return var_t{std::string(p)};
+	} else {
+		std::stringstream ss;
+		ss << "Invalid json item type on " << p << "; aborting.\n";
+		throw std::invalid_argument(ss.str());
+	}
+}
+
+static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose) {
 	if (verbose)
 		std::cout << "Loaded: \n" << data.dump() << "\n";
 
@@ -421,17 +420,17 @@ std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose) {
 
 }
 
-std::vector<Params> load_json(nlohmann::json data, bool verbose=false) {
+static std::vector<Params> load_json(nlohmann::json data, bool verbose=false) {
 	return load_json(data, Params(), verbose);
 }
 
-std::vector<Params> load_json(const std::string& s, bool verbose=false) {
+static std::vector<Params> load_json(const std::string& s, bool verbose=false) {
 	std::string t(s);
 	std::replace(t.begin(), t.end(), '\'', '"');
 	return load_json(nlohmann::json::parse(t), verbose);
 }
 
-std::string write_config(const std::vector<Params>& params) {
+static std::string write_config(const std::vector<Params>& params) {
 	std::set<std::string> keys;
 	std::map<std::string, std::set<var_t>> vals;
 	for (auto const &p : params) {

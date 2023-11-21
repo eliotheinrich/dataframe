@@ -28,7 +28,7 @@ class ParallelCompute {
 		bool record_error;
 
 
-		ParallelCompute(Params& metaparams, std::vector<std::shared_ptr<Config>> configs) {
+		ParallelCompute(Params& metaparams, std::vector<std::shared_ptr<Config>> configs) : configs(configs) {
 			num_threads = utils::get<int>(metaparams, "num_threads", 1);
 			num_threads_per_task = utils::get<int>(metaparams, "num_threads_per_task", 1);
 
@@ -126,14 +126,10 @@ class ParallelCompute {
 			df.add_metadata("num_threads", (int) num_threads);
 			df.add_metadata("num_jobs", (int) num_jobs);
 			df.add_metadata("total_time", (int) duration.count());
-			df.add_metadata("atol", atol);
-			df.add_metadata("rtol", rtol);
 
 			serialize_df.add_metadata("num_threads", (int) num_threads);
 			serialize_df.add_metadata("num_jobs", (int) num_jobs);
 			serialize_df.add_metadata("total_time", (int) duration.count());
-			serialize_df.add_metadata("atol", atol);
-			serialize_df.add_metadata("rtol", rtol);
 			// A little hacky; need to set num_runs = 1 so that configs are not duplicated when a run is
 			// started from serialized data
 			for (auto &slide : serialize_df.slides)

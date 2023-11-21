@@ -15,6 +15,7 @@ class DataSlide {
 		DataSlide(Params &params) : params(params) {}
 
 		DataSlide(const std::string &s) {
+			std::cout << "Entering DataSlide(std::string)\n";
 			std::string trimmed = s;
 			uint32_t start_pos = trimmed.find_first_not_of(" \t\n\r");
 			uint32_t end_pos = trimmed.find_last_not_of(" \t\n\r");
@@ -29,11 +30,16 @@ class DataSlide {
 			for (auto const &[k, val] : ds_json.items()) {
 				if (val.type() == nlohmann::json::value_t::array) {
 					add_data(k);
-					for (auto const &v : val)
-						push_data(k, v.dump());
-				} else
+
+					for (auto const &v : val) {
+						std::vector<Sample> samples = Sample::read_samples(v); // TODO avoid dumping back to string
+						push_data(k, samples);
+					}
+				} else {
 					add_param(k, utils::parse_json_type(val));
+				}
 			}
+			std::cout << "Exiting DataSlide(std::string)\n";
 		}
 
 		DataSlide(const DataSlide& other) {
@@ -69,9 +75,8 @@ class DataSlide {
 		}
 
 		void add_param(const Params &params) {
-			for (auto const &[key, field] : params) {
+			for (auto const &[key, field] : params)
 				add_param(key, field);
-			}
 		}
 
 		void add_data(const std::string& s) { 
@@ -155,19 +160,6 @@ class DataSlide {
 
 			std::string delim = "," + nline + tabs;
 			std::vector<std::string> buffer;
-
-			for (auto const &[key, samples_vv] : data) {
-				std::vector<std::string> sample_buffer1;
-				for (auto const &samples_v : samples_vv) {
-					std::vector<std::string> sample_buffer2; 
-					for (auto sample : samples_v)
-						sample_buffer2.push_back(sample.to_string(record_error));
-
-					sample_buffer1.push_back("[" + utils::join(sample_buffer2, ", ") + "]");
-				}
-
-				buffer.push_back("\"" + key + "\": [" + utils::join(sample_buffer1, ", ") + "]");
-			}
 
 			for (auto const &[key, samples] : data) {
 				size_t N = samples.size();
