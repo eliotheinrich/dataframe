@@ -264,7 +264,8 @@ struct make_query_t_unique {
 };
 
 static std::vector<query_t> make_query_unique(const std::vector<query_t>& results, const make_query_t_unique& query_t_visitor) {
-    std::vector<query_t> new_results(results.size());
+    std::vector<query_t> new_results;
+	new_results.reserve(results.size());
     std::transform(results.begin(), results.end(), std::back_inserter(new_results),
         [&query_t_visitor=query_t_visitor](const query_t& q) { return std::visit(query_t_visitor, q); }
     );
@@ -328,13 +329,10 @@ static var_t parse_json_type(json_object p) {
 	if ((p.type() == nlohmann::json::value_t::number_integer) || 
 		(p.type() == nlohmann::json::value_t::number_unsigned) ||
 		(p.type() == nlohmann::json::value_t::boolean)) {
-			std::cout << "detected integer\n";
 		return var_t{(int) p};
 	}  else if (p.type() == nlohmann::json::value_t::number_float) {
-		std::cout << "detected float\n";
 		return var_t{(double) p};
 	} else if (p.type() == nlohmann::json::value_t::string) {
-		std::cout << "detected string\n";
 		return var_t{std::string(p)};
 	} else {
 		std::stringstream ss;

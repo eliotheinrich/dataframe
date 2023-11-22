@@ -13,7 +13,7 @@ using namespace nanobind::literals;
 
 namespace dataframe {
 
-typedef nanobind::ndarray<nanobind::numpy, double, nanobind::ndim<3>> py_nbarray;
+typedef nanobind::ndarray<nanobind::numpy, double> py_nbarray;
 typedef std::variant<var_t, std::vector<var_t>, py_nbarray> py_query_t;
 typedef std::variant<py_query_t, std::vector<py_query_t>> py_query_result;
 

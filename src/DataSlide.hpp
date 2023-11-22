@@ -15,7 +15,6 @@ class DataSlide {
 		DataSlide(Params &params) : params(params) {}
 
 		DataSlide(const std::string &s) {
-			std::cout << "Entering DataSlide(std::string)\n";
 			std::string trimmed = s;
 			uint32_t start_pos = trimmed.find_first_not_of(" \t\n\r");
 			uint32_t end_pos = trimmed.find_last_not_of(" \t\n\r");
@@ -39,7 +38,6 @@ class DataSlide {
 					add_param(k, utils::parse_json_type(val));
 				}
 			}
-			std::cout << "Exiting DataSlide(std::string)\n";
 		}
 
 		DataSlide(const DataSlide& other) {
