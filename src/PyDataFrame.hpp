@@ -13,7 +13,7 @@ using namespace nanobind::literals;
 
 namespace dataframe {
 
-typedef nanobind::ndarray<nanobind::numpy, double, nanobind::ndim<3>> py_nbarray;
+typedef nanobind::ndarray<nanobind::numpy, double> py_nbarray;
 typedef std::variant<var_t, std::vector<var_t>, py_nbarray> py_query_t;
 typedef std::variant<py_query_t, std::vector<py_query_t>> py_query_result;
 
@@ -59,9 +59,9 @@ struct query_t_to_py {
 
 		size_t K = data[0][0].size();
 
-		for (size_t i = 0; i < N; ++i) {
-    		for (size_t j = 0; j < M; ++j) {
-        		for (size_t k = 0; k < K; ++k) {
+		for (size_t i = 0; i < N; i++) {
+    		for (size_t j = 0; j < M; j++) {
+        		for (size_t k = 0; k < K; k++) {
 					size_t findex = i*(M*K) + j*K + k;
             		my_data[findex] = data[i][j][k];
         		}

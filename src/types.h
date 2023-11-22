@@ -5,6 +5,7 @@
 #include <map>
 #include <variant>
 #include <utility>
+#include <optional>
 #include <algorithm>
 
 namespace dataframe {
