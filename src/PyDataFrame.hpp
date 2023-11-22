@@ -59,9 +59,9 @@ struct query_t_to_py {
 
 		size_t K = data[0][0].size();
 
-		for (size_t i = 0; i < N; ++i) {
-    		for (size_t j = 0; j < M; ++j) {
-        		for (size_t k = 0; k < K; ++k) {
+		for (size_t i = 0; i < N; i++) {
+    		for (size_t j = 0; j < M; j++) {
+        		for (size_t k = 0; k < K; k++) {
 					size_t findex = i*(M*K) + j*K + k;
             		my_data[findex] = data[i][j][k];
         		}

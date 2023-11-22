@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <iostream>
+#include <sstream>
 #include <math.h>
 #include <set>
 
