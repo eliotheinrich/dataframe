@@ -47,8 +47,6 @@ class ParallelCompute {
 			df.atol = atol;
 			df.rtol = rtol;
 
-			std::cout << "From PC init: " << utils::params_to_string(df.metadata) << std::endl;
-
 			serialize_df.add_metadata(metaparams);
 			serialize_df.atol = atol;
 			serialize_df.rtol = rtol;
