@@ -68,9 +68,11 @@ class TimeConfig : public Config {
             }
 
             auto end_time = std::chrono::high_resolution_clock::now();
-            int duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time).count();
+            int duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+            double duration_s = duration_ms/1000.0;
+
             slide.add_data("time");
-            slide.push_data("time", duration);
+            slide.push_data("time", duration_s);
 
             simulator->cleanup();
 

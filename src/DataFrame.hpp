@@ -316,7 +316,18 @@ class DataFrame {
 				return DataFrame(other);
 			else if (other.params.empty() && other.slides.empty())
 				return DataFrame(*this);
+
+
+			// Combine matching metadata
+			DataFrame df;
+			utils::var_t_eq equality_comparator(atol, rtol);
+			for (auto const &[k, v] : metadata) {
+				if (other.metadata.count(k) && equality_comparator(v, other.metadata.at(k))) {
+					df.add_metadata(k, v);
+				}
+			}
 			
+			// Inspect params
 			std::set<std::string> self_frame_params;
 			for (auto const& [k, _] : params)
 				self_frame_params.insert(k);
@@ -353,11 +364,9 @@ class DataFrame {
 
 			// self_frame_params and other_frame_params now only contain parameters unique to that frame
 
-			DataFrame df;
 			Params self_slide_params;
 			Params other_slide_params;
 
-			utils::var_t_eq equality_comparator(atol, rtol);
 			for (auto const& k : both_frame_params) {
 				if (equality_comparator(params.at(k), other.params.at(k)))
 					df.add_param(k, params.at(k));

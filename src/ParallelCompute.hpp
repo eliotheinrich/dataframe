@@ -47,6 +47,8 @@ class ParallelCompute {
 			df.atol = atol;
 			df.rtol = rtol;
 
+			std::cout << "From PC init: " << utils::params_to_string(df.metadata) << std::endl;
+
 			serialize_df.add_metadata(metaparams);
 			serialize_df.atol = atol;
 			serialize_df.rtol = rtol;
@@ -121,15 +123,16 @@ class ParallelCompute {
 			}
 
 			auto stop = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+			auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+			double duration_seconds = duration.count()/1000.0;
 
 			df.add_metadata("num_threads", (int) num_threads);
 			df.add_metadata("num_jobs", (int) num_jobs);
-			df.add_metadata("total_time", (int) duration.count());
+			df.add_metadata("total_time", duration_seconds);
 
 			serialize_df.add_metadata("num_threads", (int) num_threads);
 			serialize_df.add_metadata("num_jobs", (int) num_jobs);
-			serialize_df.add_metadata("total_time", (int) duration.count());
+			serialize_df.add_metadata("total_time", duration_seconds);
 			// A little hacky; need to set num_runs = 1 so that configs are not duplicated when a run is
 			// started from serialized data
 			for (auto &slide : serialize_df.slides)
@@ -140,7 +143,7 @@ class ParallelCompute {
 				df.reduce();
 
 			if (verbose)
-				std::cout << "Total runtime: " << (int) duration.count() << std::endl;
+				std::cout << "Total runtime: " << duration_seconds << std::endl;
 		}
 
 		void write_json(const std::string& filename) const {
