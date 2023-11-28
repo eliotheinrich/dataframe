@@ -59,37 +59,37 @@ class Sample {
 			}
 		}
 
-	static std::vector<Sample> read_samples(const nlohmann::json& arr) {
-		if (!arr.is_array())
-			throw std::invalid_argument("Invalid value passed to read_samples.");
+		static std::vector<Sample> read_samples(const nlohmann::json& arr) {
+			if (!arr.is_array())
+				throw std::invalid_argument("Invalid value passed to read_samples.");
 
-		size_t num_elements = arr.size();
+			size_t num_elements = arr.size();
 
-		// Need to assume at least one element exists for the remainder
-		if (num_elements == 0)
-			return std::vector<Sample>();
+			// Need to assume at least one element exists for the remainder
+			if (num_elements == 0)
+				return std::vector<Sample>();
 
-		std::string arr_str = arr.dump();
+			std::string arr_str = arr.dump();
 
-		if (Sample::is_valid(arr_str))
-			return std::vector<Sample>{Sample(arr_str)};
+			if (Sample::is_valid(arr_str))
+				return std::vector<Sample>{Sample(arr_str)};
 
-		std::vector<Sample> samples;
-		samples.reserve(num_elements);
+			std::vector<Sample> samples;
+			samples.reserve(num_elements);
 
-		for (auto const& el : arr) {
-			// Check that dimension is consistent
-			std::string s = el.dump();
-			if (!Sample::is_valid(s)) {
-				std::string error_message = "Invalid string " + s + " passed to read_samples.";
-				throw std::invalid_argument(error_message);
+			for (auto const& el : arr) {
+				// Check that dimension is consistent
+				std::string s = el.dump();
+				if (!Sample::is_valid(s)) {
+					std::string error_message = "Invalid string " + s + " passed to read_samples.";
+					throw std::invalid_argument(error_message);
+				}
+
+				samples.push_back(Sample(s));
 			}
 
-			samples.push_back(Sample(s));
+			return samples;
 		}
-
-		return samples;
-	}
 
 
         double get_mean() const {
@@ -117,7 +117,8 @@ class Sample {
 			uint32_t combined_samples = this->num_samples + other.get_num_samples();
 			if (combined_samples == 0) return Sample();
 			
-			double samples1f = get_num_samples(); double samples2f = other.get_num_samples();
+			double samples1f = get_num_samples(); 
+			double samples2f = other.get_num_samples();
 			double combined_samplesf = combined_samples;
 
 			double combined_mean = (samples1f*this->get_mean() + samples2f*other.get_mean())/combined_samplesf;
@@ -162,8 +163,9 @@ class Sample {
 				return Sample();
 
 			Sample s = samples[0];
-			for (uint32_t i = 1; i < samples.size(); i++)
+			for (uint32_t i = 1; i < N; i++) {
 				s = s.combine(samples[i]);
+			}
 
 			return s;
 		}
@@ -178,7 +180,7 @@ class Sample {
 			std::vector<Sample> collapsed_samples(M);
 			for (uint32_t i = 0; i < M; i++) {
 				Sample s = samples[0][i];
-				for (uint32_t j = 0; j < N; j++)
+				for (uint32_t j = 1; j < N; j++)
 					s = s.combine(samples[j][i]);
 			
 				collapsed_samples[i] = s;

@@ -62,8 +62,9 @@ class TimeConfig : public Config {
                 if (temporal_avg) {
                     slide.push_data(key, Sample::collapse_samples(ksamples));
                 } else {
-                    for (auto s : ksamples) 
+                    for (auto s : ksamples) {
                         slide.push_data(key, s);
+                    }
                 }
             }
 
