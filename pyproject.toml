@@ -16,6 +16,9 @@ minimum-version = "0.4"
 build-dir = "build/{wheel_tag}"
 wheel.py-api = "cp312"
 
+[tool.scikit-build.cmake.define]
+DF_MAIN_BUILDING = "ON"
+
 [tool.cibuildwheel]
 build-verbosity = 1
 
