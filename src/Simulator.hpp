@@ -18,7 +18,7 @@ class Simulator {
         double randf() { return double(rng())/double(RAND_MAX); }
 
         Simulator(Params &params) {
-            seed = utils::get<int>(params, "random_seed", DEFAULT_RANDOM_SEED);
+            seed = utils::get<int>(params, "seed", DEFAULT_RANDOM_SEED);
             if (seed == -1) {
                 thread_local std::random_device rd;
                 rng.seed(rd());

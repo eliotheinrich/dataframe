@@ -10,10 +10,6 @@
 
 namespace dataframe {
 
-#define THREADPOOL 0
-#define OPENMP 1
-#define SERIAL 2
-
 enum parallelization_t {
 	threadpool,
 	openmp,

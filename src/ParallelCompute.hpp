@@ -3,8 +3,10 @@
 #include "DataFrame.hpp"
 #include "Config.hpp"
 
+#ifndef SERIAL
 #include <BS_thread_pool.hpp>
 #include <omp.h>
+#endif
 
 #include <optional>
 #include <chrono>
@@ -71,6 +73,9 @@ class ParallelCompute {
 
 			std::vector<compute_result_t> results;
 
+#ifdef SERIAL
+			results = compute_serial(total_configs, verbose);
+#else
 			switch (parallelization_type) {
 			case parallelization_t::threadpool:
 				results = compute_bspl(total_configs, verbose);
@@ -82,6 +87,7 @@ class ParallelCompute {
 				results = compute_serial(total_configs, verbose);
 				break;
 			}
+#endif
 
 			if (verbose)
 				std::cout << "\n";
@@ -243,6 +249,7 @@ class ParallelCompute {
 			return results;
 		}
 
+#ifndef SERIAL
 		std::vector<compute_result_t> compute_bspl(
 			std::vector<std::shared_ptr<Config>> total_configs, 
 			bool verbose
@@ -309,6 +316,7 @@ class ParallelCompute {
 
 			return results;
 		}
+#endif
 };
 
 }
