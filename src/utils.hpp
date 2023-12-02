@@ -115,8 +115,9 @@ struct var_t_to_string {
     std::string operator()(const double &f) const {
 		for (int exp = 6; exp <= 30; exp += 6) {
 			double threshold = std::pow(10.0, -static_cast<double>(exp));
-			if (f > threshold)
+			if (f > threshold) {
 				return to_string_with_precision(f, exp);
+			}
 		}
 
 		return "0.000000";
@@ -136,7 +137,9 @@ struct var_t_eq {
     var_t_eq(double atol=ATOL, double rtol=RTOL) : atol(atol), rtol(rtol) {}
 
 	bool operator()(const var_t& v, const var_t& t) const {
-		if (v.index() != t.index()) return false;
+		if (v.index() != t.index()) {
+			return false;
+		}
 
 		if (v.index() == 0) {
 			return std::get<int>(v) == std::get<int>(t);
@@ -145,14 +148,16 @@ struct var_t_eq {
 			double vt = std::get<double>(t);
 
 			// check absolute tolerance first
-			if (std::abs(vd - vt) < atol)
+			if (std::abs(vd - vt) < atol) {
 				return true;
+			}
 
 			double max_val = std::max(std::abs(vd), std::abs(vt));
 
 			// both numbers are very small; use absolute comparison
-			if (max_val < std::numeric_limits<double>::epsilon())
+			if (max_val < std::numeric_limits<double>::epsilon()) {
 				return std::abs(vd - vt) < atol;
+			}
 
 			// resort to relative tolerance
 			return std::abs(vd - vt)/max_val < rtol;
@@ -163,17 +168,28 @@ struct var_t_eq {
 };
 
 static bool operator<(const var_t& lhs, const var_t& rhs) {	
-	if (lhs.index() == 2 && rhs.index() == 2) return std::get<std::string>(lhs) < std::get<std::string>(rhs);
-	else if (lhs.index() == 2 && rhs.index() != 2) return true;
-	else if (lhs.index() != 2 && rhs.index() == 2) return false;
+	if (lhs.index() == 2 && rhs.index() == 2) {
+		return std::get<std::string>(lhs) < std::get<std::string>(rhs);
+	} else if (lhs.index() == 2 && rhs.index() != 2) {
+		return true;
+	} else if (lhs.index() != 2 && rhs.index() == 2) {
+		return false;
+	}
 
 	double d1 = 0., d2 = 0.;
-	if (lhs.index() == 0) d1 = double(std::get<int>(lhs));
-	else if (lhs.index() == 1) d1 = std::get<double>(lhs);
-	else d1 = 0.;
+	if (lhs.index() == 0) {
+		d1 = double(std::get<int>(lhs));
+	} else if (lhs.index() == 1) {
+		d1 = std::get<double>(lhs);
+	} else {
+		d1 = 0.;
+	}
 
-	if (rhs.index() == 0) d2 = double(std::get<int>(rhs));
-	else if (rhs.index() == 1) d2 = std::get<double>(rhs);
+	if (rhs.index() == 0) {
+		d2 = double(std::get<int>(rhs));
+	} else if (rhs.index() == 1) {
+		d2 = std::get<double>(rhs);
+	}
 
 	return d1 < d2;
 }
@@ -186,8 +202,9 @@ struct query_t_to_string {
 	std::string operator()(const std::vector<var_t>& vec) const {
 		var_t_to_string vt;
 		std::vector<std::string> buffer(vec.size());
-		for (auto const val : vec)
+		for (auto const val : vec) {
 			buffer.push_back(std::visit(vt, val));
+		}
 		return "[" + join(buffer, ", ") + "]";
 	}
 
@@ -224,8 +241,9 @@ struct query_to_string {
 
 	std::string operator()(const std::vector<query_t>& results) { 
 		std::vector<std::string> buffer;
-		for (auto const& q : results)
+		for (auto const& q : results) {
 			buffer.push_back(std::visit(query_t_to_string(), q));
+		}
 		
 		return "[" + join(buffer, ", ") + "]";
 	}
@@ -250,8 +268,9 @@ struct make_query_t_unique {
 				return var_visitor(tar_val, val);
 			});
 
-			if (result == return_vals.end())
+			if (result == return_vals.end()) {
 				return_vals.push_back(tar_val);
+			}
 		}
 
 		std::sort(return_vals.begin(), return_vals.end());
@@ -297,7 +316,9 @@ static bool params_eq(const Params& lhs, const Params& rhs, const var_t_eq& equa
 
 static std::string params_to_string(const Params& params, uint32_t indentation=0) {
 	std::string s = "";
-	for (uint32_t i = 0; i < indentation; i++) s += "\t";
+	for (uint32_t i = 0; i < indentation; i++) {
+		s += "\t";
+	}
 	std::vector<std::string> buffer;
 
 	for (auto const &[key, field] : params) {
@@ -305,7 +326,9 @@ static std::string params_to_string(const Params& params, uint32_t indentation=0
 	}
 
 	std::string delim = ",\n";
-	for (uint32_t i = 0; i < indentation; i++) delim += "\t";
+	for (uint32_t i = 0; i < indentation; i++) {
+		delim += "\t";
+	}
 	s += join(buffer, delim);
 
 	return s;
@@ -313,8 +336,9 @@ static std::string params_to_string(const Params& params, uint32_t indentation=0
 
 template <class T>
 T get(Params &params, const std::string& key, T defaultv) {
-	if (params.count(key))
+	if (params.count(key)) {
 		return std::get<T>(params[key]);
+	}
 	
 	params[key] = var_t{defaultv};
 	return defaultv;
@@ -343,8 +367,9 @@ static var_t parse_json_type(json_object p) {
 }
 
 static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose) {
-	if (verbose)
+	if (verbose) {
 		std::cout << "Loaded: \n" << data.dump() << "\n";
+	}
 
 	std::vector<Params> params;
 
@@ -378,7 +403,9 @@ static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose
 
 	if (zparams.size() > 0) {
 		for (uint32_t i = 0; i < zparams.size(); i++) {
-			for (auto const &[k, v] : zparams[i]) p[k] = v;
+			for (auto const &[k, v] : zparams[i]) {
+				p[k] = v;
+			}
 			std::vector<Params> new_params = load_json(data, Params(p), false);
 			params.insert(params.end(), new_params.begin(), new_params.end());
 		}
@@ -435,8 +462,9 @@ static std::string write_config(const std::vector<Params>& params) {
 	for (auto const &p : params) {
 		for (auto const &[k, v] : p) {
 			keys.insert(k);
-			if (!vals.count(k))
+			if (!vals.count(k)) {
 				vals[k] = std::set<var_t>();
+			}
 			
 			vals[k].insert(v);
 		}
@@ -446,17 +474,22 @@ static std::string write_config(const std::vector<Params>& params) {
 	std::vector<std::string> buffer1;
 	for (auto const &key : keys) {
 		std::string b1 = "\t\"" + key + "\": ";
-		if (vals[key].size() > 1) b1 += "[";
+		if (vals[key].size() > 1) {
+			b1 += "[";
+		}
 
 		std::vector<std::string> buffer2;
 		std::vector<var_t> sorted_vals(vals[key].begin(), vals[key].end());
 		std::sort(sorted_vals.begin(), sorted_vals.end());
 		
-		for (auto val : sorted_vals)
+		for (auto val : sorted_vals) {
 			buffer2.push_back(std::visit(var_t_to_string(), val));
+		}
 		
 		b1 += join(buffer2, ", ");
-		if (vals[key].size() > 1) b1 += "]";
+		if (vals[key].size() > 1) {
+			b1 += "]";
+		}
 		buffer1.push_back(b1);
 	}
 

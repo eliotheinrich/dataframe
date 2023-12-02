@@ -60,19 +60,22 @@ class Sample {
 		}
 
 		static std::vector<Sample> read_samples(const nlohmann::json& arr) {
-			if (!arr.is_array())
+			if (!arr.is_array()) {
 				throw std::invalid_argument("Invalid value passed to read_samples.");
+			}
 
 			size_t num_elements = arr.size();
 
 			// Need to assume at least one element exists for the remainder
-			if (num_elements == 0)
+			if (num_elements == 0) {
 				return std::vector<Sample>();
+			}
 
 			std::string arr_str = arr.dump();
 
-			if (Sample::is_valid(arr_str))
+			if (Sample::is_valid(arr_str)) {
 				return std::vector<Sample>{Sample(arr_str)};
+			}
 
 			std::vector<Sample> samples;
 			samples.reserve(num_elements);
@@ -115,7 +118,9 @@ class Sample {
 
         Sample combine(const Sample &other) const {
 			uint32_t combined_samples = this->num_samples + other.get_num_samples();
-			if (combined_samples == 0) return Sample();
+			if (combined_samples == 0) {
+				return Sample();
+			}
 			
 			double samples1f = get_num_samples(); 
 			double samples2f = other.get_num_samples();
@@ -129,13 +134,6 @@ class Sample {
 			return Sample(combined_mean, combined_std, combined_samples);
 		}
 
-		//static std::vector<double> get_means(const std::vector<Sample> &samples) {
-		//	std::vector<double> v;
-		//	for (auto const &s : samples)
-		//		v.push_back(s.get_mean());
-		//	return v;
-		//}
-
 		std::string to_string(bool full_sample = false) const {
 			if (full_sample) {
 				std::string s = "[";
@@ -147,20 +145,23 @@ class Sample {
 		}
 
 		static std::vector<Sample> combine_samples(const std::vector<Sample>& samples1, const std::vector<Sample>& samples2) {
-			if (samples1.size() != samples2.size())
+			if (samples1.size() != samples2.size()) {
 				throw std::invalid_argument("Cannot combine samples; incongruent lentgh.");
+			}
 
 			std::vector<Sample> samples(samples1.size());
-			for (uint32_t i = 0; i < samples1.size(); i++)
+			for (uint32_t i = 0; i < samples1.size(); i++) {
 				samples[i] = samples1[i].combine(samples2[i]);
+			}
 
 			return samples;
 		}
 
 		static Sample collapse_samples(const std::vector<Sample>& samples) {
 			size_t N = samples.size();
-			if (N == 0)
+			if (N == 0) {
 				return Sample();
+			}
 
 			Sample s = samples[0];
 			for (uint32_t i = 1; i < N; i++) {
@@ -172,16 +173,18 @@ class Sample {
 
 		static std::vector<Sample> collapse_samples(const std::vector<std::vector<Sample>>& samples) {
 			size_t N = samples.size();
-			if (N == 0)
+			if (N == 0) {
 				return std::vector<Sample>();
+			}
 
 			size_t M = samples[0].size();
 
 			std::vector<Sample> collapsed_samples(M);
 			for (uint32_t i = 0; i < M; i++) {
 				Sample s = samples[0][i];
-				for (uint32_t j = 1; j < N; j++)
+				for (uint32_t j = 1; j < N; j++) {
 					s = s.combine(samples[j][i]);
+				}
 			
 				collapsed_samples[i] = s;
 			}
@@ -210,8 +213,9 @@ class data_t {
         void emplace(const std::string &key, const std::vector<double> &doubles) {
             size_t N = doubles.size();
             std::vector<Sample> samples(N);
-            for (uint32_t i = 0; i < N; i++)
+            for (uint32_t i = 0; i < N; i++) {
                 samples[i] = Sample(doubles[i]);
+			}
 
             emplace(key, samples);
         }

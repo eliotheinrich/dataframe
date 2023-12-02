@@ -14,8 +14,13 @@ namespace dataframe {
 class Simulator {
     public:
         // All simulators are equipeed with a random number generator
-        int rand() { return rng(); }
-        double randf() { return double(rng())/double(RAND_MAX); }
+        int rand() { 
+            return rng(); 
+        }
+
+        double randf() { 
+            return double(rng())/double(RAND_MAX); 
+        }
 
         Simulator(Params &params) {
             seed = utils::get<int>(params, "seed", DEFAULT_RANDOM_SEED);
@@ -49,7 +54,9 @@ class Simulator {
         virtual void cleanup() {}
         
         virtual std::shared_ptr<Simulator> clone(Params &params)=0;
-        virtual std::shared_ptr<Simulator> deserialize(Params &params, const std::string&) { return clone(params); }
+        virtual std::shared_ptr<Simulator> deserialize(Params &params, const std::string&) { 
+            return clone(params); 
+        }
 
     private:
         int seed;

@@ -21,10 +21,11 @@ class DataSlide {
 			trimmed = trimmed.substr(start_pos, end_pos - start_pos + 1);
 
 			nlohmann::json ds_json;
-			if (trimmed.empty() || trimmed.front() != '{' || trimmed.back() != '}')
+			if (trimmed.empty() || trimmed.front() != '{' || trimmed.back() != '}') {
 				ds_json = nlohmann::json::parse("{" + trimmed + "}");
-			else
+			} else {
 				ds_json = nlohmann::json::parse(trimmed);
+			}
 
 			for (auto const &[k, val] : ds_json.items()) {
 				if (val.type() == nlohmann::json::value_t::array) {
@@ -41,20 +42,23 @@ class DataSlide {
 		}
 
 		DataSlide(const DataSlide& other) {
-			for (auto const& [key, val]: other.params)
+			for (auto const& [key, val]: other.params) {
 				add_param(key, val);
+			}
 
 			for (auto const& [key, vals] : other.data) {
 				add_data(key);
-				for (auto const& val : vals)
+				for (auto const& val : vals) {
 					push_data(key, val);
+				}
 			}
 		}
 
 		static DataSlide copy_params(const DataSlide& other) {
 			DataSlide slide;
-			for (auto const& [key, val]: other.params)
+			for (auto const& [key, val]: other.params) {
 				slide.add_param(key, val);
+			}
 
 			return slide;
 		}
@@ -73,8 +77,9 @@ class DataSlide {
 		}
 
 		void add_param(const Params &params) {
-			for (auto const &[key, field] : params)
+			for (auto const &[key, field] : params) {
 				add_param(key, field);
+			}
 		}
 
 		void add_data(const std::string& s) { 
@@ -91,46 +96,54 @@ class DataSlide {
         }
 
 		std::vector<std::vector<double>> get_data(const std::string& s) const {
-			if (!data.count(s))
+			if (!data.count(s)) {
 				return std::vector<std::vector<double>>();
+			}
 
 			size_t N = data.at(s).size();
-			if (N == 0)
+			if (N == 0) {
 				return std::vector<std::vector<double>>();
+			}
 			
 			size_t M = data.at(s)[0].size();
 			std::vector<std::vector<double>> d(N, std::vector<double>(M));
 
 			for (uint32_t i = 0; i < N; i++) {
 				std::vector<Sample> di = data.at(s)[i];
-				if (di.size() != M)
+				if (di.size() != M) {
 					throw std::invalid_argument("Stored data is not square.");
+				}
 
-				for (uint32_t j = 0; j < M; j++)
+				for (uint32_t j = 0; j < M; j++) {
 					d[i][j] = di[j].get_mean();
+				}
 			}
 
 			return d;
 		}
 	
         std::vector<std::vector<double>> get_std(const std::string& s) const {
-			if (!data.count(s))
+			if (!data.count(s)) {
 				return std::vector<std::vector<double>>();
+			}
 
 			size_t N = data.at(s).size();
-			if (N == 0)
+			if (N == 0) {
 				return std::vector<std::vector<double>>();
+			}
 			
 			size_t M = data.at(s)[0].size();
 			std::vector<std::vector<double>> d(N, std::vector<double>(M));
 
 			for (uint32_t i = 0; i < N; i++) {
 				std::vector<Sample> di = data.at(s)[i];
-				if (di.size() != M)
+				if (di.size() != M) {
 					throw std::invalid_argument("Stored data is not square.");
+				}
 
-				for (uint32_t j = 0; j < M; j++)
+				for (uint32_t j = 0; j < M; j++) {
 					d[i][j] = di[j].get_std();
+				}
 			}
 
 			return d;
@@ -150,11 +163,15 @@ class DataSlide {
 			std::string tab = pretty ? "\t" : "";
 			std::string nline = pretty ? "\n" : "";
 			std::string tabs = "";
-			for (uint32_t i = 0; i < indentation; i++) tabs += tab;
+			for (uint32_t i = 0; i < indentation; i++) {
+				tabs += tab;
+			}
 			
 			std::string s = utils::params_to_string(params, indentation);
 
-			if ((!params.empty()) && (!data.empty())) s += "," + nline + tabs;
+			if ((!params.empty()) && (!data.empty())) {
+				s += "," + nline + tabs;
+			}
 
 			std::string delim = "," + nline + tabs;
 			std::vector<std::string> buffer;
@@ -165,8 +182,9 @@ class DataSlide {
 				for (uint32_t i = 0; i < N; i++) {
 					size_t M = samples[i].size();
 					std::vector<std::string> sample_buffer2(M);
-					for (uint32_t j = 0; j < M; j++)
+					for (uint32_t j = 0; j < M; j++) {
 						sample_buffer2[j] = samples[i][j].to_string(record_error);
+					}
 
 					sample_buffer1[i] = "[" + utils::join(sample_buffer2, ", ") + "]";
 				}
@@ -179,8 +197,9 @@ class DataSlide {
 		}
 
 		bool congruent(const DataSlide &ds, const utils::var_t_eq& equality_comparator) {
-			if (!utils::params_eq(params, ds.params, equality_comparator))
+			if (!utils::params_eq(params, ds.params, equality_comparator)) {
 				return false;
+			}
 
 			for (auto const &[key, samples] : data) {
 				if (!ds.data.count(key)) {

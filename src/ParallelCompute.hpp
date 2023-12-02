@@ -63,8 +63,9 @@ class ParallelCompute {
 			for (uint32_t i = 0; i < num_configs; i++) {
 				configs[i]->clone();
 				uint32_t nruns = configs[i]->get_nruns();
-				for (uint32_t j = 0; j < nruns; j++)
+				for (uint32_t j = 0; j < nruns; j++) {
 					total_configs.push_back(configs[i]->clone());
+				}
 			}
 
 			uint32_t num_jobs = total_configs.size();
@@ -120,8 +121,9 @@ class ParallelCompute {
 				// Add serializations
 				DataSlide serialize_ds = DataSlide::copy_params(slide);
 				for (uint32_t j = 0; j < nruns; j++) {
-					if (slide_serializations[j].has_value())
+					if (slide_serializations[j].has_value()) {
 						serialize_ds.add_param("serialization_" + std::to_string(j), slide_serializations[j].value());
+					}
 				}
 				serialize_df.add_slide(serialize_ds);
 			}
@@ -139,15 +141,18 @@ class ParallelCompute {
 			serialize_df.add_metadata("total_time", duration_seconds);
 			// A little hacky; need to set num_runs = 1 so that configs are not duplicated when a run is
 			// started from serialized data
-			for (auto &slide : serialize_df.slides)
+			for (auto &slide : serialize_df.slides) {
 				slide.add_param("num_runs", 1);
+			}
 
 			df.promote_params();
-			if (average_congruent_runs)
+			if (average_congruent_runs) {
 				df.reduce();
+			}
 
-			if (verbose)
+			if (verbose) {
 				std::cout << "Total runtime: " << duration_seconds << std::endl;
+			}
 		}
 
 		void write_json(const std::string& filename) const {
@@ -155,8 +160,9 @@ class ParallelCompute {
 		}
 
 		void write_serialize_json(const std::string& filename) const {
-			if (serialize)
+			if (serialize) {
 				serialize_df.write_json(filename, record_error);
+			}
 		}
 
 	private:
@@ -188,13 +194,18 @@ class ParallelCompute {
 				std::cout << "[";
 				int pos = bar_width * progress;
 				for (int i = 0; i < bar_width; ++i) {
-					if (i < pos) std::cout << "=";
-					else if (i == pos) std::cout << ">";
-					else std::cout << " ";
+					if (i < pos) {
+						std::cout << "=";
+					} else if (i == pos) {
+						std::cout << ">";
+					} else {
+						std::cout << " ";
+					}
 				}
 				std::stringstream time;
-				if (duration == -1) time << "";
-				else {
+				if (duration == -1) {
+					time << "";
+				} else {
 					time << " [ ETA: ";
 					uint32_t num_seconds = remaining_time % 60;
 					uint32_t num_minutes = remaining_time/60;
@@ -214,8 +225,9 @@ class ParallelCompute {
 			DataSlide slide = config->compute(num_threads);
 
 			std::optional<std::string> serialize_result = std::nullopt;
-			if (config->serialize)
+			if (config->serialize) {
 				serialize_result = config->write_serialize();
+			}
 
 			slide.add_param(config->params);
 
@@ -242,8 +254,9 @@ class ParallelCompute {
 			for (uint32_t i = 0; i < total_runs; i++) {
 				results[i] = ParallelCompute::thread_compute(total_configs[i], num_threads_per_task);
 
-				if (verbose)
+				if (verbose) {
 					print_progress(i, total_runs, run_start);
+				}
 			}
 
 			return results;
@@ -271,14 +284,16 @@ class ParallelCompute {
 
 
 			auto run_start = std::chrono::high_resolution_clock::now();
-			for (uint32_t i = 0; i < total_runs; i++)
+			for (uint32_t i = 0; i < total_runs; i++) {
 				futures[i] = threads.submit(ParallelCompute::thread_compute, total_configs[i], num_threads_per_task);
+			}
 
 			for (uint32_t i = 0; i < total_runs; i++) {
 				results[i] = futures[i].get();
 				
-				if (verbose)
+				if (verbose) {
 					print_progress(i, total_runs, run_start);
+				}
 			}
 
 			return results;
@@ -310,8 +325,9 @@ class ParallelCompute {
 				results[i] = ParallelCompute::thread_compute(total_configs[i], num_threads_per_task);
 				completed++;
 
-				if (verbose)
+				if (verbose) {
 					print_progress(completed, total_runs, run_start);
+				}
 			}
 
 			return results;

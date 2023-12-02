@@ -35,7 +35,9 @@ class Config {
 
 		virtual DataSlide compute(uint32_t num_threads)=0;
 		virtual std::shared_ptr<Config> clone()=0;
-		virtual std::shared_ptr<Config> deserialize(Params&, const std::string&) { return clone(); } // By default, just clone config
+		virtual std::shared_ptr<Config> deserialize(Params&, const std::string&) { 
+			return clone(); // By default, just clone config
+		}
 
 	private:
 		uint32_t num_runs;
