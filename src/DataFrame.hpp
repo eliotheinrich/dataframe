@@ -21,6 +21,8 @@ class DataFrame {
 		
 		DataFrame() : atol(ATOL), rtol(RTOL) {}
 
+		DataFrame(double atol, double rtol) : atol(atol), rtol(rtol) {}
+
 		DataFrame(const std::vector<DataSlide>& slides) : atol(ATOL), rtol(RTOL) {
 			for (uint32_t i = 0; i < slides.size(); i++) {
 				add_slide(slides[i]);
@@ -61,6 +63,8 @@ class DataFrame {
 			for (auto const &slide_str : data["slides"]) {
 				add_slide(DataSlide(slide_str.dump()));
 			}
+
+			init_qtable();
 		}
 
 		DataFrame(const DataFrame& other) : atol(other.atol), rtol(other.rtol) {
@@ -335,8 +339,6 @@ class DataFrame {
 		}
 
 		void reduce() {
-			utils::var_t_eq equality_comparator(atol, rtol);
-
 			std::vector<DataSlide> new_slides;
 
 			std::set<uint32_t> reduced;
@@ -351,7 +353,7 @@ class DataFrame {
 					if (i == j) {
 						continue;
 					}
-					slide = slide.combine(slides[j], equality_comparator);
+					slide = slide.combine(slides[j], atol, rtol);
 					reduced.insert(j);
 				} 
 				new_slides.push_back(slide);
@@ -507,13 +509,6 @@ class DataFrame {
 					}
 				}
 			}
-
-			//for (auto [key, vals]: key_vals) {
-			//	std::cout << key << ": " << "[ ";
-			//	for (uint32_t i = 0; i < vals.size(); i++) {
-			//		std::cout << std::visit(utils::var_t_to_string(), vals[i]) << " ";
-			//	} std::cout << "]\n";
-			//}
 
 			// Setting up qtable indices
 			for (auto const &[key, vals] : key_vals) {

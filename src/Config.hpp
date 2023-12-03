@@ -1,5 +1,8 @@
 #pragma once
 
+#include "types.h"
+#include "DataSlide.hpp"
+
 namespace dataframe {
 
 #define DEFAULT_NUM_RUNS 1
@@ -8,15 +11,11 @@ namespace dataframe {
 
 class Config {
 	public:
-		bool serialize;
 		Params params;
 
 		Config(Params &params) : params(params) {
 			num_runs = utils::get<int>(params, "num_runs", DEFAULT_NUM_RUNS);
-			serialize = utils::get<int>(params, "serialize", DEFAULT_SERIALIZE);
 		}
-
-		Config(Config &c) : Config(c.params) {}
 
 		virtual ~Config() {}
 
@@ -28,16 +27,8 @@ class Config {
 			return num_runs;
 		}
 
-		// To implement
-		virtual std::string write_serialize() const {
-			return "No implementation for config.serialize() provided.\n";
-		}
-
 		virtual DataSlide compute(uint32_t num_threads)=0;
 		virtual std::shared_ptr<Config> clone() const=0;
-		virtual std::shared_ptr<Config> deserialize(Params&, const std::string&) const { 
-			return clone(); // By default, just clone config
-		}
 
 	private:
 		uint32_t num_runs;

@@ -7,7 +7,7 @@
 
 namespace dataframe {
 
-#define CLONE(A, B) virtual std::shared_ptr<A> clone(dataframe::Params &params) override { return std::shared_ptr<A>(new B(params)); }
+#define CLONE(A, B) virtual std::unique_ptr<A> clone(dataframe::Params &params) override { return std::make_unique<B>(params); }
 
 #define DEFAULT_RANDOM_SEED -1
 
@@ -53,10 +53,7 @@ class Simulator {
         virtual void init_state(uint32_t num_threads)=0;
         virtual void cleanup() {}
         
-        virtual std::shared_ptr<Simulator> clone(Params &params)=0;
-        virtual std::shared_ptr<Simulator> deserialize(Params &params, const std::string&) { 
-            return clone(params); 
-        }
+        virtual std::unique_ptr<Simulator> clone(Params &params)=0;
 
     private:
         int seed;

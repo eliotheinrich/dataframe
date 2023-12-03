@@ -31,8 +31,4 @@ typedef std::map<std::string, var_t> Params;
 typedef std::vector<std::vector<std::vector<double>>> nbarray;
 typedef std::variant<var_t, std::vector<var_t>, nbarray> query_t;
 
-// --- COMPUTE RESULT USED BY PARALLElCOMPUTE --- //
-class DataSlide;
-typedef std::pair<DataSlide, std::optional<std::string>> compute_result_t;
-
 }

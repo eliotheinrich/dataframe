@@ -231,7 +231,9 @@ class DataSlide {
 			return true;
 		}
 
-		DataSlide combine(const DataSlide &ds, const utils::var_t_eq& equality_comparator) {
+		DataSlide combine(const DataSlide &ds, double atol=ATOL, double rtol=RTOL) {
+			utils::var_t_eq equality_comparator(atol, rtol);
+
 			if (!congruent(ds, equality_comparator)) {
 				std::stringstream ss;
 				ss << "DataSlides not congruent.\n"; 

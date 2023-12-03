@@ -1,4 +1,5 @@
 #include "Frame.h"
+#include "FuncConfig.hpp"
 
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
@@ -6,10 +7,10 @@
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/list.h>
 #include <nanobind/trampoline.h>
 #include <nanobind/ndarray.h>
 
-// TODO remove this
 using namespace nanobind::literals;
 
 namespace dataframe {
@@ -91,6 +92,7 @@ struct PyConfig : Config {
 	}
 };
 
+
 // Provide this function to initialize dataframe in other projects
 void init_dataframe(nanobind::module_ &m) {
 	m.def("load_json", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&utils::load_json), "data"_a, "verbose"_a = false);
@@ -98,9 +100,16 @@ void init_dataframe(nanobind::module_ &m) {
 
 	nanobind::class_<Config, PyConfig>(m, "Config")
 		.def(nanobind::init<Params&>())
-		.def_rw("params", &Config::params)
 		.def("compute", &Config::compute)
-		.def("clone", &Config::clone);
+		.def("clone", &Config::clone)
+		.def("get_nruns", &Config::get_nruns)
+		.def_rw("params", &Config::params);
+
+	nanobind::class_<FuncConfig, Config>(m, "FuncConfig")
+		.def(nanobind::init<Params&, const std::function<DataSlide(Params&, uint32_t)>&>())
+		.def("compute", &FuncConfig::compute)
+		.def("clone", &FuncConfig::clone)
+		.def_rw("params", &FuncConfig::params);
 
 	// Need to statically cast overloaded templated methods
 	void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
@@ -129,7 +138,7 @@ void init_dataframe(nanobind::module_ &m) {
 		.def("__setitem__", ds_add_param2)
 		.def("__str__", &DataSlide::to_string, "indentation"_a = 0, "pretty"_a = true, "save_full_sample"_a = false)
 		.def("congruent", &DataSlide::congruent)
-		.def("combine", &DataSlide::combine);
+		.def("combine", &DataSlide::combine, "other"_a, "atol"_a = ATOL, "rtol"_a = RTOL);
 	
 	void (DataFrame::*df_add_param1)(const Params&) = &DataFrame::add_param;
 	void (DataFrame::*df_add_param2)(const std::string&, var_t const&) = &DataFrame::add_param;
@@ -138,6 +147,7 @@ void init_dataframe(nanobind::module_ &m) {
 
 	nanobind::class_<DataFrame>(m, "DataFrame")
 		.def(nanobind::init<>())
+		.def(nanobind::init<double, double>())
 		.def(nanobind::init<const std::vector<DataSlide>&>())
 		.def(nanobind::init<const Params&, const std::vector<DataSlide>&>())
 		.def(nanobind::init<const std::string&>())
@@ -159,6 +169,7 @@ void init_dataframe(nanobind::module_ &m) {
 		.def("__add__", &DataFrame::combine)
 		.def("write_json", &DataFrame::write_json)
 		.def("promote_params", &DataFrame::promote_params)
+		.def("reduce", &DataFrame::reduce)
 		.def("filter", &DataFrame::filter)
 		.def("query", [](DataFrame& df, const std::vector<std::string>& keys, const Params& constraints, bool unique, bool error) {
 			std::vector<query_t> results = df.query(keys, constraints, unique, error);
@@ -181,15 +192,6 @@ void init_dataframe(nanobind::module_ &m) {
 				return py_query_result{py_results};
 			}
 		}, nanobind::rv_policy::move);
-	
-	nanobind::class_<ParallelCompute>(m, "ParallelCompute")
-		.def(nanobind::init<Params&, std::vector<std::shared_ptr<Config>>>())
-		.def_rw("dataframe", &ParallelCompute::df)
-		.def_rw("atol", &ParallelCompute::atol)
-		.def_rw("rtol", &ParallelCompute::rtol)
-		.def("compute", &ParallelCompute::compute, "verbose"_a = false)
-		.def("write_json", &ParallelCompute::write_json)
-		.def("write_serialize_json", &ParallelCompute::write_serialize_json);
 }
 
 }
