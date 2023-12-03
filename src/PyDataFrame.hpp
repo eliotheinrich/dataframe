@@ -6,6 +6,7 @@
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/shared_ptr.h>
+#include <nanobind/trampoline.h>
 #include <nanobind/ndarray.h>
 
 // TODO remove this
@@ -78,17 +79,36 @@ struct query_t_to_py {
 	}
 };
 
+struct PyConfig : Config {
+	NB_TRAMPOLINE(Config, 2);
+
+	DataSlide compute(uint32_t num_threads) override {
+		NB_OVERRIDE_PURE(compute, num_threads);
+	}
+
+	std::shared_ptr<Config> clone() const override {
+		NB_OVERRIDE_PURE(clone);
+	}
+};
+
 // Provide this function to initialize dataframe in other projects
 void init_dataframe(nanobind::module_ &m) {
 	m.def("load_json", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&utils::load_json), "data"_a, "verbose"_a = false);
 	m.def("write_config", &utils::write_config);
 
+	nanobind::class_<Config, PyConfig>(m, "Config")
+		.def(nanobind::init<Params&>())
+		.def_rw("params", &Config::params)
+		.def("compute", &Config::compute)
+		.def("clone", &Config::clone);
+
 	// Need to statically cast overloaded templated methods
 	void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
 	void (DataSlide::*ds_add_param2)(const std::string&, var_t const&) = &DataSlide::add_param;
 
-	void (DataSlide::*push_data1)(const std::string&, const Sample&) = &DataSlide::push_data;
-	void (DataSlide::*push_data2)(const std::string&, const std::vector<Sample>&) = &DataSlide::push_data;
+	void (DataSlide::*push_data1)(const std::string&, const double) = &DataSlide::push_data;
+	void (DataSlide::*push_data2)(const std::string&, const double, const double, const uint32_t) = &DataSlide::push_data;
+	void (DataSlide::*push_data3)(const std::string&, const std::vector<Sample>&) = &DataSlide::push_data;
 
 	nanobind::class_<DataSlide>(m, "DataSlide")
 		.def(nanobind::init<>())
@@ -102,6 +122,7 @@ void init_dataframe(nanobind::module_ &m) {
 		.def("add_data", &DataSlide::add_data)
 		.def("push_data", push_data1)
 		.def("push_data", push_data2)
+		.def("push_data", push_data3)
 		.def("remove", &DataSlide::remove)
 		.def("__contains__", &DataSlide::contains)
 		.def("__getitem__", &DataSlide::get_param)

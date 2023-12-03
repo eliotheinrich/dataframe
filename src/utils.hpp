@@ -474,6 +474,7 @@ static std::string write_config(const std::vector<Params>& params) {
 	std::vector<std::string> buffer1;
 	for (auto const &key : keys) {
 		std::string b1 = "\t\"" + key + "\": ";
+		
 		if (vals[key].size() > 1) {
 			b1 += "[";
 		}
@@ -487,9 +488,11 @@ static std::string write_config(const std::vector<Params>& params) {
 		}
 		
 		b1 += join(buffer2, ", ");
+
 		if (vals[key].size() > 1) {
 			b1 += "]";
 		}
+
 		buffer1.push_back(b1);
 	}
 

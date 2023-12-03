@@ -95,6 +95,16 @@ class DataSlide {
 			push_data(s, sample_vec);
         }
 
+		void push_data(const std::string &s, const double mean) {
+			Sample sample(mean);
+			push_data(s, sample);
+		}
+
+		void push_data(const std::string &s, const double mean, const double std, const uint32_t num_samples) {
+			Sample sample(mean, std, num_samples);
+			push_data(s, sample);
+		}
+
 		std::vector<std::vector<double>> get_data(const std::string& s) const {
 			if (!data.count(s)) {
 				return std::vector<std::vector<double>>();

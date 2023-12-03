@@ -64,7 +64,7 @@ class ParallelCompute {
 				configs[i]->clone();
 				uint32_t nruns = configs[i]->get_nruns();
 				for (uint32_t j = 0; j < nruns; j++) {
-					total_configs.push_back(configs[i]->clone());
+					total_configs.push_back(std::shared_ptr<Config>(configs[i]->clone()));
 				}
 			}
 

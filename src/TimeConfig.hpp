@@ -80,9 +80,10 @@ class TimeConfig : public Config {
             return slide;
         }
 
-        virtual std::shared_ptr<Config> clone() override {
-            std::shared_ptr<TimeConfig> config(new TimeConfig(params));
-            std::shared_ptr<Simulator> sim = simulator->clone(params);
+        virtual std::shared_ptr<Config> clone() const override {
+            Params params_copy = params;
+            std::shared_ptr<TimeConfig> config = std::make_shared<TimeConfig>(params_copy);
+            std::shared_ptr<Simulator> sim = simulator->clone(params_copy);
             config->init_simulator(sim);
             return config;
         }
@@ -91,9 +92,10 @@ class TimeConfig : public Config {
             return simulator->serialize();
         }
 
-        virtual std::shared_ptr<Config> deserialize(Params &params, const std::string &data) override {
-            std::shared_ptr<TimeConfig> config(new TimeConfig(params));
-            std::shared_ptr<Simulator> sim = simulator->deserialize(params, data);
+        virtual std::shared_ptr<Config> deserialize(Params &params, const std::string &data) const override {
+            Params params_copy = params;
+            std::shared_ptr<TimeConfig> config = std::make_shared<TimeConfig>(params_copy);
+            std::shared_ptr<Simulator> sim = simulator->deserialize(params_copy, data);
             config->init_simulator(sim);
             return config;
         }
