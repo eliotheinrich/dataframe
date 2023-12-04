@@ -147,7 +147,7 @@ void init_dataframe(nanobind::module_ &m) {
 		.def("promote_params", &DataFrame::promote_params)
 		.def("reduce", &DataFrame::reduce)
 		.def("filter", &DataFrame::filter)
-		.def("query", [](DataFrame& df, const std::vector<std::string>& keys, const Params& constraints, bool unique, bool error) {
+		.def("query", [](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique, bool error) {
 			std::vector<query_t> results = df.query(keys, constraints, unique, error);
 
 			size_t num_queries = results.size();
@@ -167,7 +167,7 @@ void init_dataframe(nanobind::module_ &m) {
 			} else {
 				return py_query_result{py_results};
 			}
-		}, nanobind::rv_policy::move);
+		}, "keys"_a, "constraints"_a = Params(), "unique"_a = false, "error"_a = false, nanobind::rv_policy::move);
 }
 
 }

@@ -313,7 +313,7 @@ class ParallelCompute:
         run_start = time.time()
 
         with Pool(self.num_threads) as pool:
-            results = pool.imap(partial(ParallelCompute._do_run, num_threads=self.num_threads_per_task), total_configs)
+            results = pool.map(partial(ParallelCompute._do_run, num_threads=self.num_threads_per_task), total_configs)
 
             i = 0
             for _ in results:

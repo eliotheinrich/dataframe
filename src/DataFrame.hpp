@@ -282,12 +282,19 @@ class DataFrame {
 			return DataFrame(params, slides);
 		}
 
+		typedef std::variant<std::string, std::vector<std::string>> query_key_t;
 		std::vector<query_t> query(
-			const std::vector<std::string>& keys, 
+			const query_key_t& keys_var, 
 			const Params& constraints, 
 			bool unique=false, 
 			bool error=false
 		) {
+			std::vector<std::string> keys;
+			if (keys_var.index() == 0) {
+				keys = std::vector<std::string>{std::get<std::string>(keys_var)};
+			} else {
+				keys = std::get<std::vector<std::string>>(keys_var);
+			}
 			if (unique) {
 				auto result = query(keys, constraints);
 				return utils::make_query_unique(result, utils::make_query_t_unique(atol, rtol));
