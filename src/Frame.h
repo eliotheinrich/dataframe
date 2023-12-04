@@ -4,5 +4,5 @@
 
 #include "DataFrame.hpp"
 #include "Simulator.hpp"
-#include "TimeConfig.hpp"
+#include "TimeSamplingDriver.hpp"
 #include "FuncConfig.hpp"

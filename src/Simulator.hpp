@@ -7,8 +7,6 @@
 
 namespace dataframe {
 
-#define CLONE(A, B) virtual std::unique_ptr<A> clone(dataframe::Params &params) override { return std::make_unique<B>(params); }
-
 #define DEFAULT_RANDOM_SEED -1
 
 class Simulator {
@@ -34,10 +32,6 @@ class Simulator {
 
         virtual ~Simulator() {}
 
-        virtual std::string serialize() const {
-            return "serialize is not implemented for this simulator.\n";
-        }
-
         virtual void timesteps(uint32_t num_steps)=0;
 
         // By default, do nothing special during equilibration timesteps
@@ -50,10 +44,7 @@ class Simulator {
             return data_t();
         }
 
-        virtual void init_state(uint32_t num_threads)=0;
         virtual void cleanup() {}
-        
-        virtual std::unique_ptr<Simulator> clone(Params &params)=0;
 
     private:
         int seed;

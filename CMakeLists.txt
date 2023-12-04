@@ -56,7 +56,7 @@ if (DEFINED DF_MAIN_BUILDING)
     src/DataFrame.hpp 
     src/Config.hpp
     src/Simulator.hpp
-    src/TimeConfig.hpp
+    src/TimeSamplingDriver.hpp
     src/FuncConfig.hpp
     src/PyDataFrame.hpp
     src/PyDataFrameModule.cpp

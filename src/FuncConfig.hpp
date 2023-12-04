@@ -3,7 +3,7 @@
 #include "types.h"
 #include "Config.hpp"
 
-#include <nanobind/stl/function.h>
+//#include <nanobind/stl/function.h>
 
 namespace dataframe {
 
