@@ -184,7 +184,9 @@ class TimeConfig(Config):
         return self.params, self.simulator_generator
      
     def compute(self, num_threads):
-        return self.simulator_driver.generate_dataslide(num_threads)
+        slide = self.simulator_driver.generate_dataslide(num_threads)
+        self.params = self.simulator_driver.params
+        return slide
     
     def clone(self):
         return TimeConfig(self.params, self.simulator_generator)
@@ -284,7 +286,7 @@ class ParallelCompute:
         
         return slide
         
-    
+
     def compute_serial(self, total_configs, verbose):
         if verbose:
             print("Computing in serial.")
@@ -312,11 +314,13 @@ class ParallelCompute:
             
         run_start = time.time()
 
+        results = []
         with Pool(self.num_threads) as pool:
-            results = pool.map(partial(ParallelCompute._do_run, num_threads=self.num_threads_per_task), total_configs)
+            iresults = pool.imap(partial(ParallelCompute._do_run, num_threads=self.num_threads_per_task), total_configs)
 
             i = 0
-            for _ in results:
+            for result in iresults:
+                results.append(result)
                 i += 1
                 self._print_progress(i, len(total_configs), run_start)
             

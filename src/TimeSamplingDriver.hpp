@@ -5,6 +5,7 @@
 #define EXPORT_SIMULATOR_DRIVER(A)                                  \
 nanobind::class_<TimeSamplingDriver<A>>(m, #A)                      \
     .def(nanobind::init<Params&>())                                 \
+    .def_rw("params", &TimeSamplingDriver<A>::params)               \
     .def("generate_dataslide", &TimeSamplingDriver<A>::generate_dataslide);
 
 #define EXPORT_CONFIG(A)                                                \
