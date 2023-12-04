@@ -54,10 +54,8 @@ if (DEFINED DF_MAIN_BUILDING)
     src/Sample.hpp 
     src/DataSlide.hpp 
     src/DataFrame.hpp 
-    src/Config.hpp
     src/Simulator.hpp
     src/TimeSamplingDriver.hpp
-    src/FuncConfig.hpp
     src/PyDataFrame.hpp
     src/PyDataFrameModule.cpp
     src/types.h

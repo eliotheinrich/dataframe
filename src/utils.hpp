@@ -366,7 +366,7 @@ static var_t parse_json_type(json_object p) {
 	}
 }
 
-static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose) {
+static std::vector<Params> parse_config(nlohmann::json data, Params p, bool verbose) {
 	if (verbose) {
 		std::cout << "Loaded: \n" << data.dump() << "\n";
 	}
@@ -406,7 +406,7 @@ static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose
 			for (auto const &[k, v] : zparams[i]) {
 				p[k] = v;
 			}
-			std::vector<Params> new_params = load_json(data, Params(p), false);
+			std::vector<Params> new_params = parse_config(data, Params(p), false);
 			params.insert(params.end(), new_params.begin(), new_params.end());
 		}
 
@@ -437,7 +437,7 @@ static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose
 		for (auto v : vals) {
 			p[vector_key] = parse_json_type(v);
 
-			std::vector<Params> new_params = load_json(data, p, false);
+			std::vector<Params> new_params = parse_config(data, p, false);
 			params.insert(params.end(), new_params.begin(), new_params.end());
 		}
 	}
@@ -446,17 +446,17 @@ static std::vector<Params> load_json(nlohmann::json data, Params p, bool verbose
 
 }
 
-static std::vector<Params> load_json(nlohmann::json data, bool verbose=false) {
-	return load_json(data, Params(), verbose);
+static std::vector<Params> parse_config(nlohmann::json data, bool verbose=false) {
+	return parse_config(data, Params(), verbose);
 }
 
-static std::vector<Params> load_json(const std::string& s, bool verbose=false) {
+static std::vector<Params> parse_config(const std::string& s, bool verbose=false) {
 	std::string t(s);
 	std::replace(t.begin(), t.end(), '\'', '"');
-	return load_json(nlohmann::json::parse(t), verbose);
+	return parse_config(nlohmann::json::parse(t), verbose);
 }
 
-static std::string write_config(const std::vector<Params>& params) {
+static std::string paramset_to_string(const std::vector<Params>& params) {
 	std::set<std::string> keys;
 	std::map<std::string, std::set<var_t>> vals;
 	for (auto const &p : params) {

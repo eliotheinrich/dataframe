@@ -78,36 +78,10 @@ struct query_t_to_py {
 	}
 };
 
-struct PyConfig : Config {
-	NB_TRAMPOLINE(Config, 2);
-
-	DataSlide compute(uint32_t num_threads) override {
-		NB_OVERRIDE_PURE(compute, num_threads);
-	}
-
-	std::shared_ptr<Config> clone() const override {
-		NB_OVERRIDE_PURE(clone);
-	}
-};
-
-
 // Provide this function to initialize dataframe in other projects
 void init_dataframe(nanobind::module_ &m) {
-	m.def("load_json", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&utils::load_json), "data"_a, "verbose"_a = false);
-	m.def("write_config", &utils::write_config);
-
-	nanobind::class_<Config, PyConfig>(m, "Config")
-		.def(nanobind::init<Params&>())
-		.def("compute", &Config::compute)
-		.def("clone", &Config::clone)
-		.def("get_nruns", &Config::get_nruns)
-		.def_rw("params", &Config::params);
-
-	nanobind::class_<FuncConfig, Config>(m, "FuncConfig")
-		.def(nanobind::init<Params&, const std::function<DataSlide(Params&, uint32_t)>&>())
-		.def("compute", &FuncConfig::compute)
-		.def("clone", &FuncConfig::clone)
-		.def_rw("params", &FuncConfig::params);
+	m.def("parse_config", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&utils::parse_config), "data"_a, "verbose"_a = false);
+	m.def("paramset_to_string", &utils::paramset_to_string);
 
 	// Need to statically cast overloaded templated methods
 	void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
@@ -134,7 +108,9 @@ void init_dataframe(nanobind::module_ &m) {
 		.def("__contains__", &DataSlide::contains)
 		.def("__getitem__", &DataSlide::get_param)
 		.def("__setitem__", ds_add_param2)
-		.def("__str__", &DataSlide::to_string, "indentation"_a = 0, "pretty"_a = true, "save_full_sample"_a = false)
+		.def("__str__", &DataSlide::to_string)
+		.def("__getstate__", [](const DataSlide& slide){ return slide.to_string(0, false, true); })
+		.def("__setstate__", [](DataSlide& slide, const std::string& s){ new (&slide) DataSlide(s); })
 		.def("congruent", &DataSlide::congruent)
 		.def("combine", &DataSlide::combine, "other"_a, "atol"_a = ATOL, "rtol"_a = RTOL);
 	
@@ -163,8 +139,10 @@ void init_dataframe(nanobind::module_ &m) {
 		.def("__contains__", &DataFrame::contains)
 		.def("__getitem__", &DataFrame::get)
 		.def("__setitem__", df_add_param2)
-		.def("__str__", &DataFrame::to_string, "record_error"_a = true)
+		.def("__str__", &DataFrame::to_string, "write_error"_a = true)
 		.def("__add__", &DataFrame::combine)
+		.def("__getstate__", [](const DataFrame& frame){ return frame.to_string(true); })
+		.def("__setstate__", [](DataFrame& frame, const std::string& s){ new (&frame) DataFrame(s); })
 		.def("write_json", &DataFrame::write_json)
 		.def("promote_params", &DataFrame::promote_params)
 		.def("reduce", &DataFrame::reduce)

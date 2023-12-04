@@ -1,12 +1,11 @@
 #pragma once
 
 #include "Simulator.hpp"
-#include "Config.hpp"
 
 #define EXPORT_SIMULATOR_DRIVER(A)                                  \
 nanobind::class_<TimeSamplingDriver<A>>(m, #A)                      \
-    .def(nanobind::init<Params>())                                 \
-    .def("generate_slide", &TimeSamplingDriver<A>::generate_slide);
+    .def(nanobind::init<Params&>())                                 \
+    .def("generate_dataslide", &TimeSamplingDriver<A>::generate_dataslide);
 
 #define EXPORT_CONFIG(A)                                                \
 nanobind::class_<A>(m, #A)                                              \
@@ -26,7 +25,7 @@ namespace dataframe {
 template <class SimulatorType>
 class TimeSamplingDriver {
     public:
-        Params& params;
+        Params params;
         uint32_t sampling_timesteps;
         uint32_t equilibration_timesteps;
         uint32_t measurement_freq;
@@ -39,7 +38,7 @@ class TimeSamplingDriver {
             temporal_avg = (bool) utils::get<int>(params, "temporal_avg", DEFAULT_TEMPORAL_AVG);
         }
 
-        DataSlide generate_slide(uint32_t num_threads) {
+        DataSlide generate_dataslide(uint32_t num_threads) {
             auto start_time = std::chrono::high_resolution_clock::now();
 
             DataSlide slide;

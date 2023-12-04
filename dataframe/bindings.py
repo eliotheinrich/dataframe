@@ -2,7 +2,7 @@ from typing import Any
 from pathos.multiprocessing import ProcessingPool as Pool
 from functools import partial
 from dataframe.dataframe_bindings import *
-#import dataframe.dataframe_bindings as _df
+
 
 import time
 
@@ -161,15 +161,47 @@ class Config(ABC):
         self.num_runs = params.setdefault("num_runs", 1)
     
     def __getstate__(self):
-        return self.params
+        return self.params,
     
-    def __setstate__(self, params):
-        self.__init__(self, params)
+    def __setstate__(self, state):
+        self.__init__(*state)
+    
+    def get_nruns(self):
+        return self.params["num_runs"]
     
     @abstractmethod
     def compute(self, num_threads):
         pass
 
+class TimeConfig(Config):
+    def __init__(self, params, simulator_generator):
+        super().__init__(params)
+
+        self.simulator_generator = simulator_generator
+        self.simulator_driver = simulator_generator(params)
+
+    def __getstate__(self):
+        return self.params, self.simulator_generator
+     
+    def compute(self, num_threads):
+        return self.simulator_driver.generate_dataslide(num_threads)
+    
+    def clone(self):
+        return TimeConfig(self.params, self.simulator_generator)
+
+class FuncConfig(Config):
+    def __init__(self, params, function):
+        super().__init__(params)
+        self.function = function
+    
+    def compute(self, num_threads):
+        return self.function(self.params, num_threads)
+
+    def __getstate__(self):
+        return self.params, self.function
+    
+    def clone(self):
+        return FuncConfig(self.params, self.function)
 
      
 class ParallelCompute:
@@ -274,17 +306,20 @@ class ParallelCompute:
     
     def compute_pool(self, total_configs, verbose):
         if verbose:
-            print("Computing in parallel.")
+            print(f"Computing in parallel. {self.num_threads} threads available.")
             print(f"num_configs: {len(self.configs)}")
             print(f"total_runs: {len(total_configs)}")
             
         run_start = time.time()
-        print("using pathos.multiprocessing")
+
         with Pool(self.num_threads) as pool:
-            results = pool.map(partial(ParallelCompute._do_run, num_threads=self.num_threads_per_task), total_configs)
+            results = pool.imap(partial(ParallelCompute._do_run, num_threads=self.num_threads_per_task), total_configs)
+
+            i = 0
+            for _ in results:
+                i += 1
+                self._print_progress(i, len(total_configs), run_start)
             
-            #if verbose:
-            #    self._print_progress(i, len(total_configs), run_start)
 
         if verbose:
             self._print_progress(len(total_configs), len(total_configs), run_start)
@@ -292,9 +327,10 @@ class ParallelCompute:
         return results
     
     def _print_progress(self, i, N, run_start=None):
-        percent_finished = round(float(i)/N * 100)
-        if (percent_finished != self._prev_percent_finished):
-            self._prev_percent_finished = percent_finished
+        percent_finished = float(i)/N * 100
+        ipercent_finished = round(percent_finished)
+        if (ipercent_finished != self._prev_percent_finished):
+            self._prev_percent_finished = ipercent_finished
             if run_start is not None:
                 now = time.time()
                 duration = now - run_start
@@ -312,7 +348,7 @@ class ParallelCompute:
             num_minutes = remaining_time // 60
             num_hours = num_minutes // 60
             
-            print(f"{bar} [ ETA: {num_hours:02}:{num_minutes:02}:{num_seconds:02} ] {progress*100} % ", end="\r")
+            print(f"{bar} [ ETA: {num_hours:02}:{num_minutes:02}:{num_seconds:02} ] {progress*100:.2f} % ", end="\r")
 
 
 def load_data(filename: str) -> DataFrame:
@@ -322,8 +358,8 @@ def load_data(filename: str) -> DataFrame:
     return DataFrame(s)
 
 def load_json(filename: str, verbose: bool = False) -> list:
-    return _df.load_json(filename, verbose)
+    return parse_config(filename, verbose)
 
 def write_config(params: list) -> str:
-    return _df.write_config(params)
+    return paramset_to_string(params)
     
