@@ -135,6 +135,10 @@ class Sample {
 		}
 
 		std::string to_string(bool full_sample = false) const {
+			if (std::isnan(mean)) {
+				throw std::invalid_argument("Attempted to write a Sample containing NaN.");
+			}
+			
 			if (full_sample) {
 				std::string s = "[";
 				s += std::to_string(this->mean) + ", " + std::to_string(this->std) + ", " + std::to_string(this->num_samples) + "]";

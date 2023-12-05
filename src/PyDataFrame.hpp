@@ -9,6 +9,28 @@
 #include <nanobind/trampoline.h>
 #include <nanobind/ndarray.h>
 
+#define EXPORT_SIMULATOR_DRIVER(A)                                  \
+nanobind::class_<TimeSamplingDriver<A>>(m, #A)                      \
+    .def(nanobind::init<Params&>())                                 \
+    .def_rw("params", &TimeSamplingDriver<A>::params)               \
+    .def("generate_dataslide", &TimeSamplingDriver<A>::generate_dataslide);
+
+#define INIT_CONFIG()                       \
+nanobind::class_<Config>(m, "Config")       \
+    .def(nanobind::init<Params&>())         \
+    .def_rw("params", &Config::params)      \
+    .def("get_nruns", &Config::get_nruns);
+
+#define EXPORT_CONFIG(A)                                                \
+nanobind::class_<A, Config>(m, #A)                                      \
+    .def(nanobind::init<Params&>())                                     \
+    .def("compute", &A::compute)                                        \
+    .def("clone", &A::clone)                                            \
+    .def("__getstate__", [](const A& config) { return config.params; }) \
+    .def("__setstate__", [](A& config, Params& params){ new (&config) A(params); } )
+
+
+
 using namespace nanobind::literals;
 
 namespace dataframe {
@@ -77,6 +99,18 @@ struct query_t_to_py {
 		return py_query_t{nb_data};
 	}
 };
+
+//struct PyConfig : Config {
+//	NB_TRAMPOLINE(Config, 2);
+//
+//	DataSlide compute(uint32_t num_threads) override {
+//		NB_OVERRIDE_PURE(compute, num_threads);
+//	}
+//
+//	std::shared_ptr<Config> clone() override {
+//		NB_OVERRIDE_PURE(clone);
+//	}
+//};
 
 // Provide this function to initialize dataframe in other projects
 void init_dataframe(nanobind::module_ &m) {
