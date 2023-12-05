@@ -161,6 +161,7 @@ class ParallelCompute:
             print(f"Computing in parallel. {self.num_threads} threads available.")
             print(f"num_configs: {len(self.configs)}")
             print(f"total_runs: {len(total_configs)}")
+            ParallelCompute.print_progress(0, len(total_configs), 1, None)
             
         with Pool(self.num_threads) as pool:
             if verbose:
