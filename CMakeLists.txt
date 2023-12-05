@@ -51,6 +51,7 @@ if (DEFINED DF_MAIN_BUILDING)
 
   set(SRC_FILES 
     src/utils.hpp 
+    src/Config.hpp
     src/Sample.hpp 
     src/DataSlide.hpp 
     src/DataFrame.hpp 

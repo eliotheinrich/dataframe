@@ -2,20 +2,6 @@
 
 #include "Simulator.hpp"
 
-#define EXPORT_SIMULATOR_DRIVER(A)                                  \
-nanobind::class_<TimeSamplingDriver<A>>(m, #A)                      \
-    .def(nanobind::init<Params&>())                                 \
-    .def_rw("params", &TimeSamplingDriver<A>::params)               \
-    .def("generate_dataslide", &TimeSamplingDriver<A>::generate_dataslide);
-
-#define EXPORT_CONFIG(A)                                                \
-nanobind::class_<A>(m, #A)                                              \
-    .def(nanobind::init<Params&>())                                     \
-    .def("compute", &A::compute)                                        \
-    .def("clone", &A::clone)                                            \
-    .def("__getstate__", [](const A& config) { return config.params; }) \
-    .def("__setstate__", [](A& config, Params& params){ new (&config) A(params); } )
-
 namespace dataframe {
 
 #define DEFAULT_EQUILIBRATION_STEPS 0u
