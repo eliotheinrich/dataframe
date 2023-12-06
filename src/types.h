@@ -10,12 +10,6 @@
 
 namespace dataframe {
 
-enum parallelization_t {
-	threadpool,
-	openmp,
-	serial,
-};
-
 // --- DEFINING VALID PARAMETER VALUES ---
 typedef std::variant<int, double, std::string> var_t;
 
