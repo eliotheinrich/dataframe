@@ -4,28 +4,24 @@
 
 #include <vector>
 #include <string>
-#include <math.h>
 #include <numeric>
 
 namespace dataframe {
 
   class Sample {
     public:
-      Sample() : mean(0.), std(0.), num_samples(0) {}
-      Sample(double mean) : mean(mean), std(0.), num_samples(1) {}
-      Sample(double mean, double std, uint32_t num_samples) : mean(mean), std(std), num_samples(num_samples) {}
+      Sample() : Sample(0.0, 0.0, 0) {}
+      Sample(double mean) : Sample(mean, 0.0, 1) {}
 
-      template<class T>
-        Sample(const std::vector<T> &v) {
-          num_samples = v.size();
-          mean = std::accumulate(v.begin(), v.end(), 0.0);
-          double sum = 0.0;
-          for (auto const t : v) {
-            sum += std::pow(t - mean, 2.0);
-          }
-
-          std = std::sqrt(sum/(num_samples - 1.));
+      Sample(double mean, double std, uint32_t num_samples) : mean(mean), std(std), num_samples(num_samples) {
+        if (isnan()) {
+          throw std::invalid_argument("Attempted to create a Sample containing NaN.");
         }
+      }
+
+      bool isnan() const {
+        return std::isnan(mean) || std::isnan(std);
+      }
 
       Sample(const std::string &s) {
         if (!Sample::is_valid(s)) {
@@ -45,6 +41,10 @@ namespace dataframe {
           mean = std::stof(s);
           std = 0.;
           num_samples = 1;
+        }
+
+        if (isnan()) {
+          throw std::invalid_argument("Attempted to create a Sample containing NaN.");
         }
       }
 
@@ -135,10 +135,6 @@ namespace dataframe {
       }
 
       std::string to_string(bool full_sample = false) const {
-        if (std::isnan(mean) || std::isnan(std)) {
-          throw std::invalid_argument("Attempted to write a Sample containing NaN.");
-        }
-
         if (full_sample) {
           std::string s = "[";
           s += std::to_string(this->mean) + ", " + std::to_string(this->std) + ", " + std::to_string(this->num_samples) + "]";

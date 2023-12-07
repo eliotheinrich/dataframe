@@ -89,6 +89,14 @@ namespace dataframe {
       void push_data(const std::string& s, const std::vector<Sample>& samples) {
         data[s].push_back(samples);
       }
+      
+      void push_data(const std::string& s, const std::vector<double>& samples) {
+        std::vector<Sample> sample_vec(samples.size());
+        for (uint32_t i = 0; i < samples.size(); i++) {
+          sample_vec[i] = Sample(samples[i]);
+        }
+        push_data(s, sample_vec);
+      }
 
       void push_data(const std::string& s, const Sample& sample) {
         std::vector<Sample> sample_vec{sample};

@@ -109,12 +109,10 @@ class ParallelCompute:
         idx = 0
         for i in range(num_configs):
             slide = results[idx]
-            print(f'slide:\n {slide}')
             nruns = self.configs[i].get_nruns()
             for _ in range(1, nruns):
                 idx += 1
                 slide_tmp = results[idx]
-                print(f'tpm:\n {slide_tmp}')
                 if self.average_congruent_runs:
                     slide = slide.combine(slide_tmp, self.atol, self.rtol)
                 else:

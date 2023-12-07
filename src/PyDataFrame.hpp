@@ -10,24 +10,24 @@
 #include <nanobind/ndarray.h>
 
 #define EXPORT_SIMULATOR_DRIVER(A)                                  \
-  nanobind::class_<TimeSamplingDriver<A>>(m, #A)                      \
-  .def(nanobind::init<Params&>())                                 \
-  .def_rw("params", &TimeSamplingDriver<A>::params)               \
-  .def("generate_dataslide", &TimeSamplingDriver<A>::generate_dataslide);
+  nanobind::class_<dataframe::TimeSamplingDriver<A>>(m, #A)                      \
+  .def(nanobind::init<dataframe::Params&>())                                 \
+  .def_rw("params", &dataframe::TimeSamplingDriver<A>::params)               \
+  .def("generate_dataslide", &dataframe::TimeSamplingDriver<A>::generate_dataslide);
 
 #define INIT_CONFIG()                       \
-  nanobind::class_<Config>(m, "Config")       \
-  .def(nanobind::init<Params&>())         \
-  .def_rw("params", &Config::params)      \
-  .def("get_nruns", &Config::get_nruns);
+  nanobind::class_<dataframe::Config>(m, "Config")       \
+  .def(nanobind::init<dataframe::Params&>())         \
+  .def_rw("params", &dataframe::Config::params)      \
+  .def("get_nruns", &dataframe::Config::get_nruns);
 
 #define EXPORT_CONFIG(A)                                                \
-  nanobind::class_<A, Config>(m, #A)                                      \
-  .def(nanobind::init<Params&>())                                     \
+  nanobind::class_<A, dataframe::Config>(m, #A)                                      \
+  .def(nanobind::init<dataframe::Params&>())                                     \
   .def("compute", &A::compute)                                        \
   .def("clone", &A::clone)                                            \
   .def("__getstate__", [](const A& config) { return config.params; }) \
-  .def("__setstate__", [](A& config, Params& params){ new (&config) A(params); } )
+  .def("__setstate__", [](A& config, dataframe::Params& params){ new (&config) A(params); } )
 
 
 
@@ -100,18 +100,6 @@ namespace dataframe {
     }
   };
 
-  //struct PyConfig : Config {
-  //	NB_TRAMPOLINE(Config, 2);
-  //
-  //	DataSlide compute(uint32_t num_threads) override {
-  //		NB_OVERRIDE_PURE(compute, num_threads);
-  //	}
-  //
-  //	std::shared_ptr<Config> clone() override {
-  //		NB_OVERRIDE_PURE(clone);
-  //	}
-  //};
-
   // Provide this function to initialize dataframe in other projects
   void init_dataframe(nanobind::module_ &m) {
     m.def("parse_config", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&utils::parse_config), "data"_a, "verbose"_a = false);
@@ -124,8 +112,6 @@ namespace dataframe {
     void (DataSlide::*push_data1)(const std::string&, const double) = &DataSlide::push_data;
     void (DataSlide::*push_data2)(const std::string&, const double, const double, const uint32_t) = &DataSlide::push_data;
     void (DataSlide::*push_data3)(const std::string&, const std::vector<Sample>&) = &DataSlide::push_data;
-
-    std::string (DataSlide::*to_string_cast)() const = &DataSlide::to_string;
 
     nanobind::class_<DataSlide>(m, "DataSlide")
       .def(nanobind::init<>())
@@ -144,7 +130,7 @@ namespace dataframe {
       .def("__contains__", &DataSlide::contains)
       .def("__getitem__", &DataSlide::get_param)
       .def("__setitem__", ds_add_param2)
-      .def("__str__", to_string_cast)
+      .def("__str__", &DataSlide::to_string)
       .def("__getstate__", [](const DataSlide& slide){ return slide.to_string_args(0, false, true); })
       .def("__setstate__", [](DataSlide& slide, const std::string& s){ new (&slide) DataSlide(s); })
       .def("congruent", &DataSlide::congruent)
