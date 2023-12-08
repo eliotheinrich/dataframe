@@ -135,6 +135,8 @@ class ParallelCompute:
 
         if verbose:
             print(f"Total runtime: {duration:0.0f}")
+        
+        return self.dataframe
 
     @staticmethod
     def _do_run(config, num_threads):
@@ -170,12 +172,12 @@ class ParallelCompute:
         return results
 
 
+
 def load_data(filename: str) -> DataFrame:
     with open(filename, 'r') as f:
         s = f.read()
 
     return DataFrame(s)
-
 
 def load_json(filename: str, verbose: bool = False) -> list:
     return parse_config(filename, verbose)
@@ -183,3 +185,28 @@ def load_json(filename: str, verbose: bool = False) -> list:
 
 def write_config(params: list) -> str:
     return paramset_to_string(params)
+
+#def field_to_string(field) -> str:
+#    if isinstance(field, str):
+#        return f'"{field}"'
+#    elif isinstance(field, bool):
+#        return 'true' if field else 'false'
+#    else:
+#        try:
+#            iterator = iter(field)
+#            return '[' + ', '.join([field_to_string(i) for i in iterator]) + ']'
+#        except TypeError:
+#            pass
+#        
+#        return str(field)
+#
+#def config_to_string(config: dict) -> str:
+#    s = "{\n"
+#    lines = []
+#    for key, val in config.items():
+#        if key[:7] == 'zparams':
+#            v = '[' + ', '.join([config_to_string(p).replace('\n', '').replace('\t', '').replace(',', ', ').replace('\'', '"') for p in val]) + ']'
+#        else:
+#            v = field_to_string(val)
+#        lines.append(f"\t\"{key}\": {v}")
+#    s += ',\n'.join(lines) + '\n}'

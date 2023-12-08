@@ -219,36 +219,48 @@ namespace dataframe {
       }
 
       bool congruent(const DataSlide &ds, const utils::var_t_eq& equality_comparator) {
-        if (!utils::params_eq(params, ds.params, equality_comparator)) {
-          return false;
+        auto incongruent_key = first_incongruent_key(ds, equality_comparator);
+        return incongruent_key == std::nullopt;
+      }
+      
+      std::optional<std::string> first_incongruent_key(const DataSlide &other, const utils::var_t_eq& equality_comparator) const {
+        for (auto const& [key, val] : params) {
+          if (!other.params.count(key) || !equality_comparator(other.params.at(key), val)) {
+            return key;
+          }
         }
-
+        
+        for (auto const& [key, val] : other.params) {
+          if (!params.count(key) || !equality_comparator(params.at(key), val)) {
+            return key;            
+          }
+        }
+        
+        
         for (auto const &[key, samples] : data) {
-          if (!ds.data.count(key)) {
-            std::cout << key << " not congruent.\n";
-            return false;
+          if (!other.data.count(key)) {
+            return key;
           }
-          if (ds.data.at(key).size() != data.at(key).size()) {
-            std::cout << key << " not congruent.\n";
-            return false;
+          if (other.data.at(key).size() != data.at(key).size()) {
+            return key;
           }
         }
-        for (auto const &[key, val] : ds.data) {
+        for (auto const &[key, val] : other.data) {
           if (!data.count(key)) {
-            std::cout << key << " not congruent.\n";
-            return false;
+            return key;
           }
         }
-
-        return true;
+        
+        return std::nullopt;
       }
 
       DataSlide combine(const DataSlide &ds, double atol=ATOL, double rtol=RTOL) {
         utils::var_t_eq equality_comparator(atol, rtol);
+        auto key = first_incongruent_key(ds, equality_comparator);
 
-        if (!congruent(ds, equality_comparator)) {
+        if (!(key == std::nullopt)) {
           std::stringstream ss;
-          ss << "DataSlides not congruent.\n"; 
+          ss << "DataSlides not congruent at key \"" << key.value() << "\".\n"; 
           ss << to_string() << "\n\n\n" << ds.to_string() << std::endl;
           std::string error_message = ss.str();
           throw std::invalid_argument(error_message);
