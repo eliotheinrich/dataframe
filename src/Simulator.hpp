@@ -30,7 +30,7 @@ namespace dataframe {
         }
       }
 
-      virtual ~Simulator() {}
+      virtual ~Simulator()=default;
 
       virtual void timesteps(uint32_t num_steps)=0;
 
@@ -44,7 +44,9 @@ namespace dataframe {
         return data_t();
       }
 
-      virtual void cleanup() {}
+      virtual void cleanup() {
+        // By default, nothing to do for cleanup
+      }
 
     private:
       int seed;
