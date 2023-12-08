@@ -22,7 +22,7 @@ namespace dataframe {
 
       Simulator(Params &params) {
         seed = utils::get<int>(params, "seed", DEFAULT_RANDOM_SEED);
-        if (seed == -1) {
+        if (seed == DEFAULT_RANDOM_SEED) {
           thread_local std::random_device rd;
           rng.seed(rd());
         } else {
