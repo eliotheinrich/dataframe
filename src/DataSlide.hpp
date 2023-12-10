@@ -72,9 +72,9 @@ namespace dataframe {
       }
 
       template <typename T>
-        void add_param(const std::string& s, T const& t) { 
-          params[s] = t; 
-        }
+      void add_param(const std::string& s, T const& t) { 
+        params[s] = t; 
+      }
 
       void add_param(const Params &params) {
         for (auto const &[key, field] : params) {

@@ -57,12 +57,12 @@ namespace dataframe {
     static void escape_sequences(std::string& str) {
       std::pair<char, char> const sequences[] {
         { '\a', 'a' },
-          { '\b', 'b' },
-          { '\f', 'f' },
-          { '\n', 'n' },
-          { '\r', 'r' },
-          { '\t', 't' },
-          { '\v', 'v' },
+        { '\b', 'b' },
+        { '\f', 'f' },
+        { '\n', 'n' },
+        { '\r', 'r' },
+        { '\t', 't' },
+        { '\v', 'v' },
       };
 
       for (size_t i = 0; i < str.length(); ++i) {
@@ -286,26 +286,23 @@ namespace dataframe {
       std::vector<query_t> new_results;
       new_results.reserve(results.size());
       std::transform(results.begin(), results.end(), std::back_inserter(new_results),
-          [&query_t_visitor=query_t_visitor](const query_t& q) { return std::visit(query_t_visitor, q); }
-          );
+        [&query_t_visitor=query_t_visitor](const query_t& q) { return std::visit(query_t_visitor, q); }
+      );
 
       return new_results;
     }
 
     static bool params_eq(const Params& lhs, const Params& rhs, const var_t_eq& equality_comparator) {
       if (lhs.size() != rhs.size()) {
-        std::cout << "params unequal size\n";
         return false;
       }
 
       for (auto const &[key, val] : lhs) {
         if (rhs.count(key)) {
           if (!equality_comparator(rhs.at(key), val)) {
-            std::cout << key << " not congruent\n";
             return false;
           }
         } else {
-          std::cout << key << " not congruent\n";
           return false;
         }
       }
@@ -315,9 +312,11 @@ namespace dataframe {
 
     static std::string params_to_string(const Params& params, uint32_t indentation=0) {
       std::string s = "";
+
       for (uint32_t i = 0; i < indentation; i++) {
         s += "\t";
       }
+
       std::vector<std::string> buffer;
 
       for (auto const &[key, field] : params) {
@@ -328,6 +327,7 @@ namespace dataframe {
       for (uint32_t i = 0; i < indentation; i++) {
         delim += "\t";
       }
+
       s += join(buffer, delim);
 
       return s;
@@ -430,7 +430,9 @@ namespace dataframe {
         }
       }
 
-      for (auto key : scalars) data.erase(key);
+      for (auto key : scalars) {
+        data.erase(key);
+      }
 
       if (!contains_vector) {
         params.push_back(p);

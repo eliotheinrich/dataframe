@@ -17,8 +17,6 @@ namespace dataframe {
       Params metadata;
       std::vector<DataSlide> slides;
 
-      friend class ParallelCompute;
-
       DataFrame() : atol(ATOL), rtol(RTOL) {}
 
       DataFrame(double atol, double rtol) : atol(atol), rtol(rtol) {}
@@ -252,10 +250,10 @@ namespace dataframe {
           std::set<uint32_t> ind_union;
 
           std::set_union(
-              inds.begin(), inds.end(),
-              c_inds.begin(), c_inds.end(),
-              std::inserter(ind_union, ind_union.begin())
-              );
+            inds.begin(), inds.end(),
+            c_inds.begin(), c_inds.end(),
+            std::inserter(ind_union, ind_union.begin())
+          );
           inds = ind_union;
         }
 
@@ -267,10 +265,10 @@ namespace dataframe {
 
           std::set<uint32_t> set_sd;
           std::set_symmetric_difference(
-              inds.begin(), inds.end(),
-              all_inds_set.begin(), all_inds_set.end(),
-              std::inserter(set_sd, set_sd.begin())
-              );
+            inds.begin(), inds.end(),
+            all_inds_set.begin(), all_inds_set.end(),
+            std::inserter(set_sd, set_sd.begin())
+          );
           inds = set_sd;
         }
 
@@ -284,11 +282,11 @@ namespace dataframe {
 
       typedef std::variant<std::string, std::vector<std::string>> query_key_t;
       std::vector<query_t> query(
-          const query_key_t& keys_var, 
-          const Params& constraints, 
-          bool unique=false, 
-          bool error=false
-          ) {
+        const query_key_t& keys_var, 
+        const Params& constraints, 
+        bool unique=false, 
+        bool error=false
+      ) {
         std::vector<std::string> keys;
         if (keys_var.index() == 0) {
           keys = std::vector<std::string>{std::get<std::string>(keys_var)};
@@ -482,10 +480,10 @@ namespace dataframe {
       std::map<std::string, std::vector<var_t>> key_vals;
 
       uint32_t corresponding_ind(
-          const var_t& v, 
-          const std::vector<var_t>& vals, 
-          const std::optional<utils::var_t_eq>& comp = std::nullopt
-          ) {
+        const var_t& v, 
+        const std::vector<var_t>& vals, 
+        const std::optional<utils::var_t_eq>& comp = std::nullopt
+      ) {
         utils::var_t_eq equality_comparator = comp.value_or(utils::var_t_eq{atol, rtol});
 
         for (uint32_t i = 0; i < vals.size(); i++) {
@@ -508,9 +506,12 @@ namespace dataframe {
               key_vals[key] = std::vector<var_t>();
             }
 
-            auto result = std::find_if(key_vals[key].begin(), key_vals[key].end(), [tar_val, &equality_comparator](const var_t& val) {
+            auto result = std::find_if(
+              key_vals[key].begin(), key_vals[key].end(), 
+              [tar_val, &equality_comparator](const var_t& val) {
                 return equality_comparator(tar_val, val);
-                });
+              }
+            );
 
             if (result == key_vals[key].end()) {
               key_vals[key].push_back(tar_val);

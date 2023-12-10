@@ -71,6 +71,7 @@ class ParallelCompute:
 
     def __init__(self, configs, **metadata):
         self.configs = configs
+        self._metadata = metadata
 
         self.num_threads = metadata.setdefault("num_threads", 1)
         self.num_threads_per_task = metadata.setdefault("num_threads_per_task", 1)
@@ -128,6 +129,7 @@ class ParallelCompute:
         self.dataframe.add_metadata("num_threads", self.num_threads)
         self.dataframe.add_metadata("num_jobs", num_jobs)
         self.dataframe.add_metadata("total_time", duration)
+        self.dataframe.add_metadata(self._metadata)
 
         self.dataframe.promote_params()
         if self.average_congruent_runs:
