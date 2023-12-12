@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from pathos.multiprocessing import ProcessingPool as Pool
+from concurrent.futures import ProcessPoolExecutor
+import concurrent
 
 import time
 import tqdm
@@ -82,6 +83,8 @@ class ParallelCompute:
         self.record_error = metadata.setdefault("record_error", True)
         self.dataframe = DataFrame(self.atol, self.rtol)
 
+        self.num_slides = None
+
     def write_json(self, filename):
         s = str(self.dataframe)
         with open(filename, 'w') as f:
@@ -90,14 +93,18 @@ class ParallelCompute:
     def compute(self, verbose=True):
         start_time = time.time()
 
-        num_configs = len(self.configs)
         total_configs = []
-        for config in self.configs:
+        j = 0
+        for i, config in enumerate(self.configs):
             config.clone()
             nruns = config.get_nruns()
 
             for _ in range(nruns):
-                total_configs.append(config.clone())
+                id = i if self.average_congruent_runs else j
+                total_configs.append((id, config.clone()))
+                j += 1
+
+        self.num_slides = len(self.configs) if self.average_congruent_runs else len(total_configs)
 
         if self.parallelization_type == self.SERIAL:
             results = self.compute_serial(total_configs, verbose)
@@ -107,19 +114,7 @@ class ParallelCompute:
         if verbose:
             print("\n", end="")
 
-        idx = 0
-        for i in range(num_configs):
-            slide = results[idx]
-            nruns = self.configs[i].get_nruns()
-            for _ in range(1, nruns):
-                idx += 1
-                slide_tmp = results[idx]
-                if self.average_congruent_runs:
-                    slide = slide.combine(slide_tmp, self.atol, self.rtol)
-                else:
-                    self.dataframe.add_slide(slide_tmp)
-
-            idx += 1
+        for slide in results:
             self.dataframe.add_slide(slide)
 
         stop_time = time.time()
@@ -137,15 +132,15 @@ class ParallelCompute:
 
         if verbose:
             print(f"Total runtime: {duration:0.0f}")
-        
+
         return self.dataframe
 
     @staticmethod
-    def _do_run(config, num_threads):
+    def _do_run(config, num_threads, id):
         slide = config.compute(num_threads)
         slide.add_param(config.params)
 
-        return slide
+        return id, slide
 
     def compute_serial(self, total_configs, verbose):
         if verbose:
@@ -153,11 +148,13 @@ class ParallelCompute:
             print(f"num_configs: {len(self.configs)}")
             print(f"total_runs: {len(total_configs)}")
 
-        results = []
-        for i in tqdm.tqdm(range(len(total_configs))):
-            results.append(ParallelCompute._do_run(total_configs[i], self.num_threads_per_task))
+        slides = [None for _ in range(self.num_slides)]
+        for i, config in tqdm.tqdm(total_configs):
+            id, slide = ParallelCompute._do_run(config, self.num_threads_per_task, i)
 
-        return results
+            slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
+
+        return slides
 
     def compute_pool(self, total_configs, verbose):
         if verbose:
@@ -165,15 +162,20 @@ class ParallelCompute:
             print(f"num_configs: {len(self.configs)}")
             print(f"total_runs: {len(total_configs)}")
 
-        with Pool(self.num_threads) as pool:
+        slides = [None for _ in range(self.num_slides)]
+        with ProcessPoolExecutor(max_workers=self.num_threads) as pool:
+            futures = [pool.submit(ParallelCompute._do_run, config, self.num_threads_per_task, i) for i,config in total_configs]
             if verbose:
-                results = list(tqdm.tqdm(pool.imap(partial(ParallelCompute._do_run, num_threads=self.num_threads_per_task), total_configs), total=len(total_configs)))
+                completed_futures = tqdm.tqdm(concurrent.futures.as_completed(futures), total=len(futures))
             else:
-                results = list(pool.imap(partial(ParallelCompute._do_run, num_threads=self.num_threads_per_task), total_configs))
+                completed_futures = concurrent.futures.as_completed(futures)
 
-        return results
+            for future in completed_futures:
+                id, slide = future.result()
 
+                slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
 
+        return slides
 
 def load_data(filename: str) -> DataFrame:
     with open(filename, 'r') as f:
