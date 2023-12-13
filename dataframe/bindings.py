@@ -4,7 +4,6 @@ import concurrent
 
 import time
 import tqdm
-from functools import partial
 
 from dataframe.dataframe_bindings import *
 
@@ -149,7 +148,9 @@ class ParallelCompute:
             print(f"total_runs: {len(total_configs)}")
 
         slides = [None for _ in range(self.num_slides)]
-        for i, config in tqdm.tqdm(total_configs):
+        if verbose:
+            total_configs = tqdm.tqdm(total_configs)
+        for i, config in total_configs:
             id, slide = ParallelCompute._do_run(config, self.num_threads_per_task, i)
 
             slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
@@ -165,10 +166,9 @@ class ParallelCompute:
         slides = [None for _ in range(self.num_slides)]
         with ProcessPoolExecutor(max_workers=self.num_threads) as pool:
             futures = [pool.submit(ParallelCompute._do_run, config, self.num_threads_per_task, i) for i,config in total_configs]
+            completed_futures = concurrent.futures.as_completed(futures)
             if verbose:
-                completed_futures = tqdm.tqdm(concurrent.futures.as_completed(futures), total=len(futures))
-            else:
-                completed_futures = concurrent.futures.as_completed(futures)
+                completed_futures = tqdm.tqdm(completed_futures, total=len(futures))
 
             for future in completed_futures:
                 id, slide = future.result()

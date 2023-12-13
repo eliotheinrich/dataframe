@@ -168,7 +168,7 @@ namespace dataframe {
       .def("write_json", &DataFrame::write_json)
       .def("promote_params", &DataFrame::promote_params)
       .def("reduce", &DataFrame::reduce)
-      .def("filter", &DataFrame::filter)
+      .def("filter", &DataFrame::filter, "constraints"_a, "filter"_a)
       .def("query", [](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique, bool error) {
           std::vector<query_t> results = df.query(keys, constraints, unique, error);
 

@@ -198,6 +198,7 @@ namespace dataframe {
   };
 
 
+  // Thin wrapper for map; desirable to overload emplace so that Sample does not need to be exposed
   class data_t {
     private:
       std::map<std::string, std::vector<Sample>> data;
@@ -228,6 +229,18 @@ namespace dataframe {
         std::vector<Sample> sample{s};
         emplace(key, sample);
       }
+      
+      void clear() {
+        data.clear();
+      }
+
+      void swap(data_t& other) {
+        data.swap(other.data);
+      }
+
+      auto find(const std::string& key) const {
+        return data.find(key);
+      }
 
       auto begin() const {
         return data.begin();
@@ -241,6 +254,18 @@ namespace dataframe {
         return data.count(key);
       }
 
+      size_t size() const {
+        return data.size();
+      }
+
+      bool empty() const {
+        return data.empty();
+      }
+
+      std::vector<Sample> at(const std::string& key) const {
+        return data.at(key);
+      }
+
       const std::vector<Sample>& operator[](const std::string& key) const {
         return data.at(key);
       }
@@ -249,6 +274,8 @@ namespace dataframe {
         return data[key];
       }
 
+      data_t& operator=(const data_t& other) {
+        data = other.data;
+      }
   };
-
 }
