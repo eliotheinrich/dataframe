@@ -276,6 +276,7 @@ namespace dataframe {
 
       data_t& operator=(const data_t& other) {
         data = other.data;
+        return *this;
       }
   };
 }
