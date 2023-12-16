@@ -1,10 +1,9 @@
-cmake_minimum_required(VERSION 3.15..3.26)
+cmake_minimum_required(VERSION 3.27)
 
 project(dataframe LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 if (DEFINED DF_MAIN_BUILDING)
-
   find_package(Python 3.10 
     REQUIRED COMPONENTS Interpreter Development.Module
     OPTIONAL_COMPONENTS Development.SABIModule
@@ -28,25 +27,17 @@ if (DEFINED DF_MAIN_BUILDING)
   include(FetchContent)
 
   FetchContent_Declare(
-      nlohmann
-      GIT_REPOSITORY https://github.com/nlohmann/json
-      GIT_TAG master
-      GIT_SHALLOW TRUE
+    glaze
+    GIT_REPOSITORY https://github.com/stephenberry/glaze.git
+    GIT_TAG main
+    GIT_SHALLOW TRUE
   )
 
-  FetchContent_Declare(
-      bspl
-      GIT_REPOSITORY https://github.com/bshoshany/thread-pool
-      GIT_TAG master
-      GIT_SHALLOW TRUE
-  )
-
-  FetchContent_MakeAvailable(nlohmann bspl)
+  FetchContent_MakeAvailable(glaze)
 
   include_directories(
       src
-      ${nlohmann_SOURCE_DIR}/include 
-      ${bspl_SOURCE_DIR}/include 
+      ${glaze_SOURCE_DIR}/include
   )
 
   set(SRC_FILES 
@@ -75,3 +66,22 @@ if (DEFINED DF_MAIN_BUILDING)
   )
 
 endif()
+
+include(FetchContent)
+
+FetchContent_Declare(
+  glaze
+  GIT_REPOSITORY https://github.com/stephenberry/glaze.git
+  GIT_TAG main
+  GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(glaze)
+
+include_directories(
+    src
+    ${glaze_SOURCE_DIR}/include
+)
+
+add_executable(test src/test.cpp)
+

@@ -20,7 +20,7 @@ namespace dataframe {
       uint32_t measurement_freq;
       bool temporal_avg;
 
-      TimeSamplingDriver<SimulatorType>(Params& params) : params(params) {
+      TimeSamplingDriver(Params& params) : params(params) {
         equilibration_timesteps = utils::get<int>(params, "equilibration_timesteps", DEFAULT_EQUILIBRATION_STEPS);
         sampling_timesteps = utils::get<int>(params, "sampling_timesteps", DEFAULT_SAMPLING_TIMESTEPS);
         measurement_freq = utils::get<int>(params, "measurement_freq", DEFAULT_MEASUREMENT_FREQ);

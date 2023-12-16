@@ -6,20 +6,22 @@
 #include <string>
 
 namespace dataframe {
-
   class Sample {
     public:
       Sample() : Sample(0.0, 0.0, 0) {}
       Sample(double mean) : Sample(mean, 0.0, 1) {}
 
-      Sample(double mean, double std, uint32_t num_samples) : mean(mean), std(std), num_samples(num_samples) {
+      Sample(double mean, double std, uint32_t num_samples) {
+        set_mean(mean);
+        set_std(std);
+        set_num_samples(num_samples);
         if (isnan()) {
           throw std::invalid_argument("Attempted to create a Sample containing NaN.");
         }
       }
 
       bool isnan() const {
-        return std::isnan(mean) || std::isnan(std);
+        return std::isnan(get_mean()) || std::isnan(get_std());
       }
 
       Sample(const std::string &s) {
@@ -33,13 +35,13 @@ namespace dataframe {
 
           std::vector<std::string> elements = utils::split(trimmed, ",");
 
-          mean = std::stof(elements[0]);
-          std = std::stof(elements[1]);
-          num_samples = std::stoi(elements[2]);
+          set_mean(std::stof(elements[0]));
+          set_std(std::stof(elements[1]));
+          set_num_samples(std::stoi(elements[2]));
         } else {
-          mean = std::stof(s);
-          std = 0.;
-          num_samples = 1;
+          set_mean(std::stof(s));
+          set_std(0.);
+          set_num_samples(1);
         }
 
         if (isnan()) {
@@ -58,65 +60,68 @@ namespace dataframe {
         }
       }
 
-      static std::vector<Sample> read_samples(const nlohmann::json& arr) {
-        if (!arr.is_array()) {
-          throw std::invalid_argument("Invalid value passed to read_samples.");
-        }
+      //static std::vector<Sample> read_samples(const nlohmann::json& arr) {
+      //  if (!arr.is_array()) {
+      //    throw std::invalid_argument("Invalid value passed to read_samples.");
+      //  }
 
-        size_t num_elements = arr.size();
+      //  size_t num_elements = arr.size();
 
-        // Need to assume at least one element exists for the remainder
-        if (num_elements == 0) {
-          return std::vector<Sample>();
-        }
+      //  // Need to assume at least one element exists for the remainder
+      //  if (num_elements == 0) {
+      //    return std::vector<Sample>();
+      //  }
 
-        std::string arr_str = arr.dump();
+      //  std::string arr_str = arr.dump();
 
-        if (Sample::is_valid(arr_str)) {
-          return std::vector<Sample>{Sample(arr_str)};
-        }
+      //  if (Sample::is_valid(arr_str)) {
+      //    return std::vector<Sample>{Sample(arr_str)};
+      //  }
 
-        std::vector<Sample> samples;
-        samples.reserve(num_elements);
+      //  std::vector<Sample> samples;
+      //  samples.reserve(num_elements);
 
-        for (auto const& el : arr) {
-          // Check that dimension is consistent
-          std::string s = el.dump();
-          if (!Sample::is_valid(s)) {
-            std::string error_message = "Invalid string " + s + " passed to read_samples.";
-            throw std::invalid_argument(error_message);
-          }
+      //  for (auto const& el : arr) {
+      //    // Check that dimension is consistent
+      //    std::string s = el.dump();
+      //    if (!Sample::is_valid(s)) {
+      //      std::string error_message = "Invalid string " + s + " passed to read_samples.";
+      //      throw std::invalid_argument(error_message);
+      //    }
 
-          samples.push_back(Sample(s));
-        }
+      //    samples.push_back(Sample(s));
+      //  }
 
-        return samples;
+      //  return samples;
+      //}
+
+
+      inline double get_mean() const {
+        return data[0];
       }
 
-
-      double get_mean() const {
-        return this->mean;
-      }
-      void set_mean(double mean) {
-        this->mean = mean;
+      inline void set_mean(double mean) {
+        data[0] = mean;
       }
 
-      double get_std() const {
-        return this->std;
-      }
-      void set_std(double std) {
-        this->std = std;
+      inline double get_std() const {
+        return data[1];
       }
 
-      uint32_t get_num_samples() const {
-        return this->num_samples;
+      inline void set_std(double std) {
+        data[1] = std;
       }
-      void set_num_samples(uint32_t num_samples) {
-        this->num_samples = num_samples;
+
+      inline uint32_t get_num_samples() const {
+        return static_cast<uint32_t>(data[2]);
+      }
+
+      inline void set_num_samples(uint32_t num_samples) {
+        data[2] = static_cast<double>(num_samples);
       }
 
       Sample combine(const Sample &other) const {
-        uint32_t combined_samples = this->num_samples + other.get_num_samples();
+        uint32_t combined_samples = get_num_samples() + other.get_num_samples();
         if (combined_samples == 0) {
           return Sample();
         }
@@ -125,8 +130,8 @@ namespace dataframe {
         double samples2f = other.get_num_samples();
         double combined_samplesf = combined_samples;
 
-        double combined_mean = (samples1f*this->get_mean() + samples2f*other.get_mean())/combined_samplesf;
-        double combined_std = std::pow((samples1f*(std::pow(this->get_std(), 2) + std::pow(this->get_mean() - combined_mean, 2))
+        double combined_mean = (samples1f*get_mean() + samples2f*other.get_mean())/combined_samplesf;
+        double combined_std = std::pow((samples1f*(std::pow(get_std(), 2) + std::pow(get_mean() - combined_mean, 2))
               + samples2f*(std::pow(other.get_std(), 2) + std::pow(other.get_mean() - combined_mean, 2))
               )/combined_samplesf, 0.5);
 
@@ -136,10 +141,10 @@ namespace dataframe {
       std::string to_string(bool full_sample = false) const {
         if (full_sample) {
           std::string s = "[";
-          s += std::to_string(this->mean) + ", " + std::to_string(this->std) + ", " + std::to_string(this->num_samples) + "]";
+          s += std::to_string(get_mean()) + ", " + std::to_string(get_std()) + ", " + std::to_string(get_num_samples()) + "]";
           return s;
         } else {
-          return std::to_string(this->mean);
+          return std::to_string(get_mean());
         }
       }
 
@@ -191,10 +196,11 @@ namespace dataframe {
         return collapsed_samples;
       }
 
-    private:
-      double mean;
-      double std;
-      uint32_t num_samples;
+      std::array<double, 3> data;
+      
+      struct glaze {
+        static constexpr auto value{&Sample::data};
+      };
   };
 
 

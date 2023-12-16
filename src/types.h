@@ -11,7 +11,7 @@
 namespace dataframe {
 
 // --- DEFINING VALID PARAMETER VALUES ---
-typedef std::variant<int, double, std::string> var_t;
+typedef std::variant<double, std::string> var_t;
 
 // Need to be provide overloaded constructors so that the Sample interface is hidden and
 // data can be provided as simple doubles or vectors of doubles

@@ -17,6 +17,14 @@ namespace dataframe {
       Params metadata;
       std::vector<DataSlide> slides;
 
+      struct glaze {
+        static constexpr auto value = glz::object(
+          "params", &DataFrame::params,
+          "metadata", &DataFrame::metadata,
+          "slides", &DataFrame::slides
+        );
+      };
+
       DataFrame() : atol(ATOL), rtol(RTOL) {}
 
       DataFrame(double atol, double rtol) : atol(atol), rtol(rtol) {}
@@ -35,16 +43,7 @@ namespace dataframe {
       }
 
       DataFrame(const std::string& s) {
-        nlohmann::json data = nlohmann::json::parse(s);
-        for (auto const &[key, val] : data["params"].items()) {
-          params[key] = utils::parse_json_type(val);
-        }
-
-        if (data.contains("metadata")) {
-          for (auto const &[key, val] : data["metadata"].items()) {
-            metadata[key] = utils::parse_json_type(val);
-          }
-        }
+        auto pe = glz::read_json(*this, s);
 
         if (metadata.count("atol")) {
           atol = std::get<double>(metadata.at("atol"));
@@ -56,10 +55,6 @@ namespace dataframe {
           rtol = std::get<double>(metadata.at("rtol"));
         } else {
           rtol = RTOL;
-        }
-
-        for (auto const &slide_str : data["slides"]) {
-          add_slide(DataSlide(slide_str.dump()));
         }
 
         init_qtable();
@@ -95,9 +90,9 @@ namespace dataframe {
       }
 
       template <typename T>
-        void add_metadata(const std::string& s, const T & t) {
-          metadata[s] = t;
-        }
+      void add_metadata(const std::string& s, const T t) {
+        metadata[s] = t;
+      }
 
       void add_metadata(const Params &params) {
         for (auto const &[key, field] : params) {
@@ -106,10 +101,10 @@ namespace dataframe {
       }
 
       template <typename T>
-        void add_param(const std::string& s, const T & t) { 
-          params[s] = t; 
-          qtable_initialized = false;
-        }
+      void add_param(const std::string& s, const T t) { 
+        params[s] = t; 
+        qtable_initialized = false;
+      }
 
 
       void add_param(const Params &params) {
@@ -157,34 +152,12 @@ namespace dataframe {
         return metadata.erase(s);
       }
 
-      std::string to_string(bool record_error=false) const {
-        std::string s = "";
-
-        s += "{\n\t\"params\": {\n";
-
-        s += utils::params_to_string(params, 2);
-
-        s += "\n\t},\n\t\"metadata\": {\n";
-
-        s += utils::params_to_string(metadata, 2);
-
-        s += "\n\t},\n\t\"slides\": [\n";
-
-        int num_slides = slides.size();
-        std::vector<std::string> buffer;
-        for (int i = 0; i < num_slides; i++) {
-          buffer.push_back("\t\t{\n" + slides[i].to_string_args(3, true, record_error) + "\n\t\t}");
-        }
-
-        s += utils::join(buffer, ",\n");
-
-        s += "\n\t]\n}\n";
-
-        return s;
+      std::string to_string() const {
+        return glz::write_json(*this);
       }
 
       void write_json(const std::string& filename, bool record_error=false) const {
-        std::string s = to_string(record_error);
+        std::string s = to_string();
 
         // Save to file
         if (!std::remove(filename.c_str())) {
@@ -595,4 +568,15 @@ namespace dataframe {
       }
   };
 
+  template <>
+  void DataFrame::add_metadata(const std::string& s, const int t) { 
+    metadata[s] = static_cast<double>(t); 
+  }
+
+  template <>
+  void DataFrame::add_param(const std::string& s, const int t) { 
+    params[s] = static_cast<double>(t); 
+    qtable_initialized = false;
+  }
 }
+

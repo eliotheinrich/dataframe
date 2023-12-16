@@ -10,35 +10,19 @@ namespace dataframe {
       Params params;
       std::map<std::string, std::vector<std::vector<Sample>>> data;
 
+      struct glaze {
+        static constexpr auto value = glz::object(
+          "params", &DataSlide::params,
+          "data", &DataSlide::data
+        );
+      };
+
       DataSlide() {}
 
       DataSlide(Params &params) : params(params) {}
 
       DataSlide(const std::string &s) {
-        std::string trimmed = s;
-        uint32_t start_pos = trimmed.find_first_not_of(" \t\n\r");
-        uint32_t end_pos = trimmed.find_last_not_of(" \t\n\r");
-        trimmed = trimmed.substr(start_pos, end_pos - start_pos + 1);
-
-        nlohmann::json ds_json;
-        if (trimmed.empty() || trimmed.front() != '{' || trimmed.back() != '}') {
-          ds_json = nlohmann::json::parse("{" + trimmed + "}");
-        } else {
-          ds_json = nlohmann::json::parse(trimmed);
-        }
-
-        for (auto const &[k, val] : ds_json.items()) {
-          if (val.type() == nlohmann::json::value_t::array) {
-            add_data(k);
-
-            for (auto const &v : val) {
-              std::vector<Sample> samples = Sample::read_samples(v); // TODO avoid dumping back to string
-              push_data(k, samples);
-            }
-          } else {
-            add_param(k, utils::parse_json_type(val));
-          }
-        }
+        auto pe = glz::read_json(*this, s);
       }
 
       DataSlide(const DataSlide& other) {
@@ -72,7 +56,7 @@ namespace dataframe {
       }
 
       template <typename T>
-      void add_param(const std::string& s, T const& t) { 
+      void add_param(const std::string& s, const T t) { 
         params[s] = t; 
       }
 
@@ -178,44 +162,7 @@ namespace dataframe {
       }
 
       std::string to_string() const {
-        return to_string_args(0, true, true);
-      }
-
-      std::string to_string_args(uint32_t indentation, bool pretty, bool record_error) const {
-        std::string tab = pretty ? "\t" : "";
-        std::string nline = pretty ? "\n" : "";
-        std::string tabs = "";
-        for (uint32_t i = 0; i < indentation; i++) {
-          tabs += tab;
-        }
-
-        std::string s = utils::params_to_string(params, indentation);
-
-        if ((!params.empty()) && (!data.empty())) {
-          s += "," + nline + tabs;
-        }
-
-        std::string delim = "," + nline + tabs;
-        std::vector<std::string> buffer;
-
-        for (auto const &[key, samples] : data) {
-          size_t N = samples.size();
-          std::vector<std::string> sample_buffer1(N);
-          for (uint32_t i = 0; i < N; i++) {
-            size_t M = samples[i].size();
-            std::vector<std::string> sample_buffer2(M);
-            for (uint32_t j = 0; j < M; j++) {
-              sample_buffer2[j] = samples[i][j].to_string(record_error);
-            }
-
-            sample_buffer1[i] = "[" + utils::join(sample_buffer2, ", ") + "]";
-          }
-
-          buffer.push_back("\"" + key + "\": [" + utils::join(sample_buffer1, ", ") + "]");
-        }
-
-        s += utils::join(buffer, delim);
-        return s;
+        return glz::write_json(*this);
       }
 
       bool congruent(const DataSlide &ds, const utils::var_t_eq& equality_comparator) {
@@ -283,5 +230,10 @@ namespace dataframe {
         return dn;
       }
   };
+
+  template <>
+  void DataSlide::add_param(const std::string& s, const int t) { 
+    params[s] = static_cast<double>(t); 
+  }
 
 }

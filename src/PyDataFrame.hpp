@@ -161,7 +161,7 @@ namespace dataframe {
       .def("__contains__", &DataFrame::contains)
       .def("__getitem__", &DataFrame::get)
       .def("__setitem__", df_add_param2)
-      .def("__str__", &DataFrame::to_string, "write_error"_a = true)
+      .def("__str__", &DataFrame::to_string)
       .def("__add__", &DataFrame::combine)
       .def("__getstate__", [](const DataFrame& frame){ return frame.to_string(true); })
       .def("__setstate__", [](DataFrame& frame, const std::string& s){ new (&frame) DataFrame(s); })

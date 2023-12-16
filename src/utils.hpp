@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-#include <nlohmann/json.hpp>
+#include <glaze/glaze.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -107,10 +107,6 @@ namespace dataframe {
     }
 
     struct var_t_to_string {
-      std::string operator()(const int &i) const {
-        return std::to_string(i); 
-      }
-
       std::string operator()(const double &f) const {
         for (int exp = 6; exp <= 30; exp += 6) {
           double threshold = std::pow(10.0, -static_cast<double>(exp));
@@ -125,7 +121,7 @@ namespace dataframe {
       std::string operator()(const std::string &s) const {
         std::string tmp = s;
         escape_sequences(tmp);
-        return "\"" + tmp + "\""; 
+        return tmp;
       }
     };
 
@@ -140,9 +136,7 @@ namespace dataframe {
           return false;
         }
 
-        if (v.index() == 0) {
-          return std::get<int>(v) == std::get<int>(t);
-        } else if (v.index() == 1) { // comparing doubles is the tricky part
+        if (v.index() == 0) { // comparing doubles is the tricky part
           double vd = std::get<double>(v);
           double vt = std::get<double>(t);
 
@@ -167,28 +161,16 @@ namespace dataframe {
     };
 
     static bool operator<(const var_t& lhs, const var_t& rhs) {	
-      if (lhs.index() == 2 && rhs.index() == 2) {
+      if (lhs.index() == 1 && rhs.index() == 1) {
         return std::get<std::string>(lhs) < std::get<std::string>(rhs);
-      } else if (lhs.index() == 2 && rhs.index() != 2) {
+      } else if (lhs.index() == 1 && rhs.index() != 1) {
         return true;
-      } else if (lhs.index() != 2 && rhs.index() == 2) {
+      } else if (lhs.index() != 1 && rhs.index() == 1) {
         return false;
       }
 
-      double d1 = 0., d2 = 0.;
-      if (lhs.index() == 0) {
-        d1 = double(std::get<int>(lhs));
-      } else if (lhs.index() == 1) {
-        d1 = std::get<double>(lhs);
-      } else {
-        d1 = 0.;
-      }
-
-      if (rhs.index() == 0) {
-        d2 = double(std::get<int>(rhs));
-      } else if (rhs.index() == 1) {
-        d2 = std::get<double>(rhs);
-      }
+      double d1 = std::get<double>(lhs);
+      double d2 = std::get<double>(rhs);
 
       return d1 < d2;
     }
@@ -344,122 +326,142 @@ namespace dataframe {
     }
 
     template <class T>
-    T get(Params &params, const std::string& key) {
+    T get(const Params &params, const std::string& key) {
       if (!params.count(key)) {
         std::string error_message = "Key \"" + key + "\" not found in Params.";
         throw std::invalid_argument(error_message);
       }
-      return std::get<T>(params[key]);
+      return std::get<T>(params.at(key));
     }
 
-    template <class json_object>
-    static var_t parse_json_type(json_object p) {
-      if ((p.type() == nlohmann::json::value_t::number_integer) || 
-          (p.type() == nlohmann::json::value_t::number_unsigned) ||
-          (p.type() == nlohmann::json::value_t::boolean)) {
-        return var_t{(int) p};
-      }  else if (p.type() == nlohmann::json::value_t::number_float) {
-        return var_t{(double) p};
-      } else if (p.type() == nlohmann::json::value_t::string) {
-        return var_t{std::string(p)};
-      } else {
-        std::stringstream ss;
-        ss << "Invalid json item type on " << p << "; aborting.\n";
-        throw std::invalid_argument(ss.str());
+    template <>
+    int get(Params &params, const std::string& key, int defaultv) { 
+      if (params.count(key)) {
+        return std::round(std::get<double>(params[key]));
       }
+
+      params[key] = var_t{static_cast<double>(defaultv)};
+      return defaultv;
     }
 
-    static std::vector<Params> parse_config(nlohmann::json data, Params p, bool verbose) {
-      if (verbose) {
-        std::cout << "Loaded: \n" << data.dump() << "\n";
+    template <>
+    int get(const Params &params, const std::string& key) {
+      if (!params.count(key)) {
+        std::string error_message = "Key \"" + key + "\" not found in Params.";
+        throw std::invalid_argument(error_message);
       }
 
-      std::vector<Params> params;
-
-      // Dealing with model parameters
-      std::vector<std::map<std::string, var_t>> zparams;
-      std::string zparam_key;
-      bool found_zparam_key = false;
-      for (auto const& [key, val] : data.items()) {
-        if (key.find("zparams") != std::string::npos) {
-          zparam_key = key;
-          found_zparam_key = true;
-          break;
-        }
-      }
-
-      if (found_zparam_key) {
-        for (uint32_t i = 0; i < data[zparam_key].size(); i++) {
-          zparams.push_back(std::map<std::string, var_t>());
-          for (auto const &[key, val] : data[zparam_key][i].items()) {
-            if (data.contains(key)) {
-              std::stringstream ss;
-              ss << "Key " << key << " passed as a zipped parameter and an unzipped parameter; aborting.\n";
-              throw std::invalid_argument(ss.str());
-            }
-            zparams[i][key] = parse_json_type(val);
-          }
-        }
-
-        data.erase(zparam_key);
-      }
-
-      if (zparams.size() > 0) {
-        for (uint32_t i = 0; i < zparams.size(); i++) {
-          for (auto const &[k, v] : zparams[i]) {
-            p[k] = v;
-          }
-          std::vector<Params> new_params = parse_config(data, Params(p), false);
-          params.insert(params.end(), new_params.begin(), new_params.end());
-        }
-
-        return params;
-      }
-
-      // Dealing with config parameters
-      std::vector<std::string> scalars;
-      std::string vector_key; // Only need one for next recursive call
-      bool contains_vector = false;
-      for (auto const &[key, val] : data.items()) {
-        if (val.type() == nlohmann::json::value_t::array) {
-          vector_key = key;
-          contains_vector = true;
-        } else {
-          p[key] = parse_json_type(val);
-          scalars.push_back(key);
-        }
-      }
-
-      for (auto key : scalars) {
-        data.erase(key);
-      }
-
-      if (!contains_vector) {
-        params.push_back(p);
-      } else {
-        auto vals = data[vector_key];
-        data.erase(vector_key);
-        for (auto v : vals) {
-          p[vector_key] = parse_json_type(v);
-
-          std::vector<Params> new_params = parse_config(data, p, false);
-          params.insert(params.end(), new_params.begin(), new_params.end());
-        }
-      }
-
-      return params;
-
+      return std::round(std::get<double>(params.at(key)));
     }
 
-    static std::vector<Params> parse_config(nlohmann::json data, bool verbose=false) {
-      return parse_config(data, Params(), verbose);
-    }
+    //template <class json_object>
+    //static var_t parse_json_type(json_object p) {
+    //  if ((p.type() == nlohmann::json::value_t::number_integer) || 
+    //      (p.type() == nlohmann::json::value_t::number_unsigned) ||
+    //      (p.type() == nlohmann::json::value_t::boolean)) {
+    //    return var_t{(int) p};
+    //  }  else if (p.type() == nlohmann::json::value_t::number_float) {
+    //    return var_t{(double) p};
+    //  } else if (p.type() == nlohmann::json::value_t::string) {
+    //    return var_t{std::string(p)};
+    //  } else {
+    //    std::stringstream ss;
+    //    ss << "Invalid json item type on " << p << "; aborting.\n";
+    //    throw std::invalid_argument(ss.str());
+    //  }
+    //}
 
-    static std::vector<Params> parse_config(const std::string& s, bool verbose=false) {
-      std::string t(s);
-      std::replace(t.begin(), t.end(), '\'', '"');
-      return parse_config(nlohmann::json::parse(t), verbose);
-    }
+    //static std::vector<Params> parse_config(nlohmann::json data, Params p, bool verbose) {
+    //  if (verbose) {
+    //    std::cout << "Loaded: \n" << data.dump() << "\n";
+    //  }
+
+    //  std::vector<Params> params;
+
+    //  // Dealing with model parameters
+    //  std::vector<std::map<std::string, var_t>> zparams;
+    //  std::string zparam_key;
+    //  bool found_zparam_key = false;
+    //  for (auto const& [key, val] : data.items()) {
+    //    if (key.find("zparams") != std::string::npos) {
+    //      zparam_key = key;
+    //      found_zparam_key = true;
+    //      break;
+    //    }
+    //  }
+
+    //  if (found_zparam_key) {
+    //    for (uint32_t i = 0; i < data[zparam_key].size(); i++) {
+    //      zparams.push_back(std::map<std::string, var_t>());
+    //      for (auto const &[key, val] : data[zparam_key][i].items()) {
+    //        if (data.contains(key)) {
+    //          std::stringstream ss;
+    //          ss << "Key " << key << " passed as a zipped parameter and an unzipped parameter; aborting.\n";
+    //          throw std::invalid_argument(ss.str());
+    //        }
+    //        zparams[i][key] = parse_json_type(val);
+    //      }
+    //    }
+
+    //    data.erase(zparam_key);
+    //  }
+
+    //  if (zparams.size() > 0) {
+    //    for (uint32_t i = 0; i < zparams.size(); i++) {
+    //      for (auto const &[k, v] : zparams[i]) {
+    //        p[k] = v;
+    //      }
+    //      std::vector<Params> new_params = parse_config(data, Params(p), false);
+    //      params.insert(params.end(), new_params.begin(), new_params.end());
+    //    }
+
+    //    return params;
+    //  }
+
+    //  // Dealing with config parameters
+    //  std::vector<std::string> scalars;
+    //  std::string vector_key; // Only need one for next recursive call
+    //  bool contains_vector = false;
+    //  for (auto const &[key, val] : data.items()) {
+    //    if (val.type() == nlohmann::json::value_t::array) {
+    //      vector_key = key;
+    //      contains_vector = true;
+    //    } else {
+    //      p[key] = parse_json_type(val);
+    //      scalars.push_back(key);
+    //    }
+    //  }
+
+    //  for (auto key : scalars) {
+    //    data.erase(key);
+    //  }
+
+    //  if (!contains_vector) {
+    //    params.push_back(p);
+    //  } else {
+    //    auto vals = data[vector_key];
+    //    data.erase(vector_key);
+    //    for (auto v : vals) {
+    //      p[vector_key] = parse_json_type(v);
+
+    //      std::vector<Params> new_params = parse_config(data, p, false);
+    //      params.insert(params.end(), new_params.begin(), new_params.end());
+    //    }
+    //  }
+
+    //  return params;
+
+    //}
+
+    //static std::vector<Params> parse_config(nlohmann::json data, bool verbose=false) {
+    //  return parse_config(data, Params(), verbose);
+    //}
+
+    //static std::vector<Params> parse_config(const std::string& s, bool verbose=false) {
+    //  std::string t(s);
+    //  std::replace(t.begin(), t.end(), '\'', '"');
+    //  return parse_config(nlohmann::json::parse(t), verbose);
+    //}
 
     static std::string paramset_to_string(const std::vector<Params>& params) {
       std::set<std::string> keys;
