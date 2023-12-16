@@ -68,7 +68,7 @@ namespace dataframe {
       for (size_t i = 0; i < str.length(); ++i) {
         char *const c = str.data() + i;
 
-        for (auto const seq : sequences) {
+        for (auto const& seq : sequences) {
           if (*c == seq.first) {
             *c = seq.second;
             str.insert(i, "\\");
@@ -183,7 +183,7 @@ namespace dataframe {
       std::string operator()(const std::vector<var_t>& vec) const {
         var_t_to_string vt;
         std::vector<std::string> buffer(vec.size());
-        for (auto const val : vec) {
+        for (auto const& val : vec) {
           buffer.push_back(std::visit(vt, val));
         }
         return "[" + join(buffer, ", ") + "]";

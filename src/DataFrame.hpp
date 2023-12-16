@@ -44,6 +44,10 @@ namespace dataframe {
 
       DataFrame(const std::string& s) {
         auto pe = glz::read_json(*this, s);
+        if (pe) {
+          std::string error_message = "Error parsing DataFrame: \n" + glz::format_error(pe, s);
+          throw std::invalid_argument(error_message);
+        }
 
         if (metadata.count("atol")) {
           atol = std::get<double>(metadata.at("atol"));

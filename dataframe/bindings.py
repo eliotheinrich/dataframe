@@ -11,6 +11,10 @@ from dataframe.dataframe_bindings import *
 ATOL = 1e-6
 RTOL = 1e-5
 
+def parse_config(config):
+    for key in config:
+        pass
+
 
 class Config(ABC):
     def __init__(self, params):

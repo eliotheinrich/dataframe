@@ -102,8 +102,8 @@ namespace dataframe {
 
   // Provide this function to initialize dataframe in other projects
   void init_dataframe(nanobind::module_ &m) {
-    m.def("parse_config", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&utils::parse_config), "data"_a, "verbose"_a = false);
-    m.def("paramset_to_string", &utils::paramset_to_string);
+    //m.def("parse_config", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&utils::parse_config), "data"_a, "verbose"_a = false);
+    //m.def("paramset_to_string", &utils::paramset_to_string);
 
     // Need to statically cast overloaded templated methods
     void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
@@ -131,7 +131,7 @@ namespace dataframe {
       .def("__getitem__", &DataSlide::get_param)
       .def("__setitem__", ds_add_param2)
       .def("__str__", &DataSlide::to_string)
-      .def("__getstate__", [](const DataSlide& slide){ return slide.to_string_args(0, false, true); })
+      .def("__getstate__", [](const DataSlide& slide){ return slide.to_string(); })
       .def("__setstate__", [](DataSlide& slide, const std::string& s){ new (&slide) DataSlide(s); })
       .def("congruent", &DataSlide::congruent)
       .def("combine", &DataSlide::combine, "other"_a, "atol"_a = ATOL, "rtol"_a = RTOL);
@@ -163,7 +163,7 @@ namespace dataframe {
       .def("__setitem__", df_add_param2)
       .def("__str__", &DataFrame::to_string)
       .def("__add__", &DataFrame::combine)
-      .def("__getstate__", [](const DataFrame& frame){ return frame.to_string(true); })
+      .def("__getstate__", [](const DataFrame& frame){ return frame.to_string(); })
       .def("__setstate__", [](DataFrame& frame, const std::string& s){ new (&frame) DataFrame(s); })
       .def("write_json", &DataFrame::write_json)
       .def("promote_params", &DataFrame::promote_params)

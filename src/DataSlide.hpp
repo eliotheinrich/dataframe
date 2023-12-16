@@ -2,6 +2,7 @@
 
 #include "utils.hpp"
 #include "Sample.hpp"
+#include <stdexcept>
 
 namespace dataframe {
 
@@ -23,6 +24,10 @@ namespace dataframe {
 
       DataSlide(const std::string &s) {
         auto pe = glz::read_json(*this, s);
+        if (pe) {
+          std::string error_message = "Error parsing DataSlide: \n" + glz::format_error(pe, s);
+          throw std::invalid_argument(error_message);
+        }
       }
 
       DataSlide(const DataSlide& other) {
