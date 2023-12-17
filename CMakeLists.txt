@@ -33,11 +33,19 @@ if (DEFINED DF_MAIN_BUILDING)
     GIT_SHALLOW TRUE
   )
 
-  FetchContent_MakeAvailable(glaze)
+  FetchContent_Declare(
+    nlohmann
+    GIT_REPOSITORY https://github.com/nlohmann/json
+    GIT_TAG master
+    GIT_SHALLOW TRUE
+  )
+
+  FetchContent_MakeAvailable(glaze nlohmann)
 
   include_directories(
       src
       ${glaze_SOURCE_DIR}/include
+      ${nlohmann_SOURCE_DIR}/include
   )
 
   set(SRC_FILES 
@@ -66,22 +74,4 @@ if (DEFINED DF_MAIN_BUILDING)
   )
 
 endif()
-
-include(FetchContent)
-
-FetchContent_Declare(
-  glaze
-  GIT_REPOSITORY https://github.com/stephenberry/glaze.git
-  GIT_TAG main
-  GIT_SHALLOW TRUE
-)
-
-FetchContent_MakeAvailable(glaze)
-
-include_directories(
-    src
-    ${glaze_SOURCE_DIR}/include
-)
-
-add_executable(test src/test.cpp)
 

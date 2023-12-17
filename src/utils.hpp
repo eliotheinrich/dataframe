@@ -3,6 +3,7 @@
 #include "types.h"
 
 #include <glaze/glaze.hpp>
+#include <nlohmann/json.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -325,6 +326,16 @@ namespace dataframe {
       return defaultv;
     }
 
+    template <>
+    inline int get<int>(Params &params, const std::string& key, int defaultv) { 
+      if (params.count(key)) {
+        return std::round(std::get<double>(params[key]));
+      }
+
+      params[key] = var_t{static_cast<double>(defaultv)};
+      return defaultv;
+    }
+
     template <class T>
     T get(const Params &params, const std::string& key) {
       if (!params.count(key)) {
@@ -335,41 +346,26 @@ namespace dataframe {
     }
 
     template <>
-    int get(Params &params, const std::string& key, int defaultv) { 
-      if (params.count(key)) {
-        return std::round(std::get<double>(params[key]));
-      }
-
-      params[key] = var_t{static_cast<double>(defaultv)};
-      return defaultv;
+    inline int get<int>(const Params &params, const std::string& key) {
+      return std::round(get<double>(params, key));
     }
 
-    template <>
-    int get(const Params &params, const std::string& key) {
-      if (!params.count(key)) {
-        std::string error_message = "Key \"" + key + "\" not found in Params.";
-        throw std::invalid_argument(error_message);
+    template <class json_object>
+    static var_t parse_json_type(json_object p) {
+      if ((p.type() == nlohmann::json::value_t::number_integer) || 
+          (p.type() == nlohmann::json::value_t::number_unsigned) ||
+          (p.type() == nlohmann::json::value_t::boolean)) {
+        return var_t{static_cast<double>(p)};
+      }  else if (p.type() == nlohmann::json::value_t::number_float) {
+        return var_t{(double) p};
+      } else if (p.type() == nlohmann::json::value_t::string) {
+        return var_t{std::string(p)};
+      } else {
+        std::stringstream ss;
+        ss << "Invalid json item type on " << p << "; aborting.\n";
+        throw std::invalid_argument(ss.str());
       }
-
-      return std::round(std::get<double>(params.at(key)));
     }
-
-    //template <class json_object>
-    //static var_t parse_json_type(json_object p) {
-    //  if ((p.type() == nlohmann::json::value_t::number_integer) || 
-    //      (p.type() == nlohmann::json::value_t::number_unsigned) ||
-    //      (p.type() == nlohmann::json::value_t::boolean)) {
-    //    return var_t{(int) p};
-    //  }  else if (p.type() == nlohmann::json::value_t::number_float) {
-    //    return var_t{(double) p};
-    //  } else if (p.type() == nlohmann::json::value_t::string) {
-    //    return var_t{std::string(p)};
-    //  } else {
-    //    std::stringstream ss;
-    //    ss << "Invalid json item type on " << p << "; aborting.\n";
-    //    throw std::invalid_argument(ss.str());
-    //  }
-    //}
 
     //static std::vector<Params> parse_config(nlohmann::json data, Params p, bool verbose) {
     //  if (verbose) {

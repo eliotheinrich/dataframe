@@ -5,9 +5,12 @@
 #include <stdexcept>
 
 namespace dataframe {
+  class DataFrame;
 
   class DataSlide {
     public:
+      friend DataFrame;
+
       Params params;
       std::map<std::string, std::vector<std::vector<Sample>>> data;
 
@@ -25,6 +28,7 @@ namespace dataframe {
       DataSlide(const std::string &s) {
         auto pe = glz::read_json(*this, s);
         if (pe) {
+
           std::string error_message = "Error parsing DataSlide: \n" + glz::format_error(pe, s);
           throw std::invalid_argument(error_message);
         }
@@ -234,10 +238,41 @@ namespace dataframe {
 
         return dn;
       }
+
+    private:
+      static DataSlide _deserialize(const std::string& s) {
+        std::string trimmed = s;
+        uint32_t start_pos = trimmed.find_first_not_of(" \t\n\r");
+        uint32_t end_pos = trimmed.find_last_not_of(" \t\n\r");
+        trimmed = trimmed.substr(start_pos, end_pos - start_pos + 1);
+
+        nlohmann::json ds_json;
+        if (trimmed.empty() || trimmed.front() != '{' || trimmed.back() != '}') {
+          ds_json = nlohmann::json::parse("{" + trimmed + "}");
+        } else {
+          ds_json = nlohmann::json::parse(trimmed);
+        }
+
+        DataSlide slide;
+        for (auto const &[key, val] : ds_json.items()) {
+          if (val.type() == nlohmann::json::value_t::array) {
+            slide.add_data(key);
+
+            for (auto const &v : val) {
+              std::vector<Sample> samples = Sample::read_samples(v);
+              slide.push_data(key, samples);
+            }
+          } else {
+            slide.add_param(key, utils::parse_json_type(val));
+          }
+        }
+
+        return slide;
+      }
   };
 
   template <>
-  void DataSlide::add_param(const std::string& s, const int t) { 
+  inline void DataSlide::add_param(const std::string& s, const int t) { 
     params[s] = static_cast<double>(t); 
   }
 
