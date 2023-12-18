@@ -11,9 +11,52 @@ from dataframe.dataframe_bindings import *
 ATOL = 1e-6
 RTOL = 1e-5
 
-def parse_config(config):
+
+def parse_config(config, p=None):
+    params = []
+    if p is None:
+        p = {}
+
+    zparams = None
     for key in config:
-        pass
+        if key.startswith("zparams"):
+            zparams = config[key]
+            del config[key]
+            break
+
+    if zparams is not None:
+        for zp in zparams:
+            for key, val in zp.items():
+                if key in config:
+                    raise ValueError(f"Key {key} passed as a zipped parameter and an unzipped parameter; aborting.")
+
+                p[key] = val
+            params += parse_config(config.copy(), p.copy())
+
+        return params
+
+    scalar_keys = []
+    vector_key = None
+    for key, val in config.items():
+        if hasattr(val, "__iter__") and not isinstance(val, str):
+            vector_key = key
+        else:
+            p[key] = val
+            scalar_keys.append(key)
+
+    for key in scalar_keys:
+        del config[key]
+
+    if vector_key is None:
+        params.append(p)
+    else:
+        vals = config[vector_key]
+        del config[vector_key]
+        for v in vals:
+            p[vector_key] = v
+            params += parse_config(config.copy(), p.copy())
+
+    return params
 
 
 class Config(ABC):
@@ -32,6 +75,10 @@ class Config(ABC):
 
     @abstractmethod
     def compute(self, num_threads):
+        pass
+
+    @abstractmethod
+    def clone(self):
         pass
 
 
@@ -193,28 +240,3 @@ def load_json(filename: str, verbose: bool = False) -> list:
 
 def write_config(params: list) -> str:
     return paramset_to_string(params)
-
-#def field_to_string(field) -> str:
-#    if isinstance(field, str):
-#        return f'"{field}"'
-#    elif isinstance(field, bool):
-#        return 'true' if field else 'false'
-#    else:
-#        try:
-#            iterator = iter(field)
-#            return '[' + ', '.join([field_to_string(i) for i in iterator]) + ']'
-#        except TypeError:
-#            pass
-#        
-#        return str(field)
-#
-#def config_to_string(config: dict) -> str:
-#    s = "{\n"
-#    lines = []
-#    for key, val in config.items():
-#        if key[:7] == 'zparams':
-#            v = '[' + ', '.join([config_to_string(p).replace('\n', '').replace('\t', '').replace(',', ', ').replace('\'', '"') for p in val]) + ']'
-#        else:
-#            v = field_to_string(val)
-#        lines.append(f"\t\"{key}\": {v}")
-#    s += ',\n'.join(lines) + '\n}'

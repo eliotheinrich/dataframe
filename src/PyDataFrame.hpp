@@ -102,8 +102,7 @@ namespace dataframe {
 
   // Provide this function to initialize dataframe in other projects
   void init_dataframe(nanobind::module_ &m) {
-    //m.def("parse_config", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&utils::parse_config), "data"_a, "verbose"_a = false);
-    //m.def("paramset_to_string", &utils::paramset_to_string);
+    m.def("paramset_to_string", &utils::paramset_to_string);
 
     // Need to statically cast overloaded templated methods
     void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
@@ -165,7 +164,7 @@ namespace dataframe {
       .def("__add__", &DataFrame::combine)
       .def("__getstate__", [](const DataFrame& frame){ return frame.to_string(); })
       .def("__setstate__", [](DataFrame& frame, const std::string& s){ new (&frame) DataFrame(s); })
-      .def("write_json", &DataFrame::write_json)
+      .def("write", &DataFrame::write)
       .def("promote_params", &DataFrame::promote_params)
       .def("reduce", &DataFrame::reduce)
       .def("filter", &DataFrame::filter, "constraints"_a, "filter"_a)

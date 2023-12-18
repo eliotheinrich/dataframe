@@ -34,8 +34,6 @@ namespace dataframe {
 
         std::unique_ptr<SimulatorType> simulator = std::make_unique<SimulatorType>(params, num_threads);
 
-        simulator->equilibration_timesteps(equilibration_timesteps);
-
         int num_timesteps, num_intervals;
         if (sampling_timesteps == 0) {
           num_timesteps = 0;
@@ -45,23 +43,28 @@ namespace dataframe {
           num_intervals = sampling_timesteps/measurement_freq;
         }
 
-        std::map<std::string, std::vector<std::vector<Sample>>> samples;
+        simulator->equilibration_timesteps(equilibration_timesteps);
 
-        for (int t = 0; t < num_intervals; t++) {
-          simulator->timesteps(num_timesteps);
-          data_t sample = simulator->take_samples();
-          for (auto const &[key, val] : sample) {
-            samples[key].push_back(val);
-          }
+        simulator->timesteps(num_timesteps);
+        data_t sample = simulator->take_samples();
+        for (auto const &[key, val] : sample) {
+          slide.add_data(key);
+          slide.push_data(key, val);
         }
 
-        for (auto const &[key, ksamples] : samples) {
-          slide.add_data(key);
+
+        for (int t = 1; t < num_intervals; t++) {
+          simulator->timesteps(num_timesteps);
+          sample = simulator->take_samples();
           if (temporal_avg) {
-            slide.push_data(key, Sample::collapse_samples(ksamples));
+            for (auto const &[key, val] : sample) {
+              for (uint32_t i = 0; i < val.size(); i++) {
+                slide.data[key][0][i] = slide.data[key][0][i].combine(val[i]);
+              }
+            }
           } else {
-            for (auto s : ksamples) {
-              slide.push_data(key, s);
+            for (auto const &[key, val] : sample) {
+              slide.data[key].push_back(val);
             }
           }
         }

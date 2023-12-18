@@ -51,31 +51,32 @@ namespace dataframe {
       }
 
       DataFrame(const std::string& s) {
-        auto pe = glz::read_json(*this, s);
+        auto pe = glz::read_json(*this, s); // try json deserialization
         if (pe) {
-          // glaze deserialization failed; try deprecated deserialization
-          try {
-            *this = deserialize(s);
-          } catch (const std::runtime_error &e) {
-            std::string error_message = "Error parsing DataFrame: \n" + glz::format_error(pe, s);
-            throw std::invalid_argument(error_message);
+          pe = glz::read_binary(*this, s); // try binary deserialization
+            if (pe) {
+              try {
+                *this = deserialize(s); // try deprecated deserialization
+              } catch (const std::runtime_error &e) {
+                std::string error_message = "Error parsing DataFrame: \n" + glz::format_error(pe, s);
+                throw std::invalid_argument(error_message);
+              }
           }
-        } else {
-          std::cout << "Successfully did new deserialize\n";
-          if (metadata.count("atol")) {
-            atol = std::get<double>(metadata.at("atol"));
-          } else {
-            atol = ATOL;
-          }
-
-          if (metadata.count("rtol")) {
-            rtol = std::get<double>(metadata.at("rtol"));
-          } else {
-            rtol = RTOL;
-          }
-
-          init_qtable();
         }
+
+        if (metadata.count("atol")) {
+          atol = std::get<double>(metadata.at("atol"));
+        } else {
+          atol = ATOL;
+        }
+
+        if (metadata.count("rtol")) {
+          rtol = std::get<double>(metadata.at("rtol"));
+        } else {
+          rtol = RTOL;
+        }
+
+        init_qtable();
       }
 
       DataFrame(const DataFrame& other) : atol(other.atol), rtol(other.rtol) {
@@ -174,16 +175,29 @@ namespace dataframe {
         return glz::write_json(*this);
       }
 
-      void write_json(const std::string& filename, bool record_error=false) const {
-        std::string s = to_string();
+      std::string to_binary() const {
+        return glz::write_binary(*this);
+      }
 
-        // Save to file
-        if (!std::remove(filename.c_str())) {
-          std::cout << "Deleting old data\n";
+      std::string to_json() const {
+        return glz::prettify(glz::write_json(*this), false, 2);
+      }
+
+      void write(const std::string& filename) const {
+        std::vector<std::string> components = utils::split(filename, ".");
+        std::string extension = components[components.size() - 1];
+        std::string content;
+        if (extension == "json") {
+          content = to_json();
+        } else if (extension == "eve") {
+          content = to_binary();
+        } else {
+          content = to_json();
         }
 
+        // Save to file
         std::ofstream output_file(filename);
-        output_file << s;
+        output_file << content;
         output_file.close();
       }
 
@@ -471,6 +485,7 @@ namespace dataframe {
       std::map<std::string, std::vector<var_t>> key_vals;
 
       static DataFrame deserialize(const std::string& s) {
+        // Deprecated json deserialization
         DataFrame frame;
 
         nlohmann::json data = nlohmann::json::parse(s);
@@ -497,7 +512,7 @@ namespace dataframe {
         }
 
         for (auto const &slide_str : data["slides"]) {
-          frame.add_slide(DataSlide::_deserialize(slide_str.dump()));
+          frame.add_slide(DataSlide::deserialize(slide_str.dump()));
         }
 
         return frame;

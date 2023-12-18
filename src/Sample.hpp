@@ -25,6 +25,8 @@ namespace dataframe {
       }
 
       Sample(const std::string &s) {
+        // Deprecated json deserialization
+        
         if (!Sample::is_valid(s)) {
           std::string error_message = "Invalid string \"" + s + "\" provided to Sample(std::string).";
           throw std::invalid_argument(error_message);
@@ -61,6 +63,8 @@ namespace dataframe {
       }
 
       static std::vector<Sample> read_samples(const nlohmann::json& arr) {
+        // Deprecated json deserialization
+
         if (!arr.is_array()) {
           throw std::invalid_argument("Invalid value passed to read_samples.");
         }

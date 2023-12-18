@@ -240,7 +240,9 @@ namespace dataframe {
       }
 
     private:
-      static DataSlide _deserialize(const std::string& s) {
+      static DataSlide deserialize(const std::string& s) {
+        // Deprecated json deserialization
+
         std::string trimmed = s;
         uint32_t start_pos = trimmed.find_first_not_of(" \t\n\r");
         uint32_t end_pos = trimmed.find_last_not_of(" \t\n\r");
