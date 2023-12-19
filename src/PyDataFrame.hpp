@@ -36,7 +36,7 @@ using namespace nanobind::literals;
 namespace dataframe {
 
   typedef nanobind::ndarray<nanobind::numpy, double> py_nbarray;
-  typedef std::variant<var_t, std::vector<var_t>, py_nbarray> py_query_t;
+  typedef std::variant<qvar_t, std::vector<qvar_t>, py_nbarray> py_query_t;
   typedef std::variant<py_query_t, std::vector<py_query_t>> py_query_result;
 
   size_t get_query_size(const query_t& q) {
@@ -67,10 +67,10 @@ namespace dataframe {
       my_data = data;
     }
 
-    py_query_t operator()(const var_t& v) const { 
+    py_query_t operator()(const qvar_t& v) const { 
       return v;
     }
-    py_query_t operator()(const std::vector<var_t>& v) const { 
+    py_query_t operator()(const std::vector<qvar_t>& v) const { 
       return v; 
     }
     py_query_t operator()(const nbarray &data) const {
@@ -102,8 +102,6 @@ namespace dataframe {
 
   // Provide this function to initialize dataframe in other projects
   void init_dataframe(nanobind::module_ &m) {
-    m.def("paramset_to_string", &utils::paramset_to_string);
-
     // Need to statically cast overloaded templated methods
     void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
     void (DataSlide::*ds_add_param2)(const std::string&, var_t const&) = &DataSlide::add_param;

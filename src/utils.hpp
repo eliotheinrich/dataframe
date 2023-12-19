@@ -107,22 +107,40 @@ namespace dataframe {
       }
     }
 
-    struct var_t_to_string {
-      std::string operator()(const double &f) const {
-        for (int exp = 6; exp <= 30; exp += 6) {
-          double threshold = std::pow(10.0, -static_cast<double>(exp));
-          if (f > threshold) {
-            return to_string_with_precision(f, exp);
-          }
+    struct qvar_t_eq {
+      double atol;
+      double rtol;
+
+      qvar_t_eq(double atol=ATOL, double rtol=RTOL) : atol(atol), rtol(rtol) {}
+
+      bool operator()(const qvar_t& v, const qvar_t& t) const {
+        if (v.index() != t.index()) {
+          return false;
         }
 
-        return "0.000000";
-      }
+        if (v.index() == 0) {
+          return std::get<std::string>(v) == std::get<std::string>(t);
+        } else if (v.index() == 1) {
+          return std::get<int>(v) == std::get<int>(t);
+        } else { // Comparing doubles is the hard part
+          double vd = std::get<double>(v);
+          double vt = std::get<double>(t);
 
-      std::string operator()(const std::string &s) const {
-        std::string tmp = s;
-        escape_sequences(tmp);
-        return tmp;
+          // check absolute tolerance first
+          if (std::abs(vd - vt) < atol) {
+            return true;
+          }
+
+          double max_val = std::max(std::abs(vd), std::abs(vt));
+
+          // both numbers are very small; use absolute comparison
+          if (max_val < std::numeric_limits<double>::epsilon()) {
+            return std::abs(vd - vt) < atol;
+          }
+
+          // resort to relative tolerance
+          return std::abs(vd - vt)/max_val < rtol;
+        }
       }
     };
 
@@ -161,6 +179,21 @@ namespace dataframe {
       }
     };
 
+    static bool operator<(const qvar_t& lhs, const qvar_t& rhs) {	
+      if (lhs.index() == 0 && rhs.index() == 0) {
+        return std::get<std::string>(lhs) < std::get<std::string>(rhs);
+      } else if (lhs.index() == 0 && rhs.index() != 0) {
+        return true;
+      } else if (lhs.index() != 0 && rhs.index() == 0) {
+        return false;
+      }
+
+      double d1 = (lhs.index() == 1) ? static_cast<double>(std::get<int>(lhs)) : std::get<double>(lhs);
+      double d2 = (rhs.index() == 1) ? static_cast<double>(std::get<int>(rhs)) : std::get<double>(rhs);
+
+      return d1 < d2;
+    }
+
     static bool operator<(const var_t& lhs, const var_t& rhs) {	
       if (lhs.index() == 1 && rhs.index() == 1) {
         return std::get<std::string>(lhs) < std::get<std::string>(rhs);
@@ -176,79 +209,41 @@ namespace dataframe {
       return d1 < d2;
     }
 
-    struct query_t_to_string {
-      std::string operator()(const var_t& v) const {
-        return std::visit(var_t_to_string(), v); 
+    struct var_to_qvar {
+      double atol;
+
+      qvar_t operator()(const std::string& s) {
+        return qvar_t{s};
       }
 
-      std::string operator()(const std::vector<var_t>& vec) const {
-        var_t_to_string vt;
-        std::vector<std::string> buffer(vec.size());
-        for (auto const& val : vec) {
-          buffer.push_back(std::visit(vt, val));
+      qvar_t operator()(double d) {
+        int di = std::round(d);
+        if (std::abs(d - static_cast<double>(di)) < atol) {
+          return qvar_t{di};
+        } else {
+          return qvar_t{d};
         }
-        return "[" + join(buffer, ", ") + "]";
-      }
-
-      std::string operator()(const nbarray& arr) const {
-        var_t_to_string vt;
-
-        size_t N = arr.size();
-
-        std::vector<std::string> buffer1(N);
-        for (size_t i = 0; i < N; i++) {
-          size_t M = arr[i].size();
-          std::vector<std::string> buffer2(M);
-          for (size_t j = 0; j < M; j++) {
-            size_t K = arr[i][j].size();
-            std::vector<std::string> buffer3(K);
-            for (size_t k = 0; k < K; k++) {
-              double d = arr[i][j][k];
-              buffer3[k] = std::visit(vt, var_t{d});
-            }
-            buffer2[j] = "[" + join(buffer3, ", ") + "]";
-          }
-
-          buffer1[i] = "[" + join(buffer2, ", ") + "]";
-        }
-
-        return "[" + join(buffer1, "\n") + "]";
-      }
-    };
-
-    struct query_to_string {
-      std::string operator()(const query_t& q) { 
-        return std::visit(query_t_to_string(), q); 
-      }
-
-      std::string operator()(const std::vector<query_t>& results) { 
-        std::vector<std::string> buffer;
-        for (auto const& q : results) {
-          buffer.push_back(std::visit(query_t_to_string(), q));
-        }
-
-        return "[" + join(buffer, ", ") + "]";
       }
     };
 
     struct make_query_t_unique {
-      var_t_eq var_visitor;
+      qvar_t_eq var_visitor;
 
       make_query_t_unique(double atol=ATOL, double rtol=RTOL) {
-        var_visitor = var_t_eq{atol, rtol};
+        var_visitor = qvar_t_eq{atol, rtol};
       }
 
-      query_t operator()(const var_t& v) const { 
-        return std::vector<var_t>{v}; 
+      query_t operator()(const qvar_t& v) const { 
+        return std::vector<qvar_t>{v}; 
       }
 
-      query_t operator()(const std::vector<var_t>& vec) const {
-        std::vector<var_t> return_vals;
+      query_t operator()(const std::vector<qvar_t>& vec) const {
+        std::vector<qvar_t> return_vals;
 
         for (auto const &tar_val : vec) {
-          auto result = std::find_if(return_vals.begin(), return_vals.end(), [tar_val, &var_visitor=var_visitor](const var_t& val) {
-              return var_visitor(tar_val, val);
-              });
+          auto result = std::find_if(return_vals.begin(), return_vals.end(), [tar_val, &var_visitor=var_visitor](const qvar_t& val) {
+            return var_visitor(tar_val, val);
+          });
 
           if (result == return_vals.end()) {
             return_vals.push_back(tar_val);
@@ -291,29 +286,6 @@ namespace dataframe {
       }
 
       return true;
-    }
-
-    static std::string params_to_string(const Params& params, uint32_t indentation=0) {
-      std::string s = "";
-
-      for (uint32_t i = 0; i < indentation; i++) {
-        s += "\t";
-      }
-
-      std::vector<std::string> buffer;
-
-      for (auto const &[key, field] : params) {
-        buffer.push_back("\"" + key + "\": " + std::visit(var_t_to_string(), field));
-      }
-
-      std::string delim = ",\n";
-      for (uint32_t i = 0; i < indentation; i++) {
-        delim += "\t";
-      }
-
-      s += join(buffer, delim);
-
-      return s;
     }
 
     template <class T>
@@ -368,53 +340,5 @@ namespace dataframe {
         throw std::invalid_argument(ss.str());
       }
     }
-
-    static std::string paramset_to_string(const std::vector<Params>& params) {
-      std::set<std::string> keys;
-      std::map<std::string, std::set<var_t>> vals;
-      for (auto const &p : params) {
-        for (auto const &[k, v] : p) {
-          keys.insert(k);
-          if (!vals.count(k)) {
-            vals[k] = std::set<var_t>();
-          }
-
-          vals[k].insert(v);
-        }
-      }
-
-      std::string s = "{\n";
-      std::vector<std::string> buffer1;
-      for (auto const &key : keys) {
-        std::string b1 = "\t\"" + key + "\": ";
-
-        if (vals[key].size() > 1) {
-          b1 += "[";
-        }
-
-        std::vector<std::string> buffer2;
-        std::vector<var_t> sorted_vals(vals[key].begin(), vals[key].end());
-        std::sort(sorted_vals.begin(), sorted_vals.end());
-
-        for (auto val : sorted_vals) {
-          buffer2.push_back(std::visit(var_t_to_string(), val));
-        }
-
-        b1 += join(buffer2, ", ");
-
-        if (vals[key].size() > 1) {
-          b1 += "]";
-        }
-
-        buffer1.push_back(b1);
-      }
-
-      s += join(buffer1, ",\n");
-
-      s += "\n}";
-
-      return s;
-    }
-
   }
 }

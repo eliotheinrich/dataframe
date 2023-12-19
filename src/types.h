@@ -23,6 +23,7 @@ typedef std::map<std::string, var_t> Params;
 // 2.) Slide-level param -> std::vector<var_t>
 // 3.) Vector data -> nbarray
 typedef std::vector<std::vector<std::vector<double>>> nbarray;
-typedef std::variant<var_t, std::vector<var_t>, nbarray> query_t;
+typedef std::variant<std::string, int, double> qvar_t;
+typedef std::variant<qvar_t, std::vector<qvar_t>, nbarray> query_t;
 
 }

@@ -311,19 +311,24 @@ namespace dataframe {
         // Compile result of query
         std::vector<query_t> result;
 
+        utils::var_to_qvar parser{atol};
+
         for (auto const& key : keys) {
           query_t key_result;
-          if (params.count(key)) {
-            key_result = query_t{params[key]};
-          } else if (metadata.count(key)) {
-            key_result = query_t{metadata[key]};
-          } else if (slides[*inds.begin()].params.count(key)) {
-            std::vector<var_t> param_vals;
+          if (params.count(key)) { // Frame-level param
+            qvar_t val = std::visit(parser, params[key]);
+            key_result = query_t{val};
+          } else if (metadata.count(key)) { // Metadata param
+            qvar_t val = std::visit(parser, metadata[key]);
+            key_result = query_t{val};
+          } else if (slides[*inds.begin()].params.count(key)) { // Slide-level param
+            std::vector<qvar_t> param_vals;
             for (auto const i : inds) {
-              param_vals.push_back(slides[i].params[key]);
+              qvar_t val = std::visit(parser, slides[i].params[key]);
+              param_vals.push_back(val);
             }
             key_result = query_t{param_vals};
-          } else {
+          } else { // Data
             std::vector<std::vector<std::vector<double>>> data_vals;
 
             if (error) {
