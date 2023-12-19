@@ -179,7 +179,7 @@ namespace dataframe {
       }
     };
 
-    static bool operator<(const qvar_t& lhs, const qvar_t& rhs) {	
+    static bool qvar_t_comparison(const qvar_t& lhs, const qvar_t& rhs) {
       if (lhs.index() == 0 && rhs.index() == 0) {
         return std::get<std::string>(lhs) < std::get<std::string>(rhs);
       } else if (lhs.index() == 0 && rhs.index() != 0) {
@@ -194,7 +194,7 @@ namespace dataframe {
       return d1 < d2;
     }
 
-    static bool operator<(const var_t& lhs, const var_t& rhs) {	
+    static bool var_t_comparison(const var_t& lhs, const var_t& rhs) {	
       if (lhs.index() == 1 && rhs.index() == 1) {
         return std::get<std::string>(lhs) < std::get<std::string>(rhs);
       } else if (lhs.index() == 1 && rhs.index() != 1) {
@@ -241,16 +241,18 @@ namespace dataframe {
         std::vector<qvar_t> return_vals;
 
         for (auto const &tar_val : vec) {
-          auto result = std::find_if(return_vals.begin(), return_vals.end(), [tar_val, &var_visitor=var_visitor](const qvar_t& val) {
-            return var_visitor(tar_val, val);
-          });
+          auto result = std::find_if(return_vals.begin(), return_vals.end(), 
+            [tar_val, &var_visitor=var_visitor](const qvar_t& val) {
+              return var_visitor(tar_val, val);
+            }
+          );
 
           if (result == return_vals.end()) {
             return_vals.push_back(tar_val);
           }
         }
 
-        std::sort(return_vals.begin(), return_vals.end());
+        std::sort(return_vals.begin(), return_vals.end(), qvar_t_comparison);
 
         return return_vals;
       }
