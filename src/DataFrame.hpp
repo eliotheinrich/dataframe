@@ -42,7 +42,7 @@ namespace dataframe {
         }
       }
 
-      DataFrame(const std::vector<std::byte>& data) {
+      DataFrame(const std::vector<uint8_t>& data) {
         auto pe = glz::read_binary(*this, data);
         if (pe) {
           std::string error_message = "Error parsing DataFrame from binary.";
@@ -53,14 +53,11 @@ namespace dataframe {
       DataFrame(const std::string& s) {
         auto pe = glz::read_json(*this, s); // try json deserialization
         if (pe) {
-          pe = glz::read_binary(*this, s); // try binary deserialization
-            if (pe) {
-              try {
-                *this = deserialize(s); // try deprecated deserialization
-              } catch (const std::runtime_error &e) {
-                std::string error_message = "Error parsing DataFrame: \n" + glz::format_error(pe, s);
-                throw std::invalid_argument(error_message);
-              }
+          try {
+            *this = deserialize(s); // try deprecated deserialization
+          } catch (const std::runtime_error &e) {
+            std::string error_message = "Error parsing DataFrame: \n" + glz::format_error(pe, s);
+            throw std::invalid_argument(error_message);
           }
         }
 
@@ -175,8 +172,10 @@ namespace dataframe {
         return glz::write_json(*this);
       }
 
-      std::string to_binary() const {
-        return glz::write_binary(*this);
+      std::vector<std::byte> to_binary() const {
+        std::vector<std::byte> data;
+        glz::write_binary(*this, data);
+        return data;
       }
 
       std::string to_json() const {
@@ -186,19 +185,17 @@ namespace dataframe {
       void write(const std::string& filename) const {
         std::vector<std::string> components = utils::split(filename, ".");
         std::string extension = components[components.size() - 1];
-        std::string content;
-        if (extension == "json") {
-          content = to_json();
-        } else if (extension == "eve") {
-          content = to_binary();
+        if (extension == "eve") {
+          std::vector<std::byte> content = to_binary();
+          std::ofstream output_file(filename, std::ios::out | std::ios::binary);
+          output_file.write(reinterpret_cast<const char*>(&content[0]), content.size());
+          output_file.close();
         } else {
-          content = to_json();
+          std::string content = to_json();
+          std::ofstream output_file(filename);
+          output_file << content;
+          output_file.close();
         }
-
-        // Save to file
-        std::ofstream output_file(filename);
-        output_file << content;
-        output_file.close();
       }
 
       bool field_congruent(const std::string& s) const {

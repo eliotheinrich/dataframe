@@ -147,6 +147,7 @@ namespace dataframe {
       .def(nanobind::init<const Params&, const std::vector<DataSlide>&>())
       .def(nanobind::init<const std::string&>())
       .def(nanobind::init<const DataFrame&>())
+      .def(nanobind::init<const std::vector<uint8_t>&>())
       .def_rw("params", &DataFrame::params)
       .def_rw("slides", &DataFrame::slides)
       .def_rw("atol", &DataFrame::atol)
