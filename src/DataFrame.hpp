@@ -33,6 +33,8 @@ namespace dataframe {
         for (uint32_t i = 0; i < slides.size(); i++) {
           add_slide(slides[i]);
         }
+
+        init_qtable();
       }
 
       DataFrame(const Params& params, const std::vector<DataSlide>& slides) : atol(ATOL), rtol(RTOL) {
@@ -40,6 +42,8 @@ namespace dataframe {
         for (uint32_t i = 0; i < slides.size(); i++) {
           add_slide(slides[i]); 
         }
+
+        init_qtable();
       }
 
       DataFrame(const std::vector<uint8_t>& data) {
@@ -48,6 +52,8 @@ namespace dataframe {
           std::string error_message = "Error parsing DataFrame from binary.";
           throw std::invalid_argument(error_message);
         }
+
+        init_qtable();
       }
 
       DataFrame(const std::string& s) {
@@ -88,6 +94,8 @@ namespace dataframe {
         for (auto const& slide : other.slides) {
           add_slide(DataSlide(slide));
         }
+
+        init_qtable();
       }
 
       void add_slide(const DataSlide& ds) {
