@@ -25,7 +25,10 @@ namespace dataframe {
         );
       };
 
-      DataFrame() : atol(ATOL), rtol(RTOL) {}
+      DataFrame() {
+        init_tolerance();
+        init_qtable();
+      }
 
       DataFrame(double atol, double rtol) : atol(atol), rtol(rtol) {}
 
@@ -34,6 +37,7 @@ namespace dataframe {
           add_slide(slides[i]);
         }
 
+        init_tolerance();
         init_qtable();
       }
 
@@ -43,6 +47,7 @@ namespace dataframe {
           add_slide(slides[i]); 
         }
 
+        init_tolerance();
         init_qtable();
       }
 
@@ -53,6 +58,7 @@ namespace dataframe {
           throw std::invalid_argument(error_message);
         }
 
+        init_tolerance();
         init_qtable();
       }
 
@@ -79,6 +85,7 @@ namespace dataframe {
           rtol = RTOL;
         }
 
+        init_tolerance();
         init_qtable();
       }
 
@@ -95,6 +102,7 @@ namespace dataframe {
           add_slide(DataSlide(slide));
         }
 
+        init_tolerance();
         init_qtable();
       }
 
@@ -526,6 +534,20 @@ namespace dataframe {
         }
 
         return frame;
+      }
+
+      void init_tolerance() {
+        if (metadata.count("atol")) {
+          atol = std::get<double>(metadata.at("atol"));
+        } else {
+          atol = ATOL;
+        }
+
+        if (metadata.count("rtol")) {
+          rtol = std::get<double>(metadata.at("rtol"));
+        } else {
+          rtol = RTOL;
+        }
       }
 
       uint32_t corresponding_ind(

@@ -16,6 +16,20 @@ namespace dataframe {
 
   namespace utils {
 
+    struct var_t_to_string {
+      std::string operator()(const std::string& s) {
+        return s;
+      }
+
+      std::string operator()(const double d) {
+        return std::to_string(d);
+      }
+
+      std::string operator()(const int i) {
+        return std::to_string(i);
+      }
+    };
+
     static std::string join(const std::vector<std::string>& v, const std::string& delim) {
       std::string s = "";
       for (const auto& i : v) {
