@@ -20,10 +20,6 @@ namespace dataframe {
 
       virtual ~Config() {}
 
-      std::string to_string() const {
-        return "{" + utils::params_to_string(params) + "}";
-      }
-
       uint32_t get_nruns() const { 
         return num_runs;
       }

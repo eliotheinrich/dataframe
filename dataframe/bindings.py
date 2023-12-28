@@ -12,6 +12,53 @@ ATOL = 1e-6
 RTOL = 1e-5
 
 
+def parse_config(config, p=None):
+    params = []
+    if p is None:
+        p = {}
+
+    zparams = None
+    for key in config:
+        if key.startswith("zparams"):
+            zparams = config[key]
+            del config[key]
+            break
+
+    if zparams is not None:
+        for zp in zparams:
+            for key, val in zp.items():
+                if key in config:
+                    raise ValueError(f"Key {key} passed as a zipped parameter and an unzipped parameter; aborting.")
+
+                p[key] = val
+            params += parse_config(config.copy(), p.copy())
+
+        return params
+
+    scalar_keys = []
+    vector_key = None
+    for key, val in config.items():
+        if hasattr(val, "__iter__") and not isinstance(val, str):
+            vector_key = key
+        else:
+            p[key] = val
+            scalar_keys.append(key)
+
+    for key in scalar_keys:
+        del config[key]
+
+    if vector_key is None:
+        params.append(p)
+    else:
+        vals = config[vector_key]
+        del config[vector_key]
+        for v in vals:
+            p[vector_key] = v
+            params += parse_config(config.copy(), p.copy())
+
+    return params
+
+
 class Config(ABC):
     def __init__(self, params):
         self.params = params
@@ -28,6 +75,10 @@ class Config(ABC):
 
     @abstractmethod
     def compute(self, num_threads):
+        pass
+
+    @abstractmethod
+    def clone(self):
         pass
 
 
@@ -81,13 +132,10 @@ class ParallelCompute:
         self.parallelization_type = metadata.setdefault("parallelization_type", self.SERIAL)
         self.record_error = metadata.setdefault("record_error", True)
         self.dataframe = DataFrame(self.atol, self.rtol)
+        
+        self.batch_size = metadata.setdefault("batch_size", 1024)
 
         self.num_slides = None
-
-    def write_json(self, filename):
-        s = str(self.dataframe)
-        with open(filename, 'w') as f:
-            f.write(s)
 
     def compute(self, verbose=True):
         start_time = time.time()
@@ -158,30 +206,54 @@ class ParallelCompute:
         return slides
 
     def compute_pool(self, total_configs, verbose):
+        num_configs = len(total_configs)
         if verbose:
             print(f"Computing in parallel. {self.num_threads} threads available.")
             print(f"num_configs: {len(self.configs)}")
-            print(f"total_runs: {len(total_configs)}")
+            print(f"total_runs: {num_configs}")
 
         slides = [None for _ in range(self.num_slides)]
+        
+        progress = tqdm.tqdm(range(num_configs))
         with ProcessPoolExecutor(max_workers=self.num_threads) as pool:
-            futures = [pool.submit(ParallelCompute._do_run, config, self.num_threads_per_task, i) for i,config in total_configs]
-            completed_futures = concurrent.futures.as_completed(futures)
-            if verbose:
-                completed_futures = tqdm.tqdm(completed_futures, total=len(futures))
+            # Batch configs so that if num_configs is very large; ProcessPoolExecutor needs a copy of
+            # total_configs for each process, so want to avoid creating num_configs**2 copies.
+            num_batches = num_configs//self.batch_size
+            last_batch_larger = num_configs % self.batch_size <= self.num_threads
+            if not last_batch_larger:
+                num_batches += 1
+                
+            for i in range(0, num_batches):
+                i1 = i*self.batch_size
+                if last_batch_larger and i == num_batches - 1:
+                    i2 = num_configs
+                else:
+                    i2 = min((i+1)*self.batch_size, num_configs)
+                    
+                futures = [pool.submit(ParallelCompute._do_run, config, self.num_threads_per_task, i) for i,config in total_configs[i1:i2]]
+                completed_futures = concurrent.futures.as_completed(futures)
 
-            for future in completed_futures:
-                id, slide = future.result()
+                for future in completed_futures:
+                    id, slide = future.result()
 
-                slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
+                    slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
+                    
+                    if verbose:
+                        progress.update(1)
 
         return slides
 
 def load_data(filename: str) -> DataFrame:
-    with open(filename, 'r') as f:
-        s = f.read()
-
-    return DataFrame(s)
+    extension = filename.split(".")[-1]
+    if extension == "json":
+        with open(filename, 'r') as f:
+            s = f.read()
+            return DataFrame(s)
+    
+    elif extension == "eve":
+        with open(filename, 'rb') as f:
+            s = list(bytearray(f.read()))
+            return DataFrame(s)
 
 def load_json(filename: str, verbose: bool = False) -> list:
     return parse_config(filename, verbose)
@@ -189,28 +261,3 @@ def load_json(filename: str, verbose: bool = False) -> list:
 
 def write_config(params: list) -> str:
     return paramset_to_string(params)
-
-#def field_to_string(field) -> str:
-#    if isinstance(field, str):
-#        return f'"{field}"'
-#    elif isinstance(field, bool):
-#        return 'true' if field else 'false'
-#    else:
-#        try:
-#            iterator = iter(field)
-#            return '[' + ', '.join([field_to_string(i) for i in iterator]) + ']'
-#        except TypeError:
-#            pass
-#        
-#        return str(field)
-#
-#def config_to_string(config: dict) -> str:
-#    s = "{\n"
-#    lines = []
-#    for key, val in config.items():
-#        if key[:7] == 'zparams':
-#            v = '[' + ', '.join([config_to_string(p).replace('\n', '').replace('\t', '').replace(',', ', ').replace('\'', '"') for p in val]) + ']'
-#        else:
-#            v = field_to_string(val)
-#        lines.append(f"\t\"{key}\": {v}")
-#    s += ',\n'.join(lines) + '\n}'

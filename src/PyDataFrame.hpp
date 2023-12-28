@@ -36,7 +36,7 @@ using namespace nanobind::literals;
 namespace dataframe {
 
   typedef nanobind::ndarray<nanobind::numpy, double> py_nbarray;
-  typedef std::variant<var_t, std::vector<var_t>, py_nbarray> py_query_t;
+  typedef std::variant<qvar_t, std::vector<qvar_t>, py_nbarray> py_query_t;
   typedef std::variant<py_query_t, std::vector<py_query_t>> py_query_result;
 
   size_t get_query_size(const query_t& q) {
@@ -67,10 +67,10 @@ namespace dataframe {
       my_data = data;
     }
 
-    py_query_t operator()(const var_t& v) const { 
+    py_query_t operator()(const qvar_t& v) const { 
       return v;
     }
-    py_query_t operator()(const std::vector<var_t>& v) const { 
+    py_query_t operator()(const std::vector<qvar_t>& v) const { 
       return v; 
     }
     py_query_t operator()(const nbarray &data) const {
@@ -102,9 +102,6 @@ namespace dataframe {
 
   // Provide this function to initialize dataframe in other projects
   void init_dataframe(nanobind::module_ &m) {
-    m.def("parse_config", static_cast<std::vector<Params>(*)(const std::string&, bool)>(&utils::parse_config), "data"_a, "verbose"_a = false);
-    m.def("paramset_to_string", &utils::paramset_to_string);
-
     // Need to statically cast overloaded templated methods
     void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
     void (DataSlide::*ds_add_param2)(const std::string&, var_t const&) = &DataSlide::add_param;
@@ -131,7 +128,7 @@ namespace dataframe {
       .def("__getitem__", &DataSlide::get_param)
       .def("__setitem__", ds_add_param2)
       .def("__str__", &DataSlide::to_string)
-      .def("__getstate__", [](const DataSlide& slide){ return slide.to_string_args(0, false, true); })
+      .def("__getstate__", [](const DataSlide& slide){ return slide.to_string(); })
       .def("__setstate__", [](DataSlide& slide, const std::string& s){ new (&slide) DataSlide(s); })
       .def("congruent", &DataSlide::congruent)
       .def("combine", &DataSlide::combine, "other"_a, "atol"_a = ATOL, "rtol"_a = RTOL);
@@ -148,6 +145,7 @@ namespace dataframe {
       .def(nanobind::init<const Params&, const std::vector<DataSlide>&>())
       .def(nanobind::init<const std::string&>())
       .def(nanobind::init<const DataFrame&>())
+      .def(nanobind::init<const std::vector<uint8_t>&>())
       .def_rw("params", &DataFrame::params)
       .def_rw("slides", &DataFrame::slides)
       .def_rw("atol", &DataFrame::atol)
@@ -161,14 +159,14 @@ namespace dataframe {
       .def("__contains__", &DataFrame::contains)
       .def("__getitem__", &DataFrame::get)
       .def("__setitem__", df_add_param2)
-      .def("__str__", &DataFrame::to_string, "write_error"_a = true)
+      .def("__str__", &DataFrame::to_string)
       .def("__add__", &DataFrame::combine)
-      .def("__getstate__", [](const DataFrame& frame){ return frame.to_string(true); })
+      .def("__getstate__", [](const DataFrame& frame){ return frame.to_string(); })
       .def("__setstate__", [](DataFrame& frame, const std::string& s){ new (&frame) DataFrame(s); })
-      .def("write_json", &DataFrame::write_json)
+      .def("write", &DataFrame::write)
       .def("promote_params", &DataFrame::promote_params)
       .def("reduce", &DataFrame::reduce)
-      .def("filter", &DataFrame::filter, "constraints"_a, "filter"_a)
+      .def("filter", &DataFrame::filter, "constraints"_a, "filter"_a = false)
       .def("query", [](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique, bool error) {
           std::vector<query_t> results = df.query(keys, constraints, unique, error);
 
