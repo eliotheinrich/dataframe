@@ -218,7 +218,7 @@ class ParallelCompute:
         with ProcessPoolExecutor(max_workers=self.num_threads) as pool:
             # Batch configs so that if num_configs is very large; ProcessPoolExecutor needs a copy of
             # total_configs for each process, so want to avoid creating num_configs**2 copies.
-            num_batches = num_configs//self.batch_size
+            num_batches = max(num_configs // self.batch_size, 1)
             last_batch_larger = num_configs % self.batch_size <= self.num_threads
             if not last_batch_larger:
                 num_batches += 1
