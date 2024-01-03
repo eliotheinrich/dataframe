@@ -7,6 +7,7 @@
 #include <utility>
 #include <optional>
 #include <algorithm>
+#include <cstdint>
 
 namespace dataframe {
 

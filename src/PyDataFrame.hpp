@@ -131,7 +131,7 @@ namespace dataframe {
       .def("__getstate__", [](const DataSlide& slide){ return slide.to_string(); })
       .def("__setstate__", [](DataSlide& slide, const std::string& s){ new (&slide) DataSlide(s); })
       .def("congruent", &DataSlide::congruent)
-      .def("combine", &DataSlide::combine, "other"_a, "atol"_a = ATOL, "rtol"_a = RTOL);
+      .def("combine", &DataSlide::combine, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL);
 
     void (DataFrame::*df_add_param1)(const Params&) = &DataFrame::add_param;
     void (DataFrame::*df_add_param2)(const std::string&, var_t const&) = &DataFrame::add_param;

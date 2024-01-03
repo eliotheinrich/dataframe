@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <string>
+#include <array>
 
 namespace dataframe {
   class Sample {
@@ -61,44 +62,6 @@ namespace dataframe {
           return utils::is_float(s);
         }
       }
-
-      static std::vector<Sample> read_samples(const nlohmann::json& arr) {
-        // Deprecated json deserialization
-
-        if (!arr.is_array()) {
-          throw std::invalid_argument("Invalid value passed to read_samples.");
-        }
-
-        size_t num_elements = arr.size();
-
-        // Need to assume at least one element exists for the remainder
-        if (num_elements == 0) {
-          return std::vector<Sample>();
-        }
-
-        std::string arr_str = arr.dump();
-
-        if (Sample::is_valid(arr_str)) {
-          return std::vector<Sample>{Sample(arr_str)};
-        }
-
-        std::vector<Sample> samples;
-        samples.reserve(num_elements);
-
-        for (auto const& el : arr) {
-          // Check that dimension is consistent
-          std::string s = el.dump();
-          if (!Sample::is_valid(s)) {
-            std::string error_message = "Invalid string " + s + " passed to read_samples.";
-            throw std::invalid_argument(error_message);
-          }
-
-          samples.push_back(Sample(s));
-        }
-
-        return samples;
-      }
-
 
       inline double get_mean() const {
         return data[0];

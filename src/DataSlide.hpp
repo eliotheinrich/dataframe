@@ -14,25 +14,11 @@ namespace dataframe {
       Params params;
       std::map<std::string, std::vector<std::vector<Sample>>> data;
 
-      struct glaze {
-        static constexpr auto value = glz::object(
-          "params", &DataSlide::params,
-          "data", &DataSlide::data
-        );
-      };
-
       DataSlide() {}
 
       DataSlide(Params &params) : params(params) {}
 
-      DataSlide(const std::string &s) {
-        auto pe = glz::read_json(*this, s);
-        if (pe) {
-
-          std::string error_message = "Error parsing DataSlide: \n" + glz::format_error(pe, s);
-          throw std::invalid_argument(error_message);
-        }
-      }
+      DataSlide(const std::string &s);
 
       DataSlide(const DataSlide& other) {
         for (auto const& [key, val]: other.params) {
@@ -170,9 +156,7 @@ namespace dataframe {
         return false;
       }
 
-      std::string to_string() const {
-        return glz::write_json(*this);
-      }
+      std::string to_string() const;
 
       bool congruent(const DataSlide &ds, const utils::var_t_eq& equality_comparator) {
         auto incongruent_key = first_incongruent_key(ds, equality_comparator);
@@ -210,7 +194,7 @@ namespace dataframe {
         return std::nullopt;
       }
 
-      DataSlide combine(const DataSlide &ds, double atol=ATOL, double rtol=RTOL) {
+      DataSlide combine(const DataSlide &ds, double atol=DF_ATOL, double rtol=DF_RTOL) {
         utils::var_t_eq equality_comparator(atol, rtol);
         auto key = first_incongruent_key(ds, equality_comparator);
 
@@ -240,37 +224,7 @@ namespace dataframe {
       }
 
     private:
-      static DataSlide deserialize(const std::string& s) {
-        // Deprecated json deserialization
-
-        std::string trimmed = s;
-        uint32_t start_pos = trimmed.find_first_not_of(" \t\n\r");
-        uint32_t end_pos = trimmed.find_last_not_of(" \t\n\r");
-        trimmed = trimmed.substr(start_pos, end_pos - start_pos + 1);
-
-        nlohmann::json ds_json;
-        if (trimmed.empty() || trimmed.front() != '{' || trimmed.back() != '}') {
-          ds_json = nlohmann::json::parse("{" + trimmed + "}");
-        } else {
-          ds_json = nlohmann::json::parse(trimmed);
-        }
-
-        DataSlide slide;
-        for (auto const &[key, val] : ds_json.items()) {
-          if (val.type() == nlohmann::json::value_t::array) {
-            slide.add_data(key);
-
-            for (auto const &v : val) {
-              std::vector<Sample> samples = Sample::read_samples(v);
-              slide.push_data(key, samples);
-            }
-          } else {
-            slide.add_param(key, utils::parse_json_type(val));
-          }
-        }
-
-        return slide;
-      }
+      static DataSlide deserialize(const std::string& s);
   };
 
   template <>

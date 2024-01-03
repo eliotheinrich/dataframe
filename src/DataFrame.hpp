@@ -5,6 +5,7 @@
 #include <optional>
 #include <set>
 #include <fstream>
+#include <numeric>
 
 namespace dataframe {
 
@@ -17,14 +18,6 @@ namespace dataframe {
       Params metadata;
       std::vector<DataSlide> slides;
 
-      struct glaze {
-        static constexpr auto value = glz::object(
-          "params", &DataFrame::params,
-          "metadata", &DataFrame::metadata,
-          "slides", &DataFrame::slides
-        );
-      };
-
       DataFrame() {
         init_tolerance();
         init_qtable();
@@ -32,7 +25,7 @@ namespace dataframe {
 
       DataFrame(double atol, double rtol) : atol(atol), rtol(rtol) {}
 
-      DataFrame(const std::vector<DataSlide>& slides) : atol(ATOL), rtol(RTOL) {
+      DataFrame(const std::vector<DataSlide>& slides) : atol(DF_ATOL), rtol(DF_RTOL) {
         for (uint32_t i = 0; i < slides.size(); i++) {
           add_slide(slides[i]);
         }
@@ -41,7 +34,7 @@ namespace dataframe {
         init_qtable();
       }
 
-      DataFrame(const Params& params, const std::vector<DataSlide>& slides) : atol(ATOL), rtol(RTOL) {
+      DataFrame(const Params& params, const std::vector<DataSlide>& slides) : atol(DF_ATOL), rtol(DF_RTOL) {
         add_param(params);
         for (uint32_t i = 0; i < slides.size(); i++) {
           add_slide(slides[i]); 
@@ -51,43 +44,9 @@ namespace dataframe {
         init_qtable();
       }
 
-      DataFrame(const std::vector<uint8_t>& data) {
-        auto pe = glz::read_binary(*this, data);
-        if (pe) {
-          std::string error_message = "Error parsing DataFrame from binary.";
-          throw std::invalid_argument(error_message);
-        }
+      DataFrame(const std::vector<uint8_t>& data);
 
-        init_tolerance();
-        init_qtable();
-      }
-
-      DataFrame(const std::string& s) {
-        auto pe = glz::read_json(*this, s); // try json deserialization
-        if (pe) {
-          try {
-            *this = deserialize(s); // try deprecated deserialization
-          } catch (const std::runtime_error &e) {
-            std::string error_message = "Error parsing DataFrame: \n" + glz::format_error(pe, s);
-            throw std::invalid_argument(error_message);
-          }
-        }
-
-        if (metadata.count("atol")) {
-          atol = std::get<double>(metadata.at("atol"));
-        } else {
-          atol = ATOL;
-        }
-
-        if (metadata.count("rtol")) {
-          rtol = std::get<double>(metadata.at("rtol"));
-        } else {
-          rtol = RTOL;
-        }
-
-        init_tolerance();
-        init_qtable();
-      }
+      DataFrame(const std::string& s);
 
       DataFrame(const DataFrame& other) : atol(other.atol), rtol(other.rtol) {
         for (auto const& [key, val] : other.params) {
@@ -184,19 +143,11 @@ namespace dataframe {
         return metadata.erase(s);
       }
 
-      std::string to_string() const {
-        return glz::write_json(*this);
-      }
+      std::string to_string() const;
 
-      std::vector<std::byte> to_binary() const {
-        std::vector<std::byte> data;
-        glz::write_binary(*this, data);
-        return data;
-      }
+      std::vector<std::byte> to_binary() const;
 
-      std::string to_json() const {
-        return glz::prettify(glz::write_json(*this), false, 2);
-      }
+      std::string to_json() const;
 
       void write(const std::string& filename) const {
         std::vector<std::string> components = utils::split(filename, ".");
@@ -502,51 +453,19 @@ namespace dataframe {
       std::map<std::string, std::vector<std::vector<uint32_t>>> qtable;
       std::map<std::string, std::vector<var_t>> key_vals;
 
-      static DataFrame deserialize(const std::string& s) {
-        // Deprecated json deserialization
-        DataFrame frame;
-
-        nlohmann::json data = nlohmann::json::parse(s);
-        for (auto const &[key, val] : data["params"].items()) {
-          frame.params[key] = utils::parse_json_type(val);  
-        }
-
-        if (data.contains("metadata")) {
-          for (auto const &[key, val] : data["metadata"].items()) {
-            frame.metadata[key] = utils::parse_json_type(val);
-          }
-        }
-
-        if (frame.metadata.count("atol")) {
-          frame.atol = std::get<double>(frame.metadata.at("atol"));
-        } else {
-          frame.atol = ATOL;
-        }
-
-        if (frame.metadata.count("rtol")) {
-          frame.rtol = std::get<double>(frame.metadata.at("rtol"));
-        } else {
-          frame.rtol = RTOL;
-        }
-
-        for (auto const &slide_str : data["slides"]) {
-          frame.add_slide(DataSlide::deserialize(slide_str.dump()));
-        }
-
-        return frame;
-      }
+      static DataFrame deserialize(const std::string& s);
 
       void init_tolerance() {
         if (metadata.count("atol")) {
           atol = std::get<double>(metadata.at("atol"));
         } else {
-          atol = ATOL;
+          atol = DF_ATOL;
         }
 
         if (metadata.count("rtol")) {
           rtol = std::get<double>(metadata.at("rtol"));
         } else {
-          rtol = RTOL;
+          rtol = DF_RTOL;
         }
       }
 
