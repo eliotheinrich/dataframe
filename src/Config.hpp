@@ -7,8 +7,6 @@
 namespace dataframe {
 
 #define DEFAULT_NUM_RUNS 1
-#define DEFAULT_SERIALIZE false
-
 
   class Config {
     public:

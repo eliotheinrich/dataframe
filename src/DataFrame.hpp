@@ -3,6 +3,7 @@
 #include "DataSlide.hpp"
 
 #include <optional>
+#include <iterator>
 #include <set>
 #include <fstream>
 #include <numeric>

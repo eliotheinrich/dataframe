@@ -135,9 +135,11 @@ class ParallelCompute:
         
         self.batch_size = metadata.setdefault("batch_size", 1024)
 
+        self.verbose = metadata.setdefault("verbose", True)
+
         self.num_slides = None
 
-    def compute(self, verbose=True):
+    def compute(self):
         start_time = time.time()
 
         total_configs = []
@@ -154,11 +156,11 @@ class ParallelCompute:
         self.num_slides = len(self.configs) if self.average_congruent_runs else len(total_configs)
 
         if self.parallelization_type == self.SERIAL:
-            results = self.compute_serial(total_configs, verbose)
+            results = self.compute_serial(total_configs)
         elif self.parallelization_type == self.POOL:
-            results = self.compute_pool(total_configs, verbose)
+            results = self.compute_pool(total_configs)
 
-        if verbose:
+        if self.verbose:
             print("\n", end="")
 
         for slide in results:
@@ -177,7 +179,7 @@ class ParallelCompute:
         if self.average_congruent_runs:
             self.dataframe.reduce()
 
-        if verbose:
+        if self.verbose:
             print(f"Total runtime: {duration:0.0f}")
 
         return self.dataframe
@@ -189,14 +191,14 @@ class ParallelCompute:
 
         return id, slide
 
-    def compute_serial(self, total_configs, verbose):
-        if verbose:
+    def compute_serial(self, total_configs):
+        if self.verbose:
             print(f"Computing in serial.")
             print(f"num_configs: {len(self.configs)}")
             print(f"total_runs: {len(total_configs)}")
 
         slides = [None for _ in range(self.num_slides)]
-        if verbose:
+        if self.verbose:
             total_configs = tqdm.tqdm(total_configs)
         for i, config in total_configs:
             id, slide = ParallelCompute._do_run(config, self.num_threads_per_task, i)
@@ -205,16 +207,19 @@ class ParallelCompute:
 
         return slides
 
-    def compute_pool(self, total_configs, verbose):
+    def compute_pool(self, total_configs):
         num_configs = len(total_configs)
-        if verbose:
+        if self.verbose:
             print(f"Computing in parallel. {self.num_threads} threads available.")
             print(f"num_configs: {len(self.configs)}")
             print(f"total_runs: {num_configs}")
 
         slides = [None for _ in range(self.num_slides)]
         
-        progress = tqdm.tqdm(range(num_configs))
+        if self.verbose:
+            progress = tqdm.tqdm(range(num_configs))
+        else:
+            progress = range(num_configs)
         with ProcessPoolExecutor(max_workers=self.num_threads) as pool:
             # Batch configs so that if num_configs is very large; ProcessPoolExecutor needs a copy of
             # total_configs for each process, so want to avoid creating num_configs**2 copies.
@@ -238,7 +243,7 @@ class ParallelCompute:
 
                     slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
                     
-                    if verbose:
+                    if self.verbose:
                         progress.update(1)
 
         return slides
