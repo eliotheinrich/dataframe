@@ -9,21 +9,21 @@
 #include <nanobind/trampoline.h>
 #include <nanobind/ndarray.h>
 
-#define EXPORT_SIMULATOR_DRIVER(A)                                  \
-  nanobind::class_<dataframe::TimeSamplingDriver<A>>(m, #A)                      \
-  .def(nanobind::init<dataframe::Params&>())                                 \
-  .def_rw("params", &dataframe::TimeSamplingDriver<A>::params)               \
+#define EXPORT_SIMULATOR_DRIVER(A)                                                   \
+  nanobind::class_<dataframe::TimeSamplingDriver<A>>(m, #A)                          \
+  .def(nanobind::init<dataframe::Params&>())                                         \
+  .def_rw("params", &dataframe::TimeSamplingDriver<A>::params)                       \
   .def("generate_dataslide", &dataframe::TimeSamplingDriver<A>::generate_dataslide);
 
-#define INIT_CONFIG()                       \
-  nanobind::class_<dataframe::Config>(m, "Config")       \
+#define INIT_CONFIG()                                \
+  nanobind::class_<dataframe::Config>(m, "Config")   \
   .def(nanobind::init<dataframe::Params&>())         \
   .def_rw("params", &dataframe::Config::params)      \
   .def("get_nruns", &dataframe::Config::get_nruns);
 
-#define EXPORT_CONFIG(A)                                                \
-  nanobind::class_<A, dataframe::Config>(m, #A)                                      \
-  .def(nanobind::init<dataframe::Params&>())                                     \
+#define EXPORT_CONFIG(A)                                              \
+  nanobind::class_<A, dataframe::Config>(m, #A)                       \
+  .def(nanobind::init<dataframe::Params&>())                          \
   .def("compute", &A::compute)                                        \
   .def("clone", &A::clone)                                            \
   .def("__getstate__", [](const A& config) { return config.params; }) \
@@ -102,6 +102,8 @@ namespace dataframe {
 
   // Provide this function to initialize dataframe in other projects
   void init_dataframe(nanobind::module_ &m) {
+    m.def("load_params", &utils::load_params);
+
     // Need to statically cast overloaded templated methods
     void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
     void (DataSlide::*ds_add_param2)(const std::string&, var_t const&) = &DataSlide::add_param;
@@ -160,7 +162,7 @@ namespace dataframe {
       .def("__contains__", &DataFrame::contains)
       .def("__getitem__", &DataFrame::get)
       .def("__setitem__", df_add_param2)
-      .def("__str__", &DataFrame::to_string)
+      .def("__str__", &DataFrame::to_json)
       .def("__add__", &DataFrame::combine)
       .def("__getstate__", [](const DataFrame& frame){ return frame.to_string(); })
       .def("__setstate__", [](DataFrame& frame, const std::string& s){ new (&frame) DataFrame(s); })

@@ -4,7 +4,9 @@
 
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <cmath>
+#include <stdexcept>
 
 namespace dataframe {
 
@@ -335,6 +337,9 @@ template <>
 inline int get<int>(const Params &params, const std::string& key) {
   return std::round(get<double>(params, key));
 }
-}
 
+
+Params load_params(const std::string& filename);
+
+}
 }

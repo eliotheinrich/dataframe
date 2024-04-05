@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ProcessPoolExecutor
 import concurrent
 
+import os
 import time
 import tqdm
 
@@ -186,10 +187,21 @@ class ParallelCompute:
 
     @staticmethod
     def _do_run(config, num_threads, id):
-        slide = config.compute(num_threads)
-        slide.add_param(config.params)
+        try:
+            slide = config.compute(num_threads)
+            slide.add_param(config.params)
 
-        return id, slide
+            return id, slide
+        except Exception as e:
+            if "SLURM_JOB_ID" in os.environ:
+                filename = "err_" + os.environ[SLURM_JOB_ID] + ".json"
+            else:
+                filename = "err.json"
+            print(f"Encountered an error; saving config params to {filename}!")
+            with open(filename, "a") as f:
+                f.write(str(config.params))
+
+            raise e
 
     def compute_serial(self, total_configs):
         if self.verbose:
