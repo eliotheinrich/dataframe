@@ -3,6 +3,7 @@ from concurrent.futures import ProcessPoolExecutor
 import concurrent
 
 import os
+import json
 import time
 import tqdm
 
@@ -12,6 +13,11 @@ from dataframe.dataframe_bindings import *
 ATOL = 1e-6
 RTOL = 1e-5
 
+def save_config(config, filename):
+    config = json.dumps(config, indent=1)
+    config.replace('\\', '') 
+    with open(filename, 'w') as file:
+        file.write(config)
 
 def parse_config(config, p=None):
     params = []
@@ -133,7 +139,7 @@ class ParallelCompute:
         self.parallelization_type = metadata.setdefault("parallelization_type", self.SERIAL)
         self.record_error = metadata.setdefault("record_error", True)
         self.dataframe = DataFrame(self.atol, self.rtol)
-        
+
         self.batch_size = metadata.setdefault("batch_size", 1024)
 
         self.verbose = metadata.setdefault("verbose", True)
@@ -194,18 +200,18 @@ class ParallelCompute:
             return id, slide
         except Exception as e:
             if "SLURM_JOB_ID" in os.environ:
-                filename = "err_" + os.environ[SLURM_JOB_ID] + ".json"
+                filename = f"err_{os.environ['SLURM_JOB_ID']}_{id}.json"
             else:
-                filename = "err.json"
+                filename = f"err_{id}.json"
+
             print(f"Encountered an error; saving config params to {filename}!")
-            with open(filename, "a") as f:
-                f.write(str(config.params))
+            save_config(config.params, filename)
 
             raise e
 
     def compute_serial(self, total_configs):
         if self.verbose:
-            print(f"Computing in serial.")
+            print("Computing in serial.")
             print(f"num_configs: {len(self.configs)}")
             print(f"total_runs: {len(total_configs)}")
 
@@ -227,7 +233,7 @@ class ParallelCompute:
             print(f"total_runs: {num_configs}")
 
         slides = [None for _ in range(self.num_slides)]
-        
+
         if self.verbose:
             progress = tqdm.tqdm(range(num_configs))
         else:
@@ -239,14 +245,14 @@ class ParallelCompute:
             last_batch_larger = num_configs % self.batch_size <= self.num_threads
             if not last_batch_larger:
                 num_batches += 1
-                
+
             for i in range(0, num_batches):
                 i1 = i*self.batch_size
                 if last_batch_larger and i == num_batches - 1:
                     i2 = num_configs
                 else:
                     i2 = min((i+1)*self.batch_size, num_configs)
-                    
+
                 futures = [pool.submit(ParallelCompute._do_run, config, self.num_threads_per_task, i) for i,config in total_configs[i1:i2]]
                 completed_futures = concurrent.futures.as_completed(futures)
 
@@ -254,7 +260,7 @@ class ParallelCompute:
                     id, slide = future.result()
 
                     slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
-                    
+
                     if self.verbose:
                         progress.update(1)
 
@@ -266,7 +272,7 @@ def load_data(filename: str) -> DataFrame:
         with open(filename, 'r') as f:
             s = f.read()
             return DataFrame(s)
-    
+
     elif extension == "eve":
         with open(filename, 'rb') as f:
             s = list(bytearray(f.read()))

@@ -112,6 +112,18 @@ namespace dataframe {
     void (DataSlide::*push_data2)(const std::string&, const double, const double, const uint32_t) = &DataSlide::push_data;
     void (DataSlide::*push_data3)(const std::string&, const std::vector<Sample>&) = &DataSlide::push_data;
 
+    nanobind::class_<Sample>(m, "Sample")
+      .def(nanobind::init<>())
+      .def(nanobind::init<double>())
+      .def(nanobind::init<double, double, uint32_t>())
+      .def("__str__", &Sample::to_string)
+      .def("get_mean", &Sample::get_mean)
+      .def("get_std", &Sample::get_std)
+      .def("get_num_samples", &Sample::get_num_samples)
+      .def("set_mean", &Sample::set_mean)
+      .def("set_std", &Sample::set_std)
+      .def("set_num_samples" &Sample::set_num_samples);
+
     nanobind::class_<DataSlide>(m, "DataSlide")
       .def(nanobind::init<>())
       .def(nanobind::init<Params&>())

@@ -66,10 +66,13 @@ namespace dataframe {
       }
 
       void push_data(const std::string& s, const std::vector<Sample>& samples) {
+        std::cout << "push_data vector<Sample>\n";
         data[s].push_back(samples);
+        std::cout << "data[" << s << "] has length " << data[s].size() << "\n";
       }
       
       void push_data(const std::string& s, const std::vector<double>& samples) {
+        std::cout << "push_data vector<double>\n";
         std::vector<Sample> sample_vec(samples.size());
         for (uint32_t i = 0; i < samples.size(); i++) {
           sample_vec[i] = Sample(samples[i]);
@@ -78,16 +81,19 @@ namespace dataframe {
       }
 
       void push_data(const std::string& s, const Sample& sample) {
+        std::cout << "push_data Sample \n";
         std::vector<Sample> sample_vec{sample};
         push_data(s, sample_vec);
       }
 
       void push_data(const std::string &s, const double mean) {
+        std::cout << "push_data double\n";
         Sample sample(mean);
         push_data(s, sample);
       }
 
       void push_data(const std::string &s, const double mean, const double std, const uint32_t num_samples) {
+        std::cout << "push_data double double uint32_t\n";
         Sample sample(mean, std, num_samples);
         push_data(s, sample);
       }
@@ -211,8 +217,12 @@ namespace dataframe {
         for (auto const &[key, samples] : data) {
           dn.add_data(key);
           for (uint32_t i = 0; i < samples.size(); i++) {
-            if (samples[i].size() != ds.data.at(key)[i].size()) {
-              std::string error_message = "Samples with key '" + key + "' have incongruent length and cannot be combined.";
+            size_t s1 = samples[i].size();
+            size_t s2 = ds.data.at(key)[i].size();
+            if (s1 != s2) {
+              std::string error_message = "Samples with key '" + key + "' have incongruent length ("
+                                        + std::to_string(s1) + " and " + std::to_string(s2) + ")"
+                                        + " and cannot be combined.";
               throw std::invalid_argument(error_message);
             }
 
