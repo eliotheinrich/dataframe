@@ -263,6 +263,7 @@ namespace dataframe {
         } else {
           keys = std::get<std::vector<std::string>>(keys_var);
         }
+
         if (unique) {
           auto result = query(keys, constraints);
           return utils::make_query_unique(result, utils::make_query_t_unique(atol, rtol));

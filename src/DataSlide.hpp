@@ -66,13 +66,10 @@ namespace dataframe {
       }
 
       void push_data(const std::string& s, const std::vector<Sample>& samples) {
-        std::cout << "push_data vector<Sample>\n";
         data[s].push_back(samples);
-        std::cout << "data[" << s << "] has length " << data[s].size() << "\n";
       }
       
       void push_data(const std::string& s, const std::vector<double>& samples) {
-        std::cout << "push_data vector<double>\n";
         std::vector<Sample> sample_vec(samples.size());
         for (uint32_t i = 0; i < samples.size(); i++) {
           sample_vec[i] = Sample(samples[i]);
@@ -81,19 +78,16 @@ namespace dataframe {
       }
 
       void push_data(const std::string& s, const Sample& sample) {
-        std::cout << "push_data Sample \n";
         std::vector<Sample> sample_vec{sample};
         push_data(s, sample_vec);
       }
 
       void push_data(const std::string &s, const double mean) {
-        std::cout << "push_data double\n";
         Sample sample(mean);
         push_data(s, sample);
       }
 
       void push_data(const std::string &s, const double mean, const double std, const uint32_t num_samples) {
-        std::cout << "push_data double double uint32_t\n";
         Sample sample(mean, std, num_samples);
         push_data(s, sample);
       }
@@ -211,7 +205,7 @@ namespace dataframe {
           std::string error_message = ss.str();
           throw std::invalid_argument(error_message);
         }
-
+        
         DataSlide dn(params); 
 
         for (auto const &[key, samples] : data) {
