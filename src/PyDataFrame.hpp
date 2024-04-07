@@ -122,7 +122,7 @@ namespace dataframe {
       .def("get_num_samples", &Sample::get_num_samples)
       .def("set_mean", &Sample::set_mean)
       .def("set_std", &Sample::set_std)
-      .def("set_num_samples" &Sample::set_num_samples);
+      .def("set_num_samples", &Sample::set_num_samples);
 
     nanobind::class_<DataSlide>(m, "DataSlide")
       .def(nanobind::init<>())
