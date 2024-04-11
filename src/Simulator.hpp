@@ -1,8 +1,6 @@
 #pragma once
 
 #include "DataSlide.hpp"
-
-#include <memory>
 #include <random>
 
 namespace dataframe {
