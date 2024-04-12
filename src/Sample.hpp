@@ -21,6 +21,25 @@ namespace dataframe {
         }
       }
 
+      Sample(const std::vector<double>& data) {
+        size_t num_samples = data.size();
+        double mean = 0.0;
+        for (size_t i = 0; i < num_samples; i++) {
+          mean += data[i];
+        }
+        mean = mean/num_samples;
+
+        double std = 0.0;
+        for (size_t i = 0; i < num_samples; i++) {
+          std += std::pow(data[i] - mean, 2);
+        }
+        std = std::sqrt(std/num_samples);
+
+        set_mean(mean);
+        set_std(std);
+        set_num_samples(num_samples);
+      }
+
       bool isnan() const {
         return std::isnan(get_mean()) || std::isnan(get_std());
       }
