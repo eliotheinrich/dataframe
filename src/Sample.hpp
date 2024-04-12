@@ -21,17 +21,17 @@ namespace dataframe {
         }
       }
 
-      Sample(const std::vector<double>& data) {
-        size_t num_samples = data.size();
+      Sample(const std::vector<double>& doubles) : Sample() {
+        size_t num_samples = doubles.size();
         double mean = 0.0;
         for (size_t i = 0; i < num_samples; i++) {
-          mean += data[i];
+          mean += doubles[i];
         }
         mean = mean/num_samples;
 
         double std = 0.0;
         for (size_t i = 0; i < num_samples; i++) {
-          std += std::pow(data[i] - mean, 2);
+          std += std::pow(doubles[i] - mean, 2);
         }
         std = std::sqrt(std/num_samples);
 
