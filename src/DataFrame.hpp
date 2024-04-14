@@ -343,8 +343,7 @@ namespace dataframe {
         slides = new_slides;
       }
 
-      // TODO seems to be a bug here
-      DataFrame combine(const DataFrame &other) const {
+      DataFrame combine(const DataFrame &other, bool average_congruent_slides=true) const {
         if (params.empty() && slides.empty()) {
           return DataFrame(other);
         } else if (other.params.empty() && other.slides.empty()) {
@@ -444,7 +443,9 @@ namespace dataframe {
         }
 
         df.promote_params();
-        df.reduce();
+        if (average_congruent_slides) {
+          df.reduce();
+        }
 
         return df;
       }
