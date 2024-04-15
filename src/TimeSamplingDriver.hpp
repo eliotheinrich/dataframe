@@ -10,6 +10,7 @@ namespace dataframe {
 #define DEFAULT_SAMPLING_TIMESTEPS 0u
 #define DEFAULT_MEASUREMENT_FREQ 1u
 #define DEFAULT_TEMPORAL_AVG true
+#define DEFAULT_SAVE_SAMPLES false
 
   template <class SimulatorType>
   class TimeSamplingDriver {
@@ -20,11 +21,20 @@ namespace dataframe {
       uint32_t measurement_freq;
       bool temporal_avg;
 
+      bool save_samples;
+
       TimeSamplingDriver(Params& params) : params(params) {
         equilibration_timesteps = utils::get<int>(params, "equilibration_timesteps", DEFAULT_EQUILIBRATION_STEPS);
         sampling_timesteps = utils::get<int>(params, "sampling_timesteps", DEFAULT_SAMPLING_TIMESTEPS);
         measurement_freq = utils::get<int>(params, "measurement_freq", DEFAULT_MEASUREMENT_FREQ);
+
         temporal_avg = (bool) utils::get<int>(params, "temporal_avg", DEFAULT_TEMPORAL_AVG);
+
+        save_samples = (bool) utils::get<int>(params, "save_samples", DEFAULT_SAVE_SAMPLES);
+
+        if (temporal_avg && save_samples) {
+          throw std::invalid_argument("Cannot both perform temporal average and save all samples.");
+        }
       }
 
       DataSlide generate_dataslide(uint32_t num_threads) {
@@ -48,23 +58,33 @@ namespace dataframe {
         simulator->timesteps(num_timesteps);
         data_t sample = simulator->take_samples();
         for (auto const &[key, val] : sample) {
-          slide.add_data(key);
-          slide.push_data(key, val);
-        }
+          if (save_samples) {
+            slide.add_samples(key);
+          } else {
+            slide.add_data(key);
+          }
 
+          for (auto const &v : val) {
+            slide.push_data(key, v);
+          }
+        }
 
         for (int t = 1; t < num_intervals; t++) {
           simulator->timesteps(num_timesteps);
           sample = simulator->take_samples();
-          if (temporal_avg) {
+          if (temporal_avg) { // If temporal_avg = True, then individual samples will not be saved; combine with previous Sample
             for (auto const &[key, val] : sample) {
               for (uint32_t i = 0; i < val.size(); i++) {
-                slide.data[key][0][i] = slide.data[key][0][i].combine(val[i]);
+                Sample s = Sample(val[i]);
+                slide.data[key][0][i] = slide.data[key][0][i].combine(s);
               }
             }
-          } else {
+          } else { // Regardless of save_samples, push_data will get sample to the right place in the slide
+            // [std::string, std::vector<double>]
             for (auto const &[key, val] : sample) {
-              slide.data[key].push_back(val);
+              for (auto const &v : val) {
+                slide.push_data(key, v);
+              }
             }
           }
         }

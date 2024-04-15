@@ -18,7 +18,8 @@ template <>
 struct glz::meta<DataSlide> {
   static constexpr auto value = glz::object(
     "params", &DataSlide::params,
-    "data", &DataSlide::data
+    "data", &DataSlide::data,
+    "samples", &DataSlide::samples
   );
 };
 

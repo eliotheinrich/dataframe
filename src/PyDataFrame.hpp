@@ -131,6 +131,7 @@ namespace dataframe {
       .def(nanobind::init<const DataSlide&>())
       .def_rw("params", &DataSlide::params)
       .def_rw("data", &DataSlide::data)
+      .def_rw("samples", &DataSlide::samples)
       .def("add_param", ds_add_param1)
       .def("add_param", ds_add_param2)
       .def("add_data", &DataSlide::add_data)

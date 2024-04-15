@@ -190,36 +190,24 @@ namespace dataframe {
   };
 
 
-  // Thin wrapper for map; desirable to overload emplace so that Sample does not need to be exposed
+  // Thin wrapper for map to overload emplace
   class data_t {
     private:
-      std::map<std::string, std::vector<Sample>> data;
+      std::map<std::string, std::vector<std::vector<double>>> data;
 
     public:
       data_t()=default;
 
-      void emplace(const std::string &key, const std::vector<Sample> &samples) {
+      void emplace(const std::string &key, const std::vector<std::vector<double>> &samples) {
         data.emplace(key, samples);
       }
 
-      void emplace(const std::string &key, const std::vector<double> &doubles) {
-        size_t N = doubles.size();
-        std::vector<Sample> samples(N);
-        for (uint32_t i = 0; i < N; i++) {
-          samples[i] = Sample(doubles[i]);
-        }
-
-        emplace(key, samples);
+      void emplace(const std::string &key, const std::vector<double> &samples) {
+        emplace(key, {samples});
       }
 
       void emplace(const std::string &key, double d) {
-        std::vector<Sample> sample{Sample(d)};
-        emplace(key, sample);
-      }
-
-      void emplace(const std::string &key, Sample s) {
-        std::vector<Sample> sample{s};
-        emplace(key, sample);
+        emplace(key, std::vector<double>{d});
       }
       
       void clear() {
@@ -254,15 +242,15 @@ namespace dataframe {
         return data.empty();
       }
 
-      std::vector<Sample> at(const std::string& key) const {
+      std::vector<std::vector<double>> at(const std::string& key) const {
         return data.at(key);
       }
 
-      const std::vector<Sample>& operator[](const std::string& key) const {
+      const std::vector<std::vector<double>>& operator[](const std::string& key) const {
         return data.at(key);
       }
 
-      std::vector<Sample>& operator[](const std::string& key) {
+      std::vector<std::vector<double>>& operator[](const std::string& key) {
         return data[key];
       }
 

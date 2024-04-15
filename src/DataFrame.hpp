@@ -108,11 +108,11 @@ namespace dataframe {
       }
 
       bool contains(const std::string& s) const {
-        return params.count(s);
+        return params.contains(s);
       }
 
       var_t get(const std::string& s) const {
-        if (params.count(s)) {
+        if (params.contains(s)) {
           return get_param(s);
         } else {
           return get_metadata(s);
@@ -128,7 +128,7 @@ namespace dataframe {
       }
 
       bool remove(const std::string& s) {
-        if (params.count(s)) {
+        if (params.contains(s)) {
           return remove_param(s);
         } else {
           return remove_metadata(s);
@@ -284,13 +284,13 @@ namespace dataframe {
 
         for (auto const& key : keys) {
           query_t key_result;
-          if (params.count(key)) { // Frame-level param
+          if (params.contains(key)) { // Frame-level param
             qvar_t val = std::visit(parser, params[key]);
             key_result = query_t{val};
-          } else if (metadata.count(key)) { // Metadata param
+          } else if (metadata.contains(key)) { // Metadata param
             qvar_t val = std::visit(parser, metadata[key]);
             key_result = query_t{val};
-          } else if (slides[*inds.begin()].params.count(key)) { // Slide-level param
+          } else if (slides[*inds.begin()].params.contains(key)) { // Slide-level param
             std::vector<qvar_t> param_vals;
             for (auto const i : inds) {
               qvar_t val = std::visit(parser, slides[i].params[key]);
@@ -324,7 +324,7 @@ namespace dataframe {
 
         std::set<uint32_t> reduced;
         for (uint32_t i = 0; i < slides.size(); i++) {
-          if (reduced.count(i)) {
+          if (reduced.contains(i)) {
             continue;
           }
 
@@ -355,7 +355,7 @@ namespace dataframe {
         DataFrame df;
         utils::var_t_eq equality_comparator(atol, rtol);
         for (auto const &[k, v] : metadata) {
-          if (other.metadata.count(k) && equality_comparator(v, other.metadata.at(k))) {
+          if (other.metadata.contains(k) && equality_comparator(v, other.metadata.at(k))) {
             df.add_metadata(k, v);
           }
         }
@@ -374,7 +374,7 @@ namespace dataframe {
         // both_frame_params is the intersection of keys of params and other.params
         std::set<std::string> both_frame_params;
         for (auto const& k : self_frame_params) {
-          if (other_frame_params.count(k)) {
+          if (other_frame_params.contains(k)) {
             both_frame_params.insert(k);
           }
         }
@@ -382,14 +382,14 @@ namespace dataframe {
         // Erase keys which appear in both frame params
         std::set<std::string> to_erase1;
         for (auto const& k : self_frame_params) {
-          if (other_frame_params.count(k)) {
+          if (other_frame_params.contains(k)) {
             to_erase1.insert(k);
           }
         }
 
         std::set<std::string> to_erase2;
         for (auto const& k : other_frame_params) {
-          if (self_frame_params.count(k)) {
+          if (self_frame_params.contains(k)) {
             to_erase2.insert(k);
           }
         }
@@ -443,9 +443,7 @@ namespace dataframe {
         }
 
         df.promote_params();
-        if (average_congruent_slides) {
-          df.reduce();
-        }
+        df.reduce();
 
         return df;
       }
@@ -459,13 +457,13 @@ namespace dataframe {
       static DataFrame deserialize(const std::string& s);
 
       void init_tolerance() {
-        if (metadata.count("atol")) {
+        if (metadata.contains("atol")) {
           atol = std::get<double>(metadata.at("atol"));
         } else {
           atol = DF_ATOL;
         }
 
-        if (metadata.count("rtol")) {
+        if (metadata.contains("rtol")) {
           rtol = std::get<double>(metadata.at("rtol"));
         } else {
           rtol = DF_RTOL;
@@ -495,7 +493,7 @@ namespace dataframe {
 
         for (auto const &slide : slides) {
           for (auto const &[key, tar_val] : slide.params) {
-            if (!key_vals.count(key)) {
+            if (!key_vals.contains(key)) {
               key_vals[key] = std::vector<var_t>();
             }
 
@@ -549,7 +547,7 @@ namespace dataframe {
         // Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
         utils::var_t_eq equality_comparator(atol, rtol);
         for (auto const &[key, val] : constraints) {
-          if (params.count(key) && !(equality_comparator(params[key], val))) {
+          if (params.contains(key) && !(equality_comparator(params[key], val))) {
             return std::set<uint32_t>();
           }
         }
@@ -557,7 +555,7 @@ namespace dataframe {
         // Determine which constraints are relevant, i.e. correspond to existing Slide-level parameters
         Params relevant_constraints;
         for (auto const &[key, val] : constraints) {
-          if (!params.count(key)) {
+          if (!params.contains(key)) {
             relevant_constraints[key] = val;
           }
         }
@@ -576,7 +574,7 @@ namespace dataframe {
           }
 
           for (auto const i : qtable[key][idx]) {
-            if (inds.count(i)) {
+            if (inds.contains(i)) {
               tmp.insert(i);
             }
           }
