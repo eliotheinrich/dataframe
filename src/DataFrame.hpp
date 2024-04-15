@@ -343,7 +343,7 @@ namespace dataframe {
         slides = new_slides;
       }
 
-      DataFrame combine(const DataFrame &other, bool average_congruent_slides=true) const {
+      DataFrame combine(const DataFrame &other) const {
         if (params.empty() && slides.empty()) {
           return DataFrame(other);
         } else if (other.params.empty() && other.slides.empty()) {

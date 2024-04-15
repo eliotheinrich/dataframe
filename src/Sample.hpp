@@ -203,7 +203,7 @@ namespace dataframe {
       }
 
       void emplace(const std::string &key, const std::vector<double> &samples) {
-        emplace(key, {samples});
+        emplace(key, std::vector<std::vector<double>>{samples});
       }
 
       void emplace(const std::string &key, double d) {
