@@ -66,6 +66,24 @@ namespace dataframe {
         init_qtable();
       }
 
+      static DataFrame from_file(const std::string& filename) {
+        std::ifstream file(filename, std::ios::binary | std::ios::ate);
+
+        std::streampos file_size = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        std::vector<char> buffer(file_size);
+        file.read(buffer.data(), file_size);
+        file.close();
+
+        std::vector<uint8_t> data(file_size);
+        for (size_t i = 0; i < file_size; i++) {
+          data[i] = static_cast<uint8_t>(buffer[i]);
+        }
+
+        return DataFrame(data);
+      }
+
       void add_slide(const DataSlide& ds) {
         slides.push_back(ds);
         qtable_initialized = false;
