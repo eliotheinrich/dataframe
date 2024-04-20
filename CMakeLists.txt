@@ -81,5 +81,8 @@ if (DEFINED DF_BUILDING_PY_BINDINGS)
     TARGETS dataframe_bindings
     LIBRARY DESTINATION dataframe
   )
+else()
+    add_executable(test src/test.cpp)
+    target_link_libraries(test PRIVATE dataframe)
 endif()
 
