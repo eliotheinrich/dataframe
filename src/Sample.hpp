@@ -21,23 +21,40 @@ namespace dataframe {
         }
       }
 
+      Sample(const Sample& other) : Sample(other.get_mean(), other.get_std(), other.get_num_samples()) {}
+
       Sample(const std::vector<double>& doubles) : Sample() {
         size_t num_samples = doubles.size();
-        double mean = 0.0;
-        for (size_t i = 0; i < num_samples; i++) {
-          mean += doubles[i];
-        }
-        mean = mean/num_samples;
+        if (num_samples == 0) {
+          set_mean(0.0);
+          set_std(0.0);
+          set_num_samples(0);
+        } else {
+          double mean = 0.0;
+          for (size_t i = 0; i < num_samples; i++) {
+            mean += doubles[i];
+          }
+          mean = mean/num_samples;
 
-        double std = 0.0;
-        for (size_t i = 0; i < num_samples; i++) {
-          std += std::pow(doubles[i] - mean, 2);
+          double std = 0.0;
+          for (size_t i = 0; i < num_samples; i++) {
+            std += std::pow(doubles[i] - mean, 2);
+          }
+          std = std::sqrt(std/num_samples);
+          
+          set_mean(mean);
+          set_std(std);
+          set_num_samples(num_samples);
+          
+          if (isnan()) {
+            std::string error_message = "Error in sample; data passed = [ ";
+            for (auto d : doubles) {
+              error_message += std::to_string(d) + " ";
+            }
+            error_message += "]. Sample = (" + std::to_string(mean) + std::to_string(std) + std::to_string(num_samples);
+            throw std::invalid_argument(error_message);
+          }
         }
-        std = std::sqrt(std/num_samples);
-
-        set_mean(mean);
-        set_std(std);
-        set_num_samples(num_samples);
       }
 
       bool isnan() const {
@@ -197,6 +214,7 @@ namespace dataframe {
 
     public:
       data_t()=default;
+      ~data_t()=default;
 
       void emplace(const std::string &key, const std::vector<std::vector<double>> &samples) {
         data.emplace(key, samples);

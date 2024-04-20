@@ -57,15 +57,18 @@ namespace dataframe {
 
         simulator->timesteps(num_timesteps);
         data_t sample = simulator->take_samples();
+        // [categories x num_samples]
         for (auto const &[key, val] : sample) {
           if (save_samples) {
             slide.add_samples(key);
+            for (auto const &v : val) {
+              slide.push_data(key, v);
+            }
           } else {
             slide.add_data(key);
-          }
-
-          for (auto const &v : val) {
-            slide.push_data(key, v);
+            for (auto const &v : val) {
+              slide.push_data(key, Sample(v));
+            }
           }
         }
 
@@ -75,12 +78,12 @@ namespace dataframe {
           if (temporal_avg) { // If temporal_avg = True, then individual samples will not be saved; combine with previous Sample
             for (auto const &[key, val] : sample) {
               for (uint32_t i = 0; i < val.size(); i++) {
-                Sample s = Sample(val[i]);
-                slide.data[key][0][i] = slide.data[key][0][i].combine(s);
+                Sample s1 = slide.data[key][i][0];
+                Sample s2 = Sample(val[i]);
+                slide.data[key][i][0] = s1.combine(s2);
               }
             }
           } else { // Regardless of save_samples, push_data will get sample to the right place in the slide
-            // [std::string, std::vector<double>]
             for (auto const &[key, val] : sample) {
               for (auto const &v : val) {
                 slide.push_data(key, v);
@@ -90,11 +93,10 @@ namespace dataframe {
         }
 
         auto end_time = std::chrono::high_resolution_clock::now();
-        int duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-        double duration_s = duration_ms/1000.0;
+        double duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count()/1000.0;
 
         slide.add_data("time");
-        slide.push_data("time", duration_s);
+        slide.push_data("time", duration);
 
         simulator->cleanup();
 

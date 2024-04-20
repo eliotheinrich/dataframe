@@ -85,7 +85,7 @@ namespace dataframe {
         if (data.contains(s)) {
           std::vector<Sample> sample_vec(double_vec.size());
           for (uint32_t i = 0; i < sample_vec.size(); i++) {
-            sample_vec[i] = Sample(sample_vec[i]);
+            sample_vec[i] = Sample(double_vec[i]);
           }
           push_data(s, sample_vec);
         } else {
@@ -94,7 +94,7 @@ namespace dataframe {
       }
 
       void push_data(const std::string& s, const Sample& sample) {
-        push_data(s, {sample});
+        push_data(s, std::vector<Sample>{sample});
       }
 
       void push_data(const std::string &s, const double d) {
@@ -102,7 +102,7 @@ namespace dataframe {
           Sample sample(d);
           push_data(s, sample);
         } else {
-          samples[s].push_back({d});
+          samples[s].push_back(std::vector<double>{d});
         }
       }
 
@@ -258,7 +258,7 @@ namespace dataframe {
         }
 
         for (auto const &[key, v] : samples) {
-          dn.add_data(key);
+          dn.add_samples(key);
           for (size_t i = 0; i < v.size(); i++) {
             dn.push_data(key, v[i]);
           }
