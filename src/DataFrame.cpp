@@ -111,7 +111,7 @@ DataSlide DataSlide::deserialize(const std::string& s) {
 
       for (auto const &v : val) {
         std::vector<Sample> samples = read_samples(v);
-        slide.push_data(key, samples);
+        slide.push_samples_to_data(key, samples);
       }
     } else {
       slide.add_param(key, parse_json_type(val));

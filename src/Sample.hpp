@@ -210,6 +210,8 @@ namespace dataframe {
   // Thin wrapper for map to overload emplace
   class data_t {
     private:
+      // formatted so that data[key] is num_rows x num_samples, where num_rows
+      // is the number of sampled parameters corresponding to key
       std::map<std::string, std::vector<std::vector<double>>> data;
 
     public:
@@ -221,7 +223,11 @@ namespace dataframe {
       }
 
       void emplace(const std::string &key, const std::vector<double> &samples) {
-        emplace(key, std::vector<std::vector<double>>{samples});
+        std::vector<std::vector<double>> to_emplace(samples.size());
+        for (size_t i = 0; i < samples.size(); i++) {
+          to_emplace[i] = std::vector<double>{samples[i]};
+        }
+        emplace(key, to_emplace);
       }
 
       void emplace(const std::string &key, double d) {

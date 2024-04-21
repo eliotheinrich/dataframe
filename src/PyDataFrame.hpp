@@ -108,9 +108,9 @@ namespace dataframe {
     void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
     void (DataSlide::*ds_add_param2)(const std::string&, var_t const&) = &DataSlide::add_param;
 
-    void (DataSlide::*push_data1)(const std::string&, const double) = &DataSlide::push_data;
-    void (DataSlide::*push_data2)(const std::string&, const double, const double, const uint32_t) = &DataSlide::push_data;
-    void (DataSlide::*push_data3)(const std::string&, const std::vector<Sample>&) = &DataSlide::push_data;
+    void (DataSlide::*push_data1)(const std::string&, const double) = &DataSlide::push_samples_to_data;
+    void (DataSlide::*push_data2)(const std::string&, const double, const double, const uint32_t) = &DataSlide::push_samples_to_data;
+    void (DataSlide::*push_data3)(const std::string&, const std::vector<Sample>&) = &DataSlide::push_samples_to_data;
 
     nanobind::class_<Sample>(m, "Sample")
       .def(nanobind::init<>())
@@ -134,10 +134,10 @@ namespace dataframe {
       .def_rw("samples", &DataSlide::samples)
       .def("add_param", ds_add_param1)
       .def("add_param", ds_add_param2)
-      .def("add_data", &DataSlide::add_data)
-      .def("push_data", push_data1)
-      .def("push_data", push_data2)
-      .def("push_data", push_data3)
+      .def("add_data", [](DataSlide& self, const std::string& s) { self.add_data(s); })
+      .def("push_samples_to_data", push_data1)
+      .def("push_samples_to_data", push_data2)
+      .def("push_samples_to_data", push_data3)
       .def("remove", &DataSlide::remove)
       .def("__contains__", &DataSlide::contains)
       .def("__getitem__", &DataSlide::get_param)
