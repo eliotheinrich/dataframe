@@ -145,6 +145,7 @@ namespace dataframe {
       .def("__str__", &DataSlide::to_string)
       .def("__getstate__", [](const DataSlide& slide){ return slide.to_string(); })
       .def("__setstate__", [](DataSlide& slide, const std::string& s){ new (&slide) DataSlide(s); })
+      .def("describe", &DataSlide::describe)
       .def("congruent", &DataSlide::congruent)
       .def("combine", &DataSlide::combine, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL);
 
@@ -179,6 +180,7 @@ namespace dataframe {
       .def("__add__", &DataFrame::combine)
       .def("__getstate__", [](const DataFrame& frame){ return frame.to_string(); })
       .def("__setstate__", [](DataFrame& frame, const std::string& s){ new (&frame) DataFrame(s); })
+      .def("describe", &DataFrame::describe)
       .def("write", &DataFrame::write)
       .def("promote_params", &DataFrame::promote_params)
       .def("reduce", &DataFrame::reduce)

@@ -163,6 +163,8 @@ namespace dataframe {
       }
 
       std::string to_string() const;
+      
+      std::string describe() const;
 
       std::vector<std::byte> to_binary() const;
 

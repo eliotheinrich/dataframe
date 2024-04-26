@@ -280,6 +280,8 @@ namespace dataframe {
 
       std::string to_string() const;
 
+      std::string describe() const;
+
       bool congruent(const DataSlide &ds, const utils::var_t_eq& equality_comparator) {
         auto incongruent_key = first_incongruent_key(ds, equality_comparator);
         return incongruent_key == std::nullopt;

@@ -35,6 +35,41 @@ std::string DataSlide::to_string() const {
   return glz::write_json(*this);
 }
 
+std::string DataSlide::describe() const {
+  std::string s = "params: { " + glz::write_json(params) + "},\n";
+  s += "data: { ";
+  std::vector<std::string> buffer;
+  for (auto const& [key, d] : data) {
+    buffer.push_back(key + ": " + std::to_string(d.size()));
+  }
+
+  for (size_t i = 0; i < buffer.size(); i++) {
+    s += buffer[i];
+    if (i != buffer.size() - 1) {
+      s += ", ";
+    }
+  }
+
+  s += " }, \n";
+  s += "samples: { ";
+
+  buffer.clear();
+  for (auto const& [key, d] : samples) {
+    buffer.push_back(key + ": " + std::to_string(d.size()));
+  }
+
+  for (size_t i = 0; i < buffer.size(); i++) {
+    s += buffer[i];
+    if (i != buffer.size() - 1) {
+      s += ", ";
+    }
+  }
+
+  s += " }\n";
+
+  return s;
+}
+
 template <class json_object>
 static var_t parse_json_type(json_object p) {
   if ((p.type() == nlohmann::json::value_t::number_integer) || 
@@ -161,6 +196,14 @@ DataFrame::DataFrame(const std::string& s) {
 
 std::string DataFrame::to_string() const {
   return glz::write_json(*this);
+}
+
+std::string DataFrame::describe() const {
+  std::string s = "params: { " + glz::write_json(params) + "},\n";
+  s += "metadata: { " + glz::write_json(metadata) + "},\n";
+
+  s += "number of slides: " + std::to_string(slides.size());
+  return s;
 }
 
 std::vector<std::byte> DataFrame::to_binary() const {
