@@ -170,7 +170,7 @@ std::vector<std::byte> DataFrame::to_binary() const {
 }
 
 std::string DataFrame::to_json() const {
-  return glz::prettify(glz::write_json(*this), false, 2);
+  return glz::prettify_json(glz::write_json(*this));
 }
 
 DataFrame DataFrame::deserialize(const std::string& s) {

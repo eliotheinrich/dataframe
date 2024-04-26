@@ -77,7 +77,7 @@ namespace dataframe {
         file.close();
 
         std::vector<uint8_t> data(file_size);
-        for (size_t i = 0; i < file_size; i++) {
+        for (int i = 0; i < file_size; i++) {
           data[i] = static_cast<uint8_t>(buffer[i]);
         }
 
