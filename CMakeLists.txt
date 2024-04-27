@@ -21,7 +21,7 @@ include(FetchContent)
 FetchContent_Declare(
   glaze
   GIT_REPOSITORY https://github.com/stephenberry/glaze.git
-  GIT_TAG 021b5915417ae420105736c08ee56f779a5d39de
+  GIT_TAG d907f9cfb7197a29fa7cbefab310895593f5b105
 )
 
 FetchContent_Declare(
