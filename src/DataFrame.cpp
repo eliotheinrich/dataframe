@@ -36,7 +36,7 @@ std::string DataSlide::to_string() const {
 }
 
 std::string DataSlide::describe() const {
-  std::string s = "params: { " + glz::write_json(params) + "},\n";
+  std::string s = "params: " + glz::write_json(params) + "},\n";
   s += "data: { ";
   std::vector<std::string> buffer;
   for (auto const& [key, d] : data) {
@@ -199,8 +199,8 @@ std::string DataFrame::to_string() const {
 }
 
 std::string DataFrame::describe() const {
-  std::string s = "params: { " + glz::write_json(params) + "},\n";
-  s += "metadata: { " + glz::write_json(metadata) + "},\n";
+  std::string s = "params: " + glz::write_json(params) + ",\n";
+  s += "metadata: " + glz::write_json(metadata) + ",\n";
 
   s += "number of slides: " + std::to_string(slides.size());
   return s;
