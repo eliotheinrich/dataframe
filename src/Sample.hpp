@@ -165,35 +165,29 @@ namespace dataframe {
       }
 
       static Sample collapse_samples(const std::vector<Sample>& samples) {
-        size_t N = samples.size();
-        if (N == 0) {
+        size_t num_samples = samples.size();
+        if (num_samples == 0) {
           return Sample();
         }
 
         Sample s = samples[0];
-        for (uint32_t i = 1; i < N; i++) {
+        for (uint32_t i = 1; i < num_samples; i++) {
           s = s.combine(samples[i]);
         }
 
         return s;
       }
 
-      static std::vector<Sample> collapse_samples(const std::vector<std::vector<Sample>>& samples) {
-        size_t N = samples.size();
-        if (N == 0) {
-          return std::vector<Sample>();
+      static std::vector<std::vector<Sample>> collapse_samples(const std::vector<std::vector<Sample>>& samples) {
+        size_t width = samples.size();
+        if (width == 0) {
+          return std::vector<std::vector<Sample>>();
         }
 
-        size_t M = samples[0].size();
-
-        std::vector<Sample> collapsed_samples(M);
-        for (uint32_t i = 0; i < M; i++) {
-          Sample s = samples[0][i];
-          for (uint32_t j = 1; j < N; j++) {
-            s = s.combine(samples[j][i]);
-          }
-
-          collapsed_samples[i] = s;
+        std::vector<std::vector<Sample>> collapsed_samples(width);
+        for (size_t i = 0; i < width; i++) {
+          size_t num_samples = samples[i].size();
+          collapsed_samples[i].push_back(Sample::collapse_samples(samples[i]));
         }
 
         return collapsed_samples;

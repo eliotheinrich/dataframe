@@ -34,7 +34,7 @@
 using namespace nanobind::literals;
 
 namespace dataframe {
-
+  // Types which are interfaced with python
   typedef nanobind::ndarray<nanobind::numpy, double> py_nbarray;
   typedef std::variant<qvar_t, std::vector<qvar_t>, py_nbarray> py_query_t;
   typedef std::variant<py_query_t, std::vector<py_query_t>> py_query_result;
@@ -184,28 +184,30 @@ namespace dataframe {
       .def("write", &DataFrame::write)
       .def("promote_params", &DataFrame::promote_params)
       .def("reduce", &DataFrame::reduce)
+      .def("average_samples", &DataFrame::average_samples_inplace)
       .def("filter", &DataFrame::filter, "constraints"_a, "filter"_a = false)
-      .def("query", [](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique, bool error) {
-          std::vector<query_t> results = df.query(keys, constraints, unique, error);
+      .def("query", [](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique, bool error, bool num_samples) {
+          std::vector<query_t> results = df.query(keys, constraints, unique, error, num_samples);
 
+          // Allocate space for query results
           size_t num_queries = results.size();
           std::vector<double*> datas(num_queries);
           for (uint32_t i = 0; i < num_queries; i++) {
-          size_t query_size = get_query_size(results[i]);
-          datas[i] = new double[query_size];
+            size_t query_size = get_query_size(results[i]);
+            datas[i] = new double[query_size];
           }
 
           std::vector<py_query_t> py_results(num_queries);
           for (uint32_t i = 0; i < num_queries; i++) {
-          py_results[i] = std::visit(query_t_to_py(datas[i]), results[i]);
+            py_results[i] = std::visit(query_t_to_py(datas[i]), results[i]);
           }
 
           if (num_queries == 1) {
-          return py_query_result{py_results[0]};
+            return py_query_result{py_results[0]};
           } else {
-          return py_query_result{py_results};
+            return py_query_result{py_results};
           }
-          }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, "error"_a = false, nanobind::rv_policy::move);
+        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, "error"_a = false, "num_samples"_a = false, nanobind::rv_policy::move);
   }
 
 }

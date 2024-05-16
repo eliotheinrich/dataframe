@@ -268,13 +268,52 @@ namespace dataframe {
         return d;
       }
 
+      std::vector<std::vector<double>> get_num_samples(const std::string& key) const {
+        if (!data.contains(key)) {
+          return std::vector<std::vector<double>>();
+        }
+
+        size_t width = data.at(key).size();
+        if (width == 0) {
+          return std::vector<std::vector<double>>();
+        }
+
+        size_t length = data.at(key)[0].size();
+        std::vector<std::vector<double>> d(width, std::vector<double>(length));
+
+        for (uint32_t i = 0; i < width; i++) {
+          std::vector<Sample> di = data.at(key)[i];
+          if (di.size() != length) {
+            throw std::invalid_argument("Stored data is not square.");
+          }
+
+          for (uint32_t j = 0; j < length; j++) {
+            d[i][j] = di[j].get_num_samples();
+          }
+        }
+
+        return d;
+      }
+
+      bool remove_param(const std::string& key) {
+        return params.erase(key);
+      }
+
+      bool remove_samples(const std::string& key) {
+        return samples.erase(key);
+      }
+
+      bool remove_data(const std::string& key) {
+        return data.erase(key);
+      }
+
       bool remove(const std::string& key) {
         if (params.contains(key)) { 
-          return params.erase(key);
+          return remove_param(key);
         } else if (data.contains(key)) {
-          return data.erase(key);
+          return remove_data(key);
         } else { 
-          return samples.erase(key);
+          return remove_samples(key);
         }
       }
 
@@ -327,6 +366,24 @@ namespace dataframe {
         }
         
         return std::nullopt;
+      }
+
+      void average_samples_inplace() {
+        for (auto const &[key, val] : data) {
+          data[key] = Sample::collapse_samples(val);
+        }
+
+        for (auto const &[key, val] : samples) {
+          add_data(key);
+          push_samples_to_data(key, val, true);
+          remove_data(key);
+        }
+      }
+
+      DataSlide average_samples() const {
+        DataSlide copy(*this);
+        copy.average_samples_inplace();
+        return copy;
       }
 
       DataSlide combine(const DataSlide &other, double atol=DF_ATOL, double rtol=DF_RTOL) {

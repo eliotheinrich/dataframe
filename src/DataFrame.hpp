@@ -233,6 +233,22 @@ namespace dataframe {
         }
       }
 
+      void average_samples_inplace() {
+        for (size_t i = 0; i < slides.size(); i++) {
+          slides[i].average_samples_inplace();
+        }
+      }
+
+      DataFrame average_samples() const {
+        DataFrame copy(*this);
+        
+        for (size_t i = 0; i < slides.size(); i++) {
+          copy.slides[i].average_samples_inplace();
+        }
+
+        return copy;
+      }
+
       DataFrame filter(const std::vector<Params>& constraints, bool invert = false) {
         std::set<uint32_t> inds;
         for (auto const &constraint : constraints) {
@@ -275,8 +291,13 @@ namespace dataframe {
         const query_key_t& keys_var, 
         const Params& constraints, 
         bool unique=false, 
-        bool error=false
+        bool error=false,
+        bool num_samples=false
       ) {
+        if (num_samples && error) {
+          throw std::invalid_argument("Cannot query both error and number of samples.");
+        }
+
         std::vector<std::string> keys;
         if (keys_var.index() == 0) {
           keys = std::vector<std::string>{std::get<std::string>(keys_var)};
@@ -323,6 +344,10 @@ namespace dataframe {
             if (error) {
               for (auto const i : inds) {
                 data_vals.push_back(slides[i].get_std(key));
+              }
+            } else if (num_samples) {
+              for (auto const i : inds) {
+                data_vals.push_back(slides[i].get_num_samples(key));
               }
             } else {
               for (auto const i : inds) {
