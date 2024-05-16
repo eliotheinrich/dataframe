@@ -194,7 +194,12 @@ class ParallelCompute:
     @staticmethod
     def _do_run(config, num_threads, id):
         try:
-            slide = config.compute(num_threads)
+            _slide = config.compute(num_threads)
+            if isinstance(_slide, DataSlide):
+                slide = _slide
+            else:
+                slide = DataSlide(_slide)
+
             slide.add_param(config.params)
 
             return id, slide

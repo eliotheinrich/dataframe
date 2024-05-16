@@ -24,7 +24,10 @@
 #define EXPORT_CONFIG(A)                                              \
   nanobind::class_<A, dataframe::Config>(m, #A)                       \
   .def(nanobind::init<dataframe::Params&>())                          \
-  .def("compute", &A::compute)                                        \
+  .def("compute", [](A& self, uint32_t num_threads) {                 \
+      dataframe::DataSlide slide = self.compute(num_threads);            \
+      return slide.to_bytes();                                        \
+    })                                                                \
   .def("clone", &A::clone)                                            \
   .def("__getstate__", [](const A& config) { return config.params; }) \
   .def("__setstate__", [](A& config, dataframe::Params& params){ new (&config) A(params); } )
@@ -129,6 +132,7 @@ namespace dataframe {
       .def(nanobind::init<Params&>())
       .def(nanobind::init<const std::string&>())
       .def(nanobind::init<const DataSlide&>())
+      .def(nanobind::init<const std::vector<byte_t>&>())
       .def_rw("params", &DataSlide::params)
       .def_rw("data", &DataSlide::data)
       .def_rw("samples", &DataSlide::samples)

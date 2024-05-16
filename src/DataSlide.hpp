@@ -40,6 +40,8 @@ namespace dataframe {
         }
       }
 
+      DataSlide(const std::vector<byte_t>& bytes);
+
       static DataSlide copy_params(const DataSlide& other) {
         DataSlide slide;
         for (auto const& [key, val]: other.params) {
@@ -89,9 +91,13 @@ namespace dataframe {
       }
 
       void push_samples_to_data(const std::string& key, const std::vector<std::vector<double>>& sample, bool avg=false) {
+        if (!data.contains(key)) {
+          std::string error_message = "Data with key " + key + " does not exist.";
+          throw std::invalid_argument(error_message);
+        }
         size_t width = data[key].size();
         if (sample.size() != width) {
-          std::string error_message = "(1) Error pushing sample at key " + key + "; data[" + key + "] has width "
+          std::string error_message = "Error pushing sample at key " + key + "; data[" + key + "] has width "
                                     + std::to_string(width) + " but provided sample has width "
                                     + std::to_string(sample.size()) + ".";
           throw std::invalid_argument(error_message);
@@ -120,6 +126,10 @@ namespace dataframe {
       }
 
       void push_samples_to_data(const std::string& key, const std::vector<std::vector<Sample>>& sample) {
+        if (!data.contains(key)) {
+          std::string error_message = "Data with key " + key + " does not exist.";
+          throw std::invalid_argument(error_message);
+        }
         size_t width = data[key].size();
         if (sample.size() != width) {
           std::string error_message = "Error pushing sample at key " + key + "; data[" + key + "] has width "
@@ -134,6 +144,10 @@ namespace dataframe {
       }
 
       void push_samples_to_data(const std::string& key, const std::vector<Sample>& sample_vec) {
+        if (!data.contains(key)) {
+          std::string error_message = "Data with key " + key + " does not exist.";
+          throw std::invalid_argument(error_message);
+        }
         size_t width = data[key].size();
         if (sample_vec.size() != width) {
           std::string error_message = "(2) Error pushing sample at key " + key + "; data[" + key + "] has width "
@@ -191,6 +205,10 @@ namespace dataframe {
       }
 
       void push_samples(const std::string& key, const std::vector<std::vector<double>>& sample) {
+        if (!samples.contains(key)) {
+          std::string error_message = "Samples with key " + key + " does not exist.";
+          throw std::invalid_argument(error_message);
+        }
         size_t width = samples[key].size();
         if (sample.size() != width) {
           std::string error_message = "Error pushing sample at key " + key + "; samples[" + key + "] has width "
@@ -205,10 +223,18 @@ namespace dataframe {
       }
 
       void push_samples(const std::string& key, const std::vector<double>& double_vec) {
+        if (!samples.contains(key)) {
+          std::string error_message = "Samples with key " + key + " does not exist.";
+          throw std::invalid_argument(error_message);
+        }
         samples[key].push_back(double_vec);
       }
 
       void push_samples(const std::string &key, const double d) {
+        if (!samples.contains(key)) {
+          std::string error_message = "Samples with key " + key + " does not exist.";
+          throw std::invalid_argument(error_message);
+        }
         samples[key].push_back(std::vector<double>(d));
       }
 
@@ -316,6 +342,8 @@ namespace dataframe {
           return remove_samples(key);
         }
       }
+
+      std::vector<byte_t> to_bytes() const;
 
       std::string to_string() const;
 
