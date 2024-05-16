@@ -45,7 +45,7 @@ namespace dataframe {
         init_qtable();
       }
 
-      DataFrame(const std::vector<uint8_t>& data);
+      DataFrame(const std::vector<byte_t>& bytes);
 
       DataFrame(const std::string& s);
 
@@ -166,7 +166,7 @@ namespace dataframe {
       
       std::string describe() const;
 
-      std::vector<std::byte> to_binary() const;
+      std::vector<byte_t> to_bytes() const;
 
       std::string to_json() const;
 
@@ -174,7 +174,7 @@ namespace dataframe {
         std::vector<std::string> components = utils::split(filename, ".");
         std::string extension = components[components.size() - 1];
         if (extension == "eve") {
-          std::vector<std::byte> content = to_binary();
+          auto content = to_bytes();
           std::ofstream output_file(filename, std::ios::out | std::ios::binary);
           output_file.write(reinterpret_cast<const char*>(&content[0]), content.size());
           output_file.close();

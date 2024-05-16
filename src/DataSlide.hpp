@@ -40,6 +40,8 @@ namespace dataframe {
         }
       }
 
+      DataSlide(const std::vector<byte_t>& bytes);
+
       static DataSlide copy_params(const DataSlide& other) {
         DataSlide slide;
         for (auto const& [key, val]: other.params) {
@@ -301,6 +303,8 @@ namespace dataframe {
           return samples.erase(key);
         }
       }
+
+      std::vector<byte_t> to_bytes() const;
 
       std::string to_string() const;
 

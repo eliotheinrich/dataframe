@@ -31,6 +31,20 @@ DataSlide::DataSlide(const std::string &s) {
   }
 }
 
+DataSlide::DataSlide(const std::vector<byte_t>& bytes) {
+  auto pe = glz::read_binary(*this, bytes);
+  if (pe) {
+    std::string error_message = "Error parsing DataSlide from binary.";
+    throw std::invalid_argument(error_message);
+  }
+}
+
+std::vector<byte_t> DataSlide::to_bytes() const {
+  std::vector<byte_t> data;
+  glz::write_binary(*this, data);
+  return data;
+}
+
 std::string DataSlide::to_string() const {
   return glz::write_json(*this);
 }
@@ -156,8 +170,8 @@ DataSlide DataSlide::deserialize(const std::string& s) {
   return slide;
 }
 
-DataFrame::DataFrame(const std::vector<uint8_t>& data) {
-  auto pe = glz::read_binary(*this, data);
+DataFrame::DataFrame(const std::vector<byte_t>& bytes) {
+  auto pe = glz::read_binary(*this, bytes);
   if (pe) {
     std::string error_message = "Error parsing DataFrame from binary.";
     throw std::invalid_argument(error_message);
@@ -206,8 +220,8 @@ std::string DataFrame::describe() const {
   return s;
 }
 
-std::vector<std::byte> DataFrame::to_binary() const {
-  std::vector<std::byte> data;
+std::vector<byte_t> DataFrame::to_bytes() const {
+  std::vector<byte_t> data;
   glz::write_binary(*this, data);
   return data;
 }
