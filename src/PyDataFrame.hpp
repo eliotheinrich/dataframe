@@ -9,11 +9,14 @@
 #include <nanobind/trampoline.h>
 #include <nanobind/ndarray.h>
 
-#define EXPORT_SIMULATOR_DRIVER(A)                                                   \
-  nanobind::class_<dataframe::TimeSamplingDriver<A>>(m, #A)                          \
-  .def(nanobind::init<dataframe::Params&>())                                         \
-  .def_rw("params", &dataframe::TimeSamplingDriver<A>::params)                       \
-  .def("generate_dataslide", &dataframe::TimeSamplingDriver<A>::generate_dataslide);
+#define EXPORT_SIMULATOR_DRIVER(A)                                                              \
+  nanobind::class_<dataframe::TimeSamplingDriver<A>>(m, #A)                                     \
+  .def(nanobind::init<dataframe::Params&>())                                                    \
+  .def_rw("params", &dataframe::TimeSamplingDriver<A>::params)                                  \
+  .def("generate_dataslide", [](dataframe::TimeSamplingDriver<A>& self, uint32_t num_threads) { \
+      dataframe::DataSlide slide = self.generate_dataslide(num_threads);                        \
+      return slide.to_bytes();                                                                  \
+    });                                                                              
 
 #define INIT_CONFIG()                                \
   nanobind::class_<dataframe::Config>(m, "Config")   \
@@ -25,7 +28,7 @@
   nanobind::class_<A, dataframe::Config>(m, #A)                       \
   .def(nanobind::init<dataframe::Params&>())                          \
   .def("compute", [](A& self, uint32_t num_threads) {                 \
-      dataframe::DataSlide slide = self.compute(num_threads);            \
+      dataframe::DataSlide slide = self.compute(num_threads);         \
       return slide.to_bytes();                                        \
     })                                                                \
   .def("clone", &A::clone)                                            \
@@ -113,7 +116,12 @@ namespace dataframe {
 
     void (DataSlide::*push_data1)(const std::string&, const double) = &DataSlide::push_samples_to_data;
     void (DataSlide::*push_data2)(const std::string&, const double, const double, const uint32_t) = &DataSlide::push_samples_to_data;
-    void (DataSlide::*push_data3)(const std::string&, const std::vector<Sample>&) = &DataSlide::push_samples_to_data;
+    void (DataSlide::*push_data3)(const std::string&, const std::vector<double>&) = &DataSlide::push_samples_to_data;
+    void (DataSlide::*push_data4)(const std::string&, const std::vector<std::vector<double>>&, bool) = &DataSlide::push_samples_to_data;
+
+    void (DataSlide::*push_samples1)(const std::string&, const double) = &DataSlide::push_samples;
+    void (DataSlide::*push_samples2)(const std::string&, const std::vector<double>&) = &DataSlide::push_samples;
+    void (DataSlide::*push_samples3)(const std::string&, const std::vector<std::vector<double>>&) = &DataSlide::push_samples;
 
     nanobind::class_<Sample>(m, "Sample")
       .def(nanobind::init<>())
@@ -138,10 +146,15 @@ namespace dataframe {
       .def_rw("samples", &DataSlide::samples)
       .def("add_param", ds_add_param1)
       .def("add_param", ds_add_param2)
-      .def("add_data", [](DataSlide& self, const std::string& s) { self.add_data(s); })
+      .def("add_data", [](DataSlide& self, const std::string& s, size_t width) { self.add_data(s, width); }, "key"_a, "width"_a = 1)
       .def("push_samples_to_data", push_data1)
       .def("push_samples_to_data", push_data2)
       .def("push_samples_to_data", push_data3)
+      .def("push_samples_to_data", push_data4, "key"_a, "data"_a, "avg"_a = false)
+      .def("add_samples", [](DataSlide& self, const std::string& s, size_t width) { self.add_samples(s, width); }, "key"_a, "width"_a = 1)
+      .def("push_samples", push_samples1)
+      .def("push_samples", push_samples2)
+      .def("push_samples", push_samples3)
       .def("remove", &DataSlide::remove)
       .def("__contains__", &DataSlide::contains)
       .def("__getitem__", &DataSlide::get_param)

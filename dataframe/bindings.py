@@ -100,6 +100,7 @@ class TimeConfig(Config):
         return self.params, self.simulator_generator
 
     def compute(self, num_threads):
+        print("in timeconfig")
         slide = self.simulator_driver.generate_dataslide(num_threads)
         self.params = self.simulator_driver.params
         return slide
