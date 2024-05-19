@@ -338,6 +338,21 @@ inline int get<int>(const Params &params, const std::string& key) {
   return std::round(get<double>(params, key));
 }
 
+static void emplace(data_t& data, const std::string& key, const std::vector<std::vector<double>>& d) {
+  data.emplace(key, d);
+}
+
+static void emplace(data_t& data, const std::string& key, const std::vector<double>& d) {
+  std::vector<std::vector<double>> d_transpose(d.size(), std::vector<double>(1));
+  for (size_t i = 0; i < d.size(); i++) {
+    d_transpose[i][0] = d[i];
+  }
+  emplace(data, key, d_transpose);
+}
+
+static void emplace(data_t& data, const std::string& key, double d) {
+  emplace(data, key, std::vector<double>{d});
+}
 
 Params load_params(const std::string& filename);
 

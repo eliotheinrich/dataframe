@@ -204,79 +204,79 @@ namespace dataframe {
 
 
   // Thin wrapper for map to overload emplace
-  class data_t {
-    private:
-      // formatted so that data[key] is num_rows x num_samples, where num_rows
-      // is the number of sampled parameters corresponding to key
-      std::map<std::string, std::vector<std::vector<double>>> data;
+  //class data_t {
+  //  private:
+  //    // formatted so that data[key] is num_rows x num_samples, where num_rows
+  //    // is the number of sampled parameters corresponding to key
+  //    std::map<std::string, std::vector<std::vector<double>>> data;
 
-    public:
-      data_t()=default;
-      ~data_t()=default;
+  //  public:
+  //    data_t()=default;
+  //    ~data_t()=default;
 
-      void emplace(const std::string &key, const std::vector<std::vector<double>> &samples) {
-        data.emplace(key, samples);
-      }
+  //    void emplace(const std::string &key, const std::vector<std::vector<double>> &samples) {
+  //      data.emplace(key, samples);
+  //    }
 
-      void emplace(const std::string &key, const std::vector<double> &samples) {
-        std::vector<std::vector<double>> to_emplace(samples.size());
-        for (size_t i = 0; i < samples.size(); i++) {
-          to_emplace[i] = std::vector<double>{samples[i]};
-        }
-        emplace(key, to_emplace);
-      }
+  //    void emplace(const std::string &key, const std::vector<double> &samples) {
+  //      std::vector<std::vector<double>> to_emplace(samples.size());
+  //      for (size_t i = 0; i < samples.size(); i++) {
+  //        to_emplace[i] = std::vector<double>{samples[i]};
+  //      }
+  //      emplace(key, to_emplace);
+  //    }
 
-      void emplace(const std::string &key, double d) {
-        emplace(key, std::vector<double>{d});
-      }
-      
-      void clear() {
-        data.clear();
-      }
+  //    void emplace(const std::string &key, double d) {
+  //      emplace(key, std::vector<double>{d});
+  //    }
+  //    
+  //    void clear() {
+  //      data.clear();
+  //    }
 
-      void swap(data_t& other) {
-        data.swap(other.data);
-      }
+  //    void swap(data_t& other) {
+  //      data.swap(other.data);
+  //    }
 
-      auto find(const std::string& key) const {
-        return data.find(key);
-      }
+  //    auto find(const std::string& key) const {
+  //      return data.find(key);
+  //    }
 
-      auto begin() const {
-        return data.begin();
-      }
+  //    auto begin() const {
+  //      return data.begin();
+  //    }
 
-      auto end() const {
-        return data.end();
-      }
+  //    auto end() const {
+  //      return data.end();
+  //    }
 
-      int count(const std::string &key) const {
-        return data.count(key);
-      }
+  //    int count(const std::string &key) const {
+  //      return data.count(key);
+  //    }
 
-      size_t size() const {
-        return data.size();
-      }
+  //    size_t size() const {
+  //      return data.size();
+  //    }
 
-      bool empty() const {
-        return data.empty();
-      }
+  //    bool empty() const {
+  //      return data.empty();
+  //    }
 
-      std::vector<std::vector<double>> at(const std::string& key) const {
-        return data.at(key);
-      }
+  //    std::vector<std::vector<double>> at(const std::string& key) const {
+  //      return data.at(key);
+  //    }
 
-      const std::vector<std::vector<double>>& operator[](const std::string& key) const {
-        return data.at(key);
-      }
+  //    const std::vector<std::vector<double>>& operator[](const std::string& key) const {
+  //      return data.at(key);
+  //    }
 
-      std::vector<std::vector<double>>& operator[](const std::string& key) {
-        return data[key];
-      }
+  //    std::vector<std::vector<double>>& operator[](const std::string& key) {
+  //      return data[key];
+  //    }
 
-      data_t& operator=(const data_t& other) {
-        data = other.data;
-        return *this;
-      }
-  };
+  //    data_t& operator=(const data_t& other) {
+  //      data = other.data;
+  //      return *this;
+  //    }
+  //};
 }

@@ -28,7 +28,7 @@ std::vector<dataframe::byte_t> convert_bytes(const nanobind::bytes& bytes) {
       dataframe::DataSlide slide = self.generate_dataslide(num_threads);                        \
       std::vector<dataframe::byte_t> _bytes = slide.to_bytes();                                 \
       nanobind::bytes bytes = convert_bytes(_bytes);                                            \
-      return _bytes;                                                                            \
+      return bytes;                                                                             \
     });                                                                              
 
 #define INIT_CONFIG()                                \

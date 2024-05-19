@@ -20,6 +20,9 @@ typedef std::variant<double, std::string> var_t;
 // data can be provided as simple doubles or vectors of doubles
 typedef std::map<std::string, var_t> Params;
 
+// For building DataSlides with TimeSamplingDriver
+typedef std::map<std::string, std::vector<std::vector<double>>> data_t;
+
 // --- DEFINING VALID QUERY RESULTS ---
 // Options are:
 // 1.) Frame-level param -> var_t

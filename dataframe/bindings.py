@@ -68,7 +68,7 @@ def parse_config(config, p=None):
 
 class Config(ABC):
     def __init__(self, params):
-        self.params = params
+        self.params = params.copy()
         self.num_runs = params.setdefault("num_runs", 1)
 
     def __getstate__(self):
@@ -195,6 +195,7 @@ class ParallelCompute:
     def _do_run(config, num_threads, id):
         try:
             _slide = config.compute(num_threads)
+
             if isinstance(_slide, DataSlide):
                 slide = _slide
             else:
