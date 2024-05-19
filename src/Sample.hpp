@@ -57,6 +57,8 @@ namespace dataframe {
         }
       }
 
+      ~Sample()=default;
+
       bool isnan() const {
         return std::isnan(get_mean()) || std::isnan(get_std());
       }

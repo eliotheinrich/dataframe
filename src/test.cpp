@@ -8,11 +8,17 @@ using namespace dataframe;
 using namespace dataframe::utils;
 
 int main(int argc, char* argv[]) {
-  DataFrame frame = DataFrame::from_file("/Users/eliotheinrich/Projects/plots/data/qrpm_21_t.eve");
-  std::cout << frame.to_json() << std::endl;
-  std::string key = "surface";
-  Params constraints;
-  constraints.emplace("system_size", 128.0);
+  std::string filename = "Users/eliotheinrich/Projects/hypergraph.json";
 
-  auto query_result = frame.query(key, constraints);
+
+  for (int i = 0; i < 10000; i++) {
+    DataSlide s1;
+    s1.add_data("test_data");
+    s1.push_samples_to_data("test_data", 0.1);
+
+    std::vector<byte_t> bytes = s1.to_bytes();
+
+    DataSlide s2(bytes);
+  }
+
 }

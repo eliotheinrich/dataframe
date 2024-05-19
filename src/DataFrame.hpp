@@ -66,6 +66,8 @@ namespace dataframe {
         init_qtable();
       }
 
+      ~DataFrame()=default;
+
       static DataFrame from_file(const std::string& filename) {
         std::ifstream file(filename, std::ios::binary | std::ios::ate);
 
@@ -76,9 +78,9 @@ namespace dataframe {
         file.read(buffer.data(), file_size);
         file.close();
 
-        std::vector<uint8_t> data(file_size);
+        std::vector<byte_t> data(file_size);
         for (int i = 0; i < file_size; i++) {
-          data[i] = static_cast<uint8_t>(buffer[i]);
+          data[i] = static_cast<byte_t>(buffer[i]);
         }
 
         return DataFrame(data);

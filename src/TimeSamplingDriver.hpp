@@ -37,6 +37,8 @@ namespace dataframe {
         }
       }
 
+      ~TimeSamplingDriver()=default;
+
       DataSlide generate_dataslide(uint32_t num_threads) {
         auto start_time = std::chrono::high_resolution_clock::now();
 

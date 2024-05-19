@@ -42,6 +42,8 @@ namespace dataframe {
 
       DataSlide(const std::vector<byte_t>& bytes);
 
+      ~DataSlide()=default;
+
       static DataSlide copy_params(const DataSlide& other) {
         DataSlide slide;
         for (auto const& [key, val]: other.params) {

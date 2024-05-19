@@ -11,7 +11,7 @@
 
 namespace dataframe {
   
-typedef uint8_t byte_t;
+typedef char byte_t;
 
 // --- DEFINING VALID PARAMETER VALUES ---
 typedef std::variant<double, std::string> var_t;

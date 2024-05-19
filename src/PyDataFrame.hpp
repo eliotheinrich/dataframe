@@ -9,13 +9,26 @@
 #include <nanobind/trampoline.h>
 #include <nanobind/ndarray.h>
 
+nanobind::bytes convert_bytes(const std::vector<dataframe::byte_t>& bytes) {
+  nanobind::bytes nb_bytes(bytes.data(), bytes.size());
+  return nb_bytes;
+}
+
+std::vector<dataframe::byte_t> convert_bytes(const nanobind::bytes& bytes) {
+  std::vector<dataframe::byte_t> bytes_vec(bytes.c_str(), bytes.c_str() + bytes.size());
+  bytes_vec.push_back('\0');
+  return bytes_vec;
+}
+
 #define EXPORT_SIMULATOR_DRIVER(A)                                                              \
   nanobind::class_<dataframe::TimeSamplingDriver<A>>(m, #A)                                     \
   .def(nanobind::init<dataframe::Params&>())                                                    \
   .def_rw("params", &dataframe::TimeSamplingDriver<A>::params)                                  \
   .def("generate_dataslide", [](dataframe::TimeSamplingDriver<A>& self, uint32_t num_threads) { \
       dataframe::DataSlide slide = self.generate_dataslide(num_threads);                        \
-      return slide.to_bytes();                                                                  \
+      std::vector<dataframe::byte_t> _bytes = slide.to_bytes();                                 \
+      nanobind::bytes bytes = convert_bytes(_bytes);                                            \
+      return _bytes;                                                                            \
     });                                                                              
 
 #define INIT_CONFIG()                                \
@@ -29,13 +42,13 @@
   .def(nanobind::init<dataframe::Params&>())                          \
   .def("compute", [](A& self, uint32_t num_threads) {                 \
       dataframe::DataSlide slide = self.compute(num_threads);         \
-      return slide.to_bytes();                                        \
+      std::vector<dataframe::byte_t> _bytes = slide.to_bytes();       \
+      nanobind::bytes bytes = convert_bytes(_bytes);                  \
+      return bytes;                                                   \
     })                                                                \
   .def("clone", &A::clone)                                            \
   .def("__getstate__", [](const A& config) { return config.params; }) \
   .def("__setstate__", [](A& config, dataframe::Params& params){ new (&config) A(params); } )
-
-
 
 using namespace nanobind::literals;
 
@@ -140,10 +153,14 @@ namespace dataframe {
       .def(nanobind::init<Params&>())
       .def(nanobind::init<const std::string&>())
       .def(nanobind::init<const DataSlide&>())
-      .def(nanobind::init<const std::vector<byte_t>&>())
+      .def("__init__", [](DataSlide* t, const nanobind::bytes& bytes) {
+        auto byte_vec = convert_bytes(bytes);
+        new (t) DataSlide(byte_vec);
+      })
       .def_rw("params", &DataSlide::params)
       .def_rw("data", &DataSlide::data)
       .def_rw("samples", &DataSlide::samples)
+      .def("to_bytes", &DataSlide::to_bytes)
       .def("add_param", ds_add_param1)
       .def("add_param", ds_add_param2)
       .def("add_data", [](DataSlide& self, const std::string& s, size_t width) { self.add_data(s, width); }, "key"_a, "width"_a = 1)
@@ -178,7 +195,10 @@ namespace dataframe {
       .def(nanobind::init<const Params&, const std::vector<DataSlide>&>())
       .def(nanobind::init<const std::string&>())
       .def(nanobind::init<const DataFrame&>())
-      .def(nanobind::init<const std::vector<uint8_t>&>())
+      .def("__init__", [](DataFrame* t, const nanobind::bytes& bytes) {
+        auto byte_vec = convert_bytes(bytes);
+        new (t) DataFrame(byte_vec);
+      })
       .def_rw("params", &DataFrame::params)
       .def_rw("metadata", &DataFrame::metadata)
       .def_rw("slides", &DataFrame::slides)
