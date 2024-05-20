@@ -112,15 +112,18 @@ namespace dataframe {
 
         if (avg) {
           for (size_t i = 0; i < width; i++) {
-            if (data[key][i].size() != 1) {
+            size_t num_samples = data[key][i].size();
+            if (num_samples == 0) { // Data is empty; emplace
+              data[key][i].push_back(sample_vec[i]);
+            } else if (num_samples == 1) { // Average with (single) existing sample
+              Sample s1 = data[key][i][0];
+              Sample s2 = sample_vec[i];
+              data[key][i][0] = s1.combine(s2);
+            } else { // Otherwise, throw an error
               std::string error_message = "data[" + key + "][" + std::to_string(i) + "] has width "
                                         + std::to_string(data[key][i].size()) + "; cannot perform average.";
-              throw std::invalid_argument(error_message);
+              throw std::runtime_error(error_message);
             }
-
-            Sample s1 = data[key][i][0];
-            Sample s2 = sample_vec[i];
-            data[key][i][0] = s1.combine(s2);
           }
         } else {
           push_samples_to_data(key, sample_vec);
@@ -404,7 +407,7 @@ namespace dataframe {
         }
 
         for (auto const &[key, val] : samples) {
-          add_data(key);
+          add_data(key, val.size());
           push_samples_to_data(key, val, true);
           remove_data(key);
         }

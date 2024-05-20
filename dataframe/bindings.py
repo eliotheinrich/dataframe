@@ -281,7 +281,7 @@ def load_data(filename: str) -> DataFrame:
 
     elif extension == "eve":
         with open(filename, 'rb') as f:
-            s = list(bytearray(f.read()))
+            s = bytes(f.read())
             return DataFrame(s)
 
 def load_json(filename: str, verbose: bool = False) -> list:
