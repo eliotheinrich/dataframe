@@ -406,10 +406,16 @@ namespace dataframe {
           data[key] = Sample::collapse_samples(val);
         }
 
+        std::vector<std::string> to_delete;
         for (auto const &[key, val] : samples) {
           add_data(key, val.size());
           push_samples_to_data(key, val, true);
-          remove_data(key);
+          to_delete.push_back(key);
+        }
+
+
+        for (auto const& key : to_delete) {
+          remove_samples(key);
         }
       }
 
