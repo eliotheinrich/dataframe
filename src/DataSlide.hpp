@@ -18,13 +18,16 @@ namespace dataframe {
       std::map<std::string, std::vector<std::vector<Sample>>> data;
       std::map<std::string, std::vector<std::vector<double>>> samples;
 
+      // For storing extraneous data, e.g. serialized simulator states associated with this slide
+      std::vector<byte_t> buffer;
+
       DataSlide() {}
 
       DataSlide(Params &params) : params(params) {}
 
       DataSlide(const std::string &s);
 
-      DataSlide(const DataSlide& other) {
+      DataSlide(const DataSlide& other) : buffer(other.buffer) {
         for (auto const& [key, val]: other.params) {
           add_param(key, val);
         }
@@ -350,7 +353,7 @@ namespace dataframe {
 
       std::vector<byte_t> to_bytes() const;
 
-      std::string to_string() const;
+      std::string to_json() const;
 
       std::string describe() const;
 
@@ -431,7 +434,7 @@ namespace dataframe {
 
         if (key != std::nullopt) {
           std::string error_message = "DataSlides not congruent at key \"" + key.value() + "\".\n"
-                                    + to_string() + "\n\n\n" + other.to_string() + "\n";
+                                    + to_json() + "\n\n\n" + other.to_json() + "\n";
           throw std::invalid_argument(error_message);
         }
         

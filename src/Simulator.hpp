@@ -4,7 +4,6 @@
 #include <random>
 
 namespace dataframe {
-
 #define DEFAULT_RANDOM_SEED -1
 
   class Simulator {
@@ -40,6 +39,15 @@ namespace dataframe {
 
       virtual data_t take_samples() {
         return data_t();
+      }
+
+      virtual std::vector<byte_t> serialize() const {
+        std::cerr << "WARNING: serialize not implemented for this simulator; return empty data.";
+        return {};
+      }
+
+      virtual void deserialize(const std::vector<byte_t>& data) {
+        std::cerr << "Deserialize not implemented for this simulator; skipping.";
       }
 
       virtual void cleanup() {

@@ -78,7 +78,7 @@ class Config(ABC):
         self.__init__(*state)
 
     def get_nruns(self):
-        return self.params["num_runs"]
+        return int(self.params["num_runs"])
 
     @abstractmethod
     def compute(self, num_threads):
@@ -95,12 +95,20 @@ class TimeConfig(Config):
 
         self.simulator_generator = simulator_generator
         self.simulator_driver = simulator_generator(params)
+        self._serialized_simulator = None
+
+    # Allow injection of serialized simulator data
+    def store_serialized_simulator(self, data):
+        self._serialized_simulator = data
 
     def __getstate__(self):
         return self.params, self.simulator_generator
 
     def compute(self, num_threads):
-        slide = self.simulator_driver.generate_dataslide(num_threads)
+        self.simulator_driver.init_simulator(num_threads, self._serialized_simulator)
+
+        slide = self.simulator_driver.generate_dataslide()
+
         self.params = self.simulator_driver.params
         return slide
 
@@ -131,19 +139,16 @@ class ParallelCompute:
         self.configs = configs
         self._metadata = metadata
 
-        self.num_threads = metadata.setdefault("num_threads", 1)
-        self.num_threads_per_task = metadata.setdefault("num_threads_per_task", 1)
-        self.atol = metadata.setdefault("atol", ATOL)
-        self.rtol = metadata.setdefault("rtol", RTOL)
-        self.average_congruent_runs = metadata.setdefault("average_congruent_runs", True)
-        self.parallelization_type = metadata.setdefault("parallelization_type", self.SERIAL)
-        self.record_error = metadata.setdefault("record_error", True)
+        self.num_threads = int(metadata.setdefault("num_threads", 1))
+        self.num_threads_per_task = int(metadata.setdefault("num_threads_per_task", 1))
+        self.atol = float(metadata.setdefault("atol", ATOL))
+        self.rtol = float(metadata.setdefault("rtol", RTOL))
+        self.parallelization_type = int(metadata.setdefault("parallelization_type", self.SERIAL))
+        self.average_congruent_runs = bool(metadata.setdefault("average_congruent_runs", True))
+        self.batch_size = int(metadata.setdefault("batch_size", 1024))
+        self.verbose = bool(metadata.setdefault("verbose", True))
+
         self.dataframe = DataFrame(self.atol, self.rtol)
-
-        self.batch_size = metadata.setdefault("batch_size", 1024)
-
-        self.verbose = metadata.setdefault("verbose", True)
-
         self.num_slides = None
 
     def compute(self):
@@ -204,6 +209,7 @@ class ParallelCompute:
             slide.add_param(config.params)
 
             return id, slide
+
         except Exception as e:
             if "SLURM_JOB_ID" in os.environ:
                 filename = f"err_{os.environ['SLURM_JOB_ID']}_{id}.json"

@@ -19,7 +19,8 @@ struct glz::meta<DataSlide> {
   static constexpr auto value = glz::object(
     "params", &DataSlide::params,
     "data", &DataSlide::data,
-    "samples", &DataSlide::samples
+    "samples", &DataSlide::samples,
+    "buffer", &DataSlide::buffer
   );
 };
 
@@ -45,8 +46,12 @@ std::vector<byte_t> DataSlide::to_bytes() const {
   return data;
 }
 
-std::string DataSlide::to_string() const {
-  return glz::write_json(*this);
+std::string DataSlide::to_json() const {
+  static constexpr auto partial = glz::json_ptrs("/params", "/data", "/samples");
+
+  std::string s;
+  glz::write_json<partial>(*this, s);
+  return glz::prettify_json(s);
 }
 
 std::string DataSlide::describe() const {
@@ -208,10 +213,6 @@ DataFrame::DataFrame(const std::string& s) {
   init_qtable();
 }
 
-std::string DataFrame::to_string() const {
-  return glz::write_json(*this);
-}
-
 std::string DataFrame::describe() const {
   std::string s = "params: " + glz::write_json(params) + ",\n";
   s += "metadata: " + glz::write_json(metadata) + ",\n";
@@ -227,7 +228,12 @@ std::vector<byte_t> DataFrame::to_bytes() const {
 }
 
 std::string DataFrame::to_json() const {
-  return glz::prettify_json(glz::write_json(*this));
+  // For now, don't print slides when displaying DataFrame
+  static constexpr auto partial = glz::json_ptrs("/params", "/metadata");
+
+  std::string s;
+  glz::write_json<partial>(*this, s);
+  return glz::prettify_json(s);
 }
 
 DataFrame DataFrame::deserialize(const std::string& s) {

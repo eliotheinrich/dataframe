@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "DataSlide.hpp"
+#include "Simulator.hpp"
 #include <chrono>
 
 namespace dataframe {
@@ -19,6 +20,7 @@ namespace dataframe {
       uint32_t sampling_timesteps;
       uint32_t equilibration_timesteps;
       uint32_t measurement_freq;
+      bool serialize;
       bool temporal_avg;
 
       bool save_samples;
@@ -29,22 +31,27 @@ namespace dataframe {
         measurement_freq = utils::get<int>(params, "measurement_freq", DEFAULT_MEASUREMENT_FREQ);
 
         temporal_avg = (bool) utils::get<int>(params, "temporal_avg", DEFAULT_TEMPORAL_AVG);
-
         save_samples = (bool) utils::get<int>(params, "save_samples", DEFAULT_SAVE_SAMPLES);
-
         if (temporal_avg && save_samples) {
           throw std::invalid_argument("Cannot both perform temporal average and save all samples.");
         }
+
+        serialize = (bool) utils::get<int>(params, "serialize", false);
       }
 
       ~TimeSamplingDriver()=default;
 
-      DataSlide generate_dataslide(uint32_t num_threads) {
+      void init_simulator(size_t num_threads, const std::optional<std::vector<byte_t>>& data = std::nullopt) {
+        simulator = std::make_unique<SimulatorType>(params, num_threads);
+        if (data.has_value()) {
+          simulator->deserialize(data.value());
+        }
+      }
+
+      DataSlide generate_dataslide() {
         auto start_time = std::chrono::high_resolution_clock::now();
 
         DataSlide slide;
-
-        std::unique_ptr<SimulatorType> simulator = std::make_unique<SimulatorType>(params, num_threads);
 
         int num_timesteps, num_intervals;
         if (sampling_timesteps == 0) {
@@ -85,10 +92,17 @@ namespace dataframe {
         slide.add_data("time");
         slide.push_samples_to_data("time", duration);
 
+        if (serialize) {
+          slide.buffer = simulator->serialize();
+        }
+
         simulator->cleanup();
 
         return slide;
       }
+
+    private:
+      std::unique_ptr<SimulatorType> simulator;
   };
 
 }

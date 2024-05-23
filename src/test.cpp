@@ -8,17 +8,18 @@ using namespace dataframe;
 using namespace dataframe::utils;
 
 int main(int argc, char* argv[]) {
-  std::string filename = "Users/eliotheinrich/Projects/hypergraph.json";
+  DataFrame df;
+  DataSlide ds;
+  ds.add_data("test_data", 2);
+  std::vector<std::vector<Sample>> test_data{{2.0, 3.0}, {3.0, 4.0}};
+  ds.push_samples_to_data("test_data", test_data);
 
+  ds.add_samples("test_samples", 2);
+  std::vector<std::vector<double>> test_samples{{2.0, 3.0}, {3.0, 4.0}};
+  ds.push_samples("test_samples", test_samples);
 
-  for (int i = 0; i < 10000; i++) {
-    DataSlide s1;
-    s1.add_data("test_data");
-    s1.push_samples_to_data("test_data", 0.1);
-
-    std::vector<byte_t> bytes = s1.to_bytes();
-
-    DataSlide s2(bytes);
-  }
-
+  df.add_slide(ds);
+  std::cout << df.to_json() << "\n";
+  df.average_samples_inplace();
+  std::cout << df.to_json() << "\n";
 }

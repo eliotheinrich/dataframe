@@ -164,13 +164,10 @@ namespace dataframe {
         return metadata.erase(s);
       }
 
-      std::string to_string() const;
-      
       std::string describe() const;
 
-      std::vector<byte_t> to_bytes() const;
-
       std::string to_json() const;
+      std::vector<byte_t> to_bytes() const;
 
       void write(const std::string& filename) const {
         std::vector<std::string> components = utils::split(filename, ".");
