@@ -102,7 +102,11 @@ class TimeConfig(Config):
         self._serialized_simulator = data
 
     def __getstate__(self):
-        return self.params, self.simulator_generator
+        return self.params, self.simulator_generator, self._serialized_simulator
+
+    def __setstate__(self, state):
+        self.__init__(state[0], state[1])
+        self.store_serialized_simulator(state[2])
 
     def compute(self, num_threads):
         self.simulator_driver.init_simulator(num_threads, self._serialized_simulator)
@@ -113,7 +117,9 @@ class TimeConfig(Config):
         return slide
 
     def clone(self):
-        return TimeConfig(self.params, self.simulator_generator)
+        config = TimeConfig(self.params, self.simulator_generator)
+        config.store_serialized_simulator(self._serialized_simulator)
+        return config
 
 
 class FuncConfig(Config):
