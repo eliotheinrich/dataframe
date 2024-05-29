@@ -39,8 +39,8 @@ std::vector<dataframe::byte_t> convert_bytes(const nanobind::bytes& bytes) {
     self.init_simulator(num_threads, _data);                                                         \
   }, "num_threads"_a, "data"_a = nanobind::none())                                                   \
   .def("generate_dataslide",                                                                         \
-    [](dataframe::TimeSamplingDriver<A>& self) {                                                     \
-    dataframe::DataSlide slide = self.generate_dataslide();                                          \
+    [](dataframe::TimeSamplingDriver<A>& self, bool serialize) {                                     \
+    dataframe::DataSlide slide = self.generate_dataslide(serialize);                                 \
                                                                                                      \
     nanobind::bytes bytes = convert_bytes(slide.to_bytes());                                         \
     return bytes;                                                                                    \
@@ -184,6 +184,8 @@ namespace dataframe {
       .def("push_samples_to_data", push_data3)
       .def("push_samples_to_data", push_data4, "key"_a, "data"_a, "avg"_a = false)
       .def("add_samples", [](DataSlide& self, const std::string& s, size_t width) { self.add_samples(s, width); }, "key"_a, "width"_a = 1)
+      .def("combine", &DataSlide::combine, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL)
+      .def("combine_data", &DataSlide::combine_data)
       .def("push_samples", push_samples1)
       .def("push_samples", push_samples2)
       .def("push_samples", push_samples3)

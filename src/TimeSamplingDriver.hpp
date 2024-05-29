@@ -20,7 +20,6 @@ namespace dataframe {
       uint32_t sampling_timesteps;
       uint32_t equilibration_timesteps;
       uint32_t measurement_freq;
-      bool serialize;
       bool temporal_avg;
 
       bool save_samples;
@@ -35,8 +34,6 @@ namespace dataframe {
         if (temporal_avg && save_samples) {
           throw std::invalid_argument("Cannot both perform temporal average and save all samples.");
         }
-
-        serialize = (bool) utils::get<int>(params, "serialize", false);
       }
 
       ~TimeSamplingDriver()=default;
@@ -48,7 +45,7 @@ namespace dataframe {
         }
       }
 
-      DataSlide generate_dataslide() {
+      DataSlide generate_dataslide(bool serialize) {
         auto start_time = std::chrono::high_resolution_clock::now();
 
         DataSlide slide;

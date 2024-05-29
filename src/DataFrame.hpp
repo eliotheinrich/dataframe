@@ -487,7 +487,6 @@ namespace dataframe {
         }
 
         df.promote_params();
-        df.reduce();
 
         return df;
       }

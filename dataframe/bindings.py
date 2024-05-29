@@ -19,32 +19,33 @@ def save_config(config, filename):
     with open(filename, 'w') as file:
         file.write(config)
 
-def parse_config(config, p=None):
+def unbundle_params(param_bundle, p=None):
     params = []
     if p is None:
+        param_bundle = param_bundle.copy()
         p = {}
 
     zparams = None
-    for key in config:
+    for key in param_bundle:
         if key.startswith("zparams"):
-            zparams = config[key]
-            del config[key]
+            zparams = param_bundle[key]
+            del param_bundle[key]
             break
 
     if zparams is not None:
         for zp in zparams:
             for key, val in zp.items():
-                if key in config:
+                if key in param_bundle:
                     raise ValueError(f"Key {key} passed as a zipped parameter and an unzipped parameter; aborting.")
 
                 p[key] = val
-            params += parse_config(config.copy(), p.copy())
+            params += unbundle_params(param_bundle.copy(), p.copy())
 
         return params
 
     scalar_keys = []
     vector_key = None
-    for key, val in config.items():
+    for key, val in param_bundle.items():
         if hasattr(val, "__iter__") and not isinstance(val, str):
             vector_key = key
         else:
@@ -52,16 +53,16 @@ def parse_config(config, p=None):
             scalar_keys.append(key)
 
     for key in scalar_keys:
-        del config[key]
+        del param_bundle[key]
 
     if vector_key is None:
         params.append(p)
     else:
-        vals = config[vector_key]
-        del config[vector_key]
+        vals = param_bundle[vector_key]
+        del param_bundle[vector_key]
         for v in vals:
             p[vector_key] = v
-            params += parse_config(config.copy(), p.copy())
+            params += unbundle_params(param_bundle.copy(), p.copy())
 
     return params
 
@@ -90,11 +91,12 @@ class Config(ABC):
 
 
 class TimeConfig(Config):
-    def __init__(self, params, simulator_generator):
+    def __init__(self, params, simulator_generator, serialize=False):
         super().__init__(params)
 
         self.simulator_generator = simulator_generator
         self.simulator_driver = simulator_generator(params)
+        self.serialize = serialize
         self._serialized_simulator = None
 
     # Allow injection of serialized simulator data
@@ -102,22 +104,22 @@ class TimeConfig(Config):
         self._serialized_simulator = data
 
     def __getstate__(self):
-        return self.params, self.simulator_generator, self._serialized_simulator
+        return self.params, self.simulator_generator, self.serialize, self._serialized_simulator
 
     def __setstate__(self, state):
-        self.__init__(state[0], state[1])
-        self.store_serialized_simulator(state[2])
+        self.__init__(state[0], state[1], state[2])
+        self.store_serialized_simulator(state[3])
 
     def compute(self, num_threads):
         self.simulator_driver.init_simulator(num_threads, self._serialized_simulator)
 
-        slide = self.simulator_driver.generate_dataslide()
+        slide = self.simulator_driver.generate_dataslide(self.serialize)
 
         self.params = self.simulator_driver.params
         return slide
 
     def clone(self):
-        config = TimeConfig(self.params, self.simulator_generator)
+        config = TimeConfig(self.params, self.simulator_generator, self.serialize)
         config.store_serialized_simulator(self._serialized_simulator)
         return config
 
@@ -300,5 +302,5 @@ def load_json(filename: str, verbose: bool = False) -> list:
     return parse_config(filename, verbose)
 
 
-def write_config(params: list) -> str:
+def write_param_bundle(params: list) -> str:
     return paramset_to_string(params)

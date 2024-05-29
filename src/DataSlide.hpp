@@ -34,12 +34,12 @@ namespace dataframe {
 
         for (auto const& [key, vals] : other.data) {
           add_data(key, vals.size());
-          push_samples_to_data(key, vals);
+          data[key] = vals;
         }
 
         for (auto const& [key, vals] : other.samples) {
           add_samples(key, vals.size());
-          push_samples(key, vals);
+          samples[key] = vals;
         }
       }
 
@@ -146,8 +146,22 @@ namespace dataframe {
           throw std::invalid_argument(error_message);
         }
 
+        size_t num_samples;
+        if (width > 0) {
+          num_samples = data[key][0].size();
+        }
+
         for (size_t i = 0; i < width; i++) {
-          data[key][i].insert(data[key][i].end(), sample[i].begin(), sample[i].end());
+          size_t num_samples = data[key][i].size();
+          if (num_samples != sample[i].size()) {
+            std::string error_message = "Error pushing sample at key " + key + "; data[" + key + "][" + std::to_string(i)
+              + "] has length " + std::to_string(num_samples) + " but provided sample["
+              + std::to_string(i) + "] has length " + std::to_string(sample[i].size());
+            throw std::invalid_argument(error_message);
+          }
+          for (size_t j = 0; j < num_samples; j++) {
+            data[key][i][j] = data[key][i][j].combine(sample[i][j]);
+          }
         }
       }
 
@@ -428,6 +442,34 @@ namespace dataframe {
         return copy;
       }
 
+      void combine_data(const DataSlide& other) {
+        for (auto const &[key, val] : other.data) {
+          size_t width1 = val.size();
+          size_t width2 = data.at(key).size();
+          if (width1 != width2) {
+            std::string error_message = "Data with key '" + key + "' have incongruent width ("
+                                      + std::to_string(width1) + " and " + std::to_string(width2) + ")"
+                                      + " and cannot be combined.";
+            throw std::invalid_argument(error_message);
+          }
+
+          push_samples_to_data(key, val);
+        }
+
+        for (auto const &[key, val] : other.samples) {
+          size_t width1 = val.size();
+          size_t width2 = samples.at(key).size();
+          if (width1 != width2) {
+            std::string error_message = "Samples with key '" + key + "' have incongruent width ("
+                                      + std::to_string(width1) + " and " + std::to_string(width2) + ")"
+                                      + " and cannot be combined.";
+            throw std::invalid_argument(error_message);
+          }
+
+          push_samples(key, val);
+        }
+      }
+
       DataSlide combine(const DataSlide &other, double atol=DF_ATOL, double rtol=DF_RTOL) {
         utils::var_t_eq equality_comparator(atol, rtol);
         auto key = first_incongruent_key(other, equality_comparator);
@@ -438,59 +480,10 @@ namespace dataframe {
           throw std::invalid_argument(error_message);
         }
         
-        DataSlide dn(params); 
+        DataSlide slide(*this); 
+        slide.combine_data(other);
 
-        for (auto const &[key, val] : data) {
-          size_t width1 = val.size();
-          size_t width2 = other.data.at(key).size();
-          if (width1 != width2) {
-            std::string error_message = "Samples with key '" + key + "' have incongruent width ("
-                                      + std::to_string(width1) + " and " + std::to_string(width2) + ")"
-                                      + " and cannot be combined.";
-            throw std::invalid_argument(error_message);
-          }
-
-          dn.add_data(key, width1);
-
-          std::vector<std::vector<Sample>> combined_samples(width1);
-          for (uint32_t i = 0; i < width1; i++) {
-            size_t length1 = val[i].size();
-            size_t length2 = other.data.at(key)[i].size();
-            if (length1 != length2) {
-              std::string error_message = "Samples with key '" + key + "' have incongruent length ("
-                                        + std::to_string(length1) + " and " + std::to_string(length2) + ")"
-                                        + " and cannot be combined.";
-              throw std::invalid_argument(error_message);
-            }
-
-            combined_samples[i].resize(length1);
-            
-            for (size_t j = 0; j < length1; j++) {
-              Sample s1 = val[i][j];
-              Sample s2 = other.data.at(key)[i][j];
-              combined_samples[i][j] = s1.combine(s2);
-            }
-          }
-
-          dn.push_samples_to_data(key, combined_samples);
-        }
-
-        for (auto const &[key, val] : samples) {
-          size_t width1 = val.size();
-          size_t width2 = other.samples.at(key).size();
-          if (width1 != width2) {
-            std::string error_message = "Samples with key '" + key + "' have incongruent width ("
-                                      + std::to_string(width1) + " and " + std::to_string(width2) + ")"
-                                      + " and cannot be combined.";
-            throw std::invalid_argument(error_message);
-          }
-
-          dn.add_samples(key, width1);
-          dn.push_samples(key, val);
-          dn.push_samples(key, other.samples.at(key));
-        }
-
-        return dn;
+        return slide;
       }
 
     private:
