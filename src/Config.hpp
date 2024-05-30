@@ -16,9 +16,7 @@ namespace dataframe {
         num_runs = utils::get<int>(params, "num_runs", DEFAULT_NUM_RUNS);
       }
 
-      virtual ~Config() {
-        std::cout << "From ~Config, params have size " << params.size() << "\n";
-      }
+      virtual ~Config() {}
 
       uint32_t get_nruns() const { 
         return num_runs;
