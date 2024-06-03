@@ -8,6 +8,8 @@
 #include <cmath>
 #include <stdexcept>
 
+#include <fmt/format.h>
+
 namespace dataframe {
 
 namespace utils {
@@ -327,8 +329,7 @@ inline int get<int>(Params &params, const std::string& key, int defaultv) {
 template <class T>
 T get(const Params &params, const std::string& key) {
   if (!params.count(key)) {
-    std::string error_message = "Key \"" + key + "\" not found in Params.";
-    throw std::invalid_argument(error_message);
+    throw std::runtime_error(fmt::format("Key \"{}\" not found in Params.", key));
   }
   return std::get<T>(params.at(key));
 }

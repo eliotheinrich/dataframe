@@ -1,7 +1,10 @@
 #pragma once
 
+#include <fmt/format.h>
+
 #include "utils.hpp"
 #include "Sample.hpp"
+
 #include <stdexcept>
 
 namespace dataframe {
@@ -97,15 +100,16 @@ namespace dataframe {
 
       void push_samples_to_data(const std::string& key, const std::vector<std::vector<double>>& sample, bool avg=false) {
         if (!data.contains(key)) {
-          std::string error_message = "Data with key " + key + " does not exist.";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(fmt::format("Data with key {} does not exist.", key));
         }
         size_t width = data[key].size();
         if (sample.size() != width) {
-          std::string error_message = "Error pushing sample at key " + key + "; data[" + key + "] has width "
-                                    + std::to_string(width) + " but provided sample has width "
-                                    + std::to_string(sample.size()) + ".";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(
+            fmt::format(
+              "Error pushing sample at key {}; data[{}] has width {} but provided sample has width {}",
+              key, key, width, sample.size()
+            )
+          );
         }
 
         std::vector<Sample> sample_vec(width);
@@ -123,9 +127,12 @@ namespace dataframe {
               Sample s2 = sample_vec[i];
               data[key][i][0] = s1.combine(s2);
             } else { // Otherwise, throw an error
-              std::string error_message = "data[" + key + "][" + std::to_string(i) + "] has width "
-                                        + std::to_string(data[key][i].size()) + "; cannot perform average.";
-              throw std::runtime_error(error_message);
+              throw std::runtime_error(
+                fmt::format(
+                  "data[{}][{}] has width {}; cannot perform average.",
+                  key, i, data[key][i].size()
+                )
+              );
             }
           }
         } else {
@@ -135,15 +142,16 @@ namespace dataframe {
 
       void push_samples_to_data(const std::string& key, const std::vector<std::vector<Sample>>& sample) {
         if (!data.contains(key)) {
-          std::string error_message = "Data with key " + key + " does not exist.";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(fmt::format("Data with key {} does not exist.", key));
         }
         size_t width = data[key].size();
         if (sample.size() != width) {
-          std::string error_message = "Error pushing sample at key " + key + "; data[" + key + "] has width "
-                                    + std::to_string(width) + " but provided sample has width "
-                                    + std::to_string(sample.size()) + ".";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(
+            fmt::format(
+              "Error pushing sample at key {}; data[{}] has width {} but provided sample has width {}.",
+              key, key, width, sample.size()
+            )
+          );
         }
 
         size_t num_samples;
@@ -154,10 +162,12 @@ namespace dataframe {
         for (size_t i = 0; i < width; i++) {
           size_t num_samples = data[key][i].size();
           if (num_samples != sample[i].size()) {
-            std::string error_message = "Error pushing sample at key " + key + "; data[" + key + "][" + std::to_string(i)
-              + "] has length " + std::to_string(num_samples) + " but provided sample["
-              + std::to_string(i) + "] has length " + std::to_string(sample[i].size());
-            throw std::invalid_argument(error_message);
+            throw std::runtime_error(
+              fmt::format(
+                "Error pushing sample at key {}; data[{}][{}] has length {} but provided sample[{}] has length {}.",
+                key, key, i, num_samples, i, sample.size()
+              )
+            );
           }
           for (size_t j = 0; j < num_samples; j++) {
             data[key][i][j] = data[key][i][j].combine(sample[i][j]);
@@ -167,15 +177,16 @@ namespace dataframe {
 
       void push_samples_to_data(const std::string& key, const std::vector<Sample>& sample_vec) {
         if (!data.contains(key)) {
-          std::string error_message = "Data with key " + key + " does not exist.";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(fmt::format("Data with key {} does not exist.", key));
         }
         size_t width = data[key].size();
         if (sample_vec.size() != width) {
-          std::string error_message = "(2) Error pushing sample at key " + key + "; data[" + key + "] has width "
-                                    + std::to_string(width) + " but provided sample has width "
-                                    + std::to_string(sample_vec.size()) + ".";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(
+            fmt::format(
+              "Error pushing sample at key {}; data[{}] has width {} but provided sample has width {}.",
+              key, key, width, sample_vec.size()
+            )
+          );
         }
 
         for (size_t i = 0; i < width; i++) {
@@ -228,15 +239,16 @@ namespace dataframe {
 
       void push_samples(const std::string& key, const std::vector<std::vector<double>>& sample) {
         if (!samples.contains(key)) {
-          std::string error_message = "Samples with key " + key + " does not exist.";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(fmt::format("Samples with key {} does not exist.", key));
         }
         size_t width = samples[key].size();
         if (sample.size() != width) {
-          std::string error_message = "Error pushing sample at key " + key + "; samples[" + key + "] has width "
-                                    + std::to_string(width) + " but provided sample has width "
-                                    + std::to_string(sample.size()) + ".";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(
+            fmt::format(
+              "Error pushing sample at key {}; samples[{}] has width {} but provided sample has width {}.",
+              key, key, width, sample.size()
+            )
+          );
         }
 
         for (size_t i = 0; i < width; i++) {
@@ -246,16 +258,14 @@ namespace dataframe {
 
       void push_samples(const std::string& key, const std::vector<double>& double_vec) {
         if (!samples.contains(key)) {
-          std::string error_message = "Samples with key " + key + " does not exist.";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(fmt::format("Samples with key {} does not exist.", key));
         }
         samples[key].push_back(double_vec);
       }
 
       void push_samples(const std::string &key, const double d) {
         if (!samples.contains(key)) {
-          std::string error_message = "Samples with key " + key + " does not exist.";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(fmt::format("Samples with key {} does not exist.", key));
         }
         samples[key].push_back(std::vector<double>(d));
       }
@@ -273,7 +283,7 @@ namespace dataframe {
           for (uint32_t i = 0; i < width; i++) {
             std::vector<Sample> di = data.at(key)[i];
             if (di.size() != length) {
-              throw std::invalid_argument("Stored data is not square.");
+              throw std::runtime_error("Stored data is not square.");
             }
 
             for (uint32_t j = 0; j < length; j++) {
@@ -305,7 +315,7 @@ namespace dataframe {
         for (uint32_t i = 0; i < width; i++) {
           std::vector<Sample> di = data.at(key)[i];
           if (di.size() != length) {
-            throw std::invalid_argument("Stored data is not square.");
+            throw std::runtime_error("Stored data is not square.");
           }
 
           for (uint32_t j = 0; j < length; j++) {
@@ -332,7 +342,7 @@ namespace dataframe {
         for (uint32_t i = 0; i < width; i++) {
           std::vector<Sample> di = data.at(key)[i];
           if (di.size() != length) {
-            throw std::invalid_argument("Stored data is not square.");
+            throw std::runtime_error("Stored data is not square.");
           }
 
           for (uint32_t j = 0; j < length; j++) {
@@ -447,10 +457,12 @@ namespace dataframe {
           size_t width1 = val.size();
           size_t width2 = data.at(key).size();
           if (width1 != width2) {
-            std::string error_message = "Data with key '" + key + "' have incongruent width ("
-                                      + std::to_string(width1) + " and " + std::to_string(width2) + ")"
-                                      + " and cannot be combined.";
-            throw std::invalid_argument(error_message);
+            throw std::runtime_error(
+              fmt::format(
+                "Data with key {} have incongruent width ({} and {}) and connot be combined.",
+                key, width1, width2
+              )
+            );
           }
 
           push_samples_to_data(key, val);
@@ -460,10 +472,12 @@ namespace dataframe {
           size_t width1 = val.size();
           size_t width2 = samples.at(key).size();
           if (width1 != width2) {
-            std::string error_message = "Samples with key '" + key + "' have incongruent width ("
-                                      + std::to_string(width1) + " and " + std::to_string(width2) + ")"
-                                      + " and cannot be combined.";
-            throw std::invalid_argument(error_message);
+            throw std::runtime_error(
+              fmt::format(
+                "Samples with key {} have incongruent width ({} and {}) and connot be combined.",
+                key, width1, width2
+              )
+            );
           }
 
           push_samples(key, val);
@@ -475,9 +489,13 @@ namespace dataframe {
         auto key = first_incongruent_key(other, equality_comparator);
 
         if (key != std::nullopt) {
-          std::string error_message = "DataSlides not congruent at key \"" + key.value() + "\".\n"
-                                    + to_json() + "\n\n\n" + other.to_json() + "\n";
-          throw std::invalid_argument(error_message);
+          throw std::runtime_error(
+            fmt::format(
+              "DataSlides not congruent at key \"{}\".\n{}\n\n\n{}\n",
+              key.value(), to_json(), other.to_json()
+            )
+          );
+
         }
         
         DataSlide slide(*this); 
@@ -485,9 +503,6 @@ namespace dataframe {
 
         return slide;
       }
-
-    private:
-      static DataSlide deserialize(const std::string& s);
   };
 
   template <>

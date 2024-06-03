@@ -24,19 +24,11 @@ FetchContent_Declare(
   GIT_TAG main
 )
 
-FetchContent_Declare(
-  nlohmann
-  GIT_REPOSITORY https://github.com/nlohmann/json
-  GIT_TAG master
-  GIT_SHALLOW TRUE
-)
-
-FetchContent_MakeAvailable(glaze nlohmann)
+FetchContent_MakeAvailable(glaze)
 
 include_directories(
   src
   ${glaze_SOURCE_DIR}/include
-  ${nlohmann_SOURCE_DIR}/include
 )
 
 set(SRC_FILES 
@@ -53,6 +45,9 @@ set(SRC_FILES
 )
 
 add_library(dataframe ${SRC_FILES}) 
+
+find_package(fmt)
+target_link_libraries(dataframe fmt::fmt)
 
 if (DEFINED DF_BUILDING_PY_BINDINGS)
   find_package(Python 3.10 
@@ -76,12 +71,14 @@ if (DEFINED DF_BUILDING_PY_BINDINGS)
     src/PyDataFrameModule.cpp
   )
 
+  target_link_libraries(dataframe_bindings PRIVATE fmt::fmt)
+
   install(
     TARGETS dataframe_bindings
     LIBRARY DESTINATION dataframe
   )
 else()
     add_executable(test src/test.cpp)
-    target_link_libraries(test PRIVATE dataframe)
+    target_link_libraries(test PRIVATE dataframe fmt::fmt)
 endif()
 

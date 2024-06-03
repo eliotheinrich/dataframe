@@ -2,6 +2,9 @@
 
 #include "utils.hpp"
 
+#include <fmt/core.h>
+#include <fmt/ranges.h>
+
 #include <vector>
 #include <string>
 #include <array>
@@ -47,12 +50,12 @@ namespace dataframe {
           set_num_samples(num_samples);
           
           if (isnan()) {
-            std::string error_message = "Error in sample; data passed = [ ";
-            for (auto d : doubles) {
-              error_message += std::to_string(d) + " ";
-            }
-            error_message += "]. Sample = (" + std::to_string(mean) + std::to_string(std) + std::to_string(num_samples);
-            throw std::invalid_argument(error_message);
+            throw std::invalid_argument(
+              fmt::format(
+                "Error in sample; data passed = {}. Sample = ({}, {}, {})",
+                doubles, mean, std, num_samples
+              )
+            );
           }
         }
       }
@@ -67,8 +70,7 @@ namespace dataframe {
         // Deprecated json deserialization
         
         if (!Sample::is_valid(s)) {
-          std::string error_message = "Invalid string \"" + s + "\" provided to Sample(std::string).";
-          throw std::invalid_argument(error_message);
+          throw std::invalid_argument(fmt::format("Invalid string \"{}\" provided to Sample(std::string)", s));
         }
 
         if (s.front() == '[' && s.back() == ']') {

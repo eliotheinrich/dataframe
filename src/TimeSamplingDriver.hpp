@@ -32,7 +32,7 @@ namespace dataframe {
         temporal_avg = (bool) utils::get<int>(params, "temporal_avg", DEFAULT_TEMPORAL_AVG);
         save_samples = (bool) utils::get<int>(params, "save_samples", DEFAULT_SAVE_SAMPLES);
         if (temporal_avg && save_samples) {
-          throw std::invalid_argument("Cannot both perform temporal average and save all samples.");
+          throw std::runtime_error("Cannot both perform temporal average and save all samples.");
         }
       }
 

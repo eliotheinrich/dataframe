@@ -497,8 +497,6 @@ namespace dataframe {
       std::map<std::string, std::vector<std::vector<uint32_t>>> qtable;
       std::map<std::string, std::vector<var_t>> key_vals;
 
-      static DataFrame deserialize(const std::string& s);
-
       void init_tolerance() {
         if (metadata.contains("atol")) {
           atol = std::get<double>(metadata.at("atol"));
