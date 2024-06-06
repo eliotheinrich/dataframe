@@ -77,7 +77,7 @@ if (DEFINED DF_BUILDING_PY_BINDINGS)
     TARGETS dataframe_bindings
     LIBRARY DESTINATION dataframe
   )
-else()
+elseif (DEFINED DF_BUILDING_BINARIES)
     add_executable(test src/test.cpp)
     target_link_libraries(test PRIVATE dataframe fmt::fmt)
 endif()

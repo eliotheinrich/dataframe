@@ -13,11 +13,13 @@ from dataframe.dataframe_bindings import *
 ATOL = 1e-6
 RTOL = 1e-5
 
+
 def save_config(config, filename):
     config = json.dumps(config, indent=1)
-    config.replace('\\', '') 
+    config = config.replace('\\', '').replace(': false', ': 0').replace(': true', ': 1')
     with open(filename, 'w') as file:
         file.write(config)
+
 
 def unbundle_params(param_bundle, p=None):
     params = []
@@ -286,6 +288,7 @@ class ParallelCompute:
 
         return slides
 
+
 def load_data(filename: str) -> DataFrame:
     extension = filename.split(".")[-1]
     if extension == "json":
@@ -297,6 +300,7 @@ def load_data(filename: str) -> DataFrame:
         with open(filename, 'rb') as f:
             s = bytes(f.read())
             return DataFrame(s)
+
 
 def load_json(filename: str, verbose: bool = False) -> list:
     return parse_config(filename, verbose)
