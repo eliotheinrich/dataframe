@@ -97,7 +97,7 @@ namespace dataframe {
           std::string trimmed = s.substr(1, s.length() - 2);
           std::vector<std::string> elements = utils::split(trimmed, ",");
 
-          return elements.size() == 3 && utils::is_float(elements[0]) && utils::is_float(elements[1]) & utils::is_integer(elements[2]);
+          return elements.size() == 3 && utils::is_float(elements[0]) && utils::is_float(elements[1]) && utils::is_integer(elements[2]);
         } else {
           return utils::is_float(s);
         }
@@ -190,7 +190,6 @@ namespace dataframe {
 
         std::vector<std::vector<Sample>> collapsed_samples(width);
         for (size_t i = 0; i < width; i++) {
-          size_t num_samples = samples[i].size();
           collapsed_samples[i].push_back(Sample::collapse_samples(samples[i]));
         }
 

@@ -45,7 +45,7 @@ namespace dataframe {
         }
       }
 
-      DataSlide generate_dataslide(bool serialize) {
+      DataSlide generate_dataslide(bool serialize=false) {
         auto start_time = std::chrono::high_resolution_clock::now();
 
         DataSlide slide;

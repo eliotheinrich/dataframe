@@ -154,11 +154,6 @@ namespace dataframe {
           );
         }
 
-        size_t num_samples;
-        if (width > 0) {
-          num_samples = data[key][0].size();
-        }
-
         for (size_t i = 0; i < width; i++) {
           size_t num_samples = data[key][i].size();
           if (num_samples != sample[i].size()) {

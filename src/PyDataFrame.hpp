@@ -208,6 +208,29 @@ namespace dataframe {
     void (DataFrame::*df_add_metadata1)(const Params&) = &DataFrame::add_metadata;
     void (DataFrame::*df_add_metadata2)(const std::string&, var_t const&) = &DataFrame::add_metadata;
 
+    auto _query = [](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique, DataFrame::QueryType query_type) {
+          std::vector<query_t> results = df.query(keys, constraints, unique, query_type);
+
+          // Allocate space for query results
+          size_t num_queries = results.size();
+          std::vector<double*> datas(num_queries);
+          for (uint32_t i = 0; i < num_queries; i++) {
+            size_t query_size = get_query_size(results[i]);
+            datas[i] = new double[query_size];
+          }
+
+          std::vector<py_query_t> py_results(num_queries);
+          for (uint32_t i = 0; i < num_queries; i++) {
+            py_results[i] = std::visit(query_t_to_py(datas[i]), results[i]);
+          }
+
+          if (num_queries == 1) {
+            return py_query_result{py_results[0]};
+          } else {
+            return py_query_result{py_results};
+          }
+        };
+
     nanobind::class_<DataFrame>(m, "DataFrame")
       .def(nanobind::init<>())
       .def(nanobind::init<double, double>())
@@ -243,28 +266,19 @@ namespace dataframe {
       .def("reduce", &DataFrame::reduce)
       .def("average_samples", &DataFrame::average_samples_inplace)
       .def("filter", &DataFrame::filter, "constraints"_a, "filter"_a = false)
-      .def("query", [](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique, bool error, bool num_samples) {
-          std::vector<query_t> results = df.query(keys, constraints, unique, error, num_samples);
+      .def("query", [&_query](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique) {
+          return _query(df, keys, constraints, unique, DataFrame::QueryType::Mean);
+        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move)
+      .def("query_std", [&_query](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique) {
+          return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardDeviation);
+        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move)
+      .def("query_sde", [&_query](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique) {
+          return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardError);
+        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move)
+      .def("query_nsamples", [&_query](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique) {
+          return _query(df, keys, constraints, unique, DataFrame::QueryType::NumSamples);
+        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move);
 
-          // Allocate space for query results
-          size_t num_queries = results.size();
-          std::vector<double*> datas(num_queries);
-          for (uint32_t i = 0; i < num_queries; i++) {
-            size_t query_size = get_query_size(results[i]);
-            datas[i] = new double[query_size];
-          }
-
-          std::vector<py_query_t> py_results(num_queries);
-          for (uint32_t i = 0; i < num_queries; i++) {
-            py_results[i] = std::visit(query_t_to_py(datas[i]), results[i]);
-          }
-
-          if (num_queries == 1) {
-            return py_query_result{py_results[0]};
-          } else {
-            return py_query_result{py_results};
-          }
-        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, "error"_a = false, "num_samples"_a = false, nanobind::rv_policy::move);
   }
 
 }

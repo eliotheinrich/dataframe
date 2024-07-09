@@ -285,18 +285,20 @@ namespace dataframe {
         return DataFrame(params, slides);
       }
 
+      enum QueryType {
+        Mean,
+        StandardDeviation,
+        NumSamples,
+        StandardError,
+      };
+
       typedef std::variant<std::string, std::vector<std::string>> query_key_t;
       std::vector<query_t> query(
         const query_key_t& keys_var, 
         const Params& constraints, 
         bool unique=false, 
-        bool error=false,
-        bool num_samples=false
+        QueryType query_type=QueryType::Mean
       ) {
-        if (num_samples && error) {
-          throw std::invalid_argument("Cannot query both error and number of samples.");
-        }
-
         std::vector<std::string> keys;
         if (keys_var.index() == 0) {
           keys = std::vector<std::string>{std::get<std::string>(keys_var)};
@@ -340,13 +342,27 @@ namespace dataframe {
           } else { // Data
             std::vector<std::vector<std::vector<double>>> data_vals;
 
-            if (error) {
+            if (query_type == QueryType::StandardDeviation) {
               for (auto const i : inds) {
                 data_vals.push_back(slides[i].get_std(key));
               }
-            } else if (num_samples) {
+            } else if (query_type == QueryType::NumSamples) {
               for (auto const i : inds) {
                 data_vals.push_back(slides[i].get_num_samples(key));
+              }
+            } else if (query_type == QueryType::StandardError) {
+              for (auto const i : inds) {
+                std::vector<std::vector<double>> std = slides[i].get_std(key);
+                std::vector<std::vector<double>> nsamples = slides[i].get_num_samples(key);
+                std::vector<std::vector<double>> sde(std.size());
+                for (size_t j = 0; j < std.size(); j++) {
+                  std::vector<double> v(std[j].size());
+                  for (size_t k = 0; k < std[j].size(); k++) {
+                    v[k] = std[j][k]/std::sqrt(nsamples[j][k]);
+                  }
+                  sde[j] = v;
+                }
+                data_vals.push_back(sde);
               }
             } else {
               for (auto const i : inds) {
