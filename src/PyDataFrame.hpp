@@ -5,7 +5,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/vector.h>
-#include <nanobind/stl/bind_map.h>
+#include <nanobind/stl/map.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/trampoline.h>
 #include <nanobind/ndarray.h>
@@ -72,6 +72,7 @@ namespace dataframe {
   typedef nanobind::ndarray<nanobind::numpy, double> py_nbarray;
   typedef std::variant<qvar_t, std::vector<qvar_t>, py_nbarray> py_query_t;
   typedef std::variant<py_query_t, std::vector<py_query_t>> py_query_result;
+  typedef std::string query_key_t;
 
   size_t get_query_size(const query_t& q) {
     if (q.index() != 2) {
@@ -129,7 +130,11 @@ namespace dataframe {
         }
       }
 
-      py_nbarray nb_data(my_data, {N, M, K});
+      nanobind::capsule owner(my_data, [](void *p) noexcept {
+         delete[] (double *) p;
+      });
+
+      py_nbarray nb_data(my_data, {N, M, K}, owner);
       return py_query_t{nb_data};
     }
   };
@@ -208,7 +213,7 @@ namespace dataframe {
     void (DataFrame::*df_add_metadata1)(const Params&) = &DataFrame::add_metadata;
     void (DataFrame::*df_add_metadata2)(const std::string&, var_t const&) = &DataFrame::add_metadata;
 
-    auto _query = [](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique, DataFrame::QueryType query_type) {
+    auto _query = [](DataFrame& df, const query_key_t& keys, const Params& constraints, bool unique, DataFrame::QueryType query_type) {
           std::vector<query_t> results = df.query(keys, constraints, unique, query_type);
 
           // Allocate space for query results
@@ -224,11 +229,7 @@ namespace dataframe {
             py_results[i] = std::visit(query_t_to_py(datas[i]), results[i]);
           }
 
-          if (num_queries == 1) {
-            return py_query_result{py_results[0]};
-          } else {
-            return py_query_result{py_results};
-          }
+          return py_query_result{py_results};
         };
 
     nanobind::class_<DataFrame>(m, "DataFrame")
@@ -266,16 +267,16 @@ namespace dataframe {
       .def("reduce", &DataFrame::reduce)
       .def("average_samples", &DataFrame::average_samples_inplace)
       .def("filter", &DataFrame::filter, "constraints"_a, "filter"_a = false)
-      .def("query", [&_query](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique) {
+      .def("query", [&_query](DataFrame& df, const query_key_t& keys, const Params& constraints, bool unique) {
           return _query(df, keys, constraints, unique, DataFrame::QueryType::Mean);
-        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move)
-      .def("query_std", [&_query](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique) {
+        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::copy)
+      .def("query_std", [&_query](DataFrame& df, const query_key_t& keys, const Params& constraints, bool unique) {
           return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardDeviation);
         }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move)
-      .def("query_sde", [&_query](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique) {
+      .def("query_sde", [&_query](DataFrame& df, const query_key_t& keys, const Params& constraints, bool unique) {
           return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardError);
         }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move)
-      .def("query_nsamples", [&_query](DataFrame& df, const DataFrame::query_key_t& keys, const Params& constraints, bool unique) {
+      .def("query_nsamples", [&_query](DataFrame& df, const query_key_t& keys, const Params& constraints, bool unique) {
           return _query(df, keys, constraints, unique, DataFrame::QueryType::NumSamples);
         }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move);
 
