@@ -5,7 +5,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/vector.h>
-#include <nanobind/stl/bind_map.h>
+#include <nanobind/stl/map.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/trampoline.h>
 #include <nanobind/ndarray.h>
@@ -129,7 +129,11 @@ namespace dataframe {
         }
       }
 
-      py_nbarray nb_data(my_data, {N, M, K});
+      nanobind::capsule owner(my_data, [](void *p) noexcept {
+        delete[] (double *) p;
+      });
+
+      py_nbarray nb_data(my_data, {N, M, K}, owner);
       return py_query_t{nb_data};
     }
   };
