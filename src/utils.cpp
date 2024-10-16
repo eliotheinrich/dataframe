@@ -21,3 +21,9 @@ dataframe::Params dataframe::utils::load_params(const std::string& filename) {
   
   return params;
 }
+
+std::string dataframe::utils::params_to_string(const dataframe::Params& params) {
+  std::string s;
+  glz::write_json(params, s);
+  return glz::prettify_json(s);
+}

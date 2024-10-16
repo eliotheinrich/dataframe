@@ -17,7 +17,6 @@ namespace utils {
 #define DF_ATOL 1e-6
 #define DF_RTOL 1e-5
 
-
 struct var_t_to_string {
   std::string operator()(const std::string& s) {
     return s;
@@ -356,6 +355,8 @@ static void emplace(data_t& data, const std::string& key, double d) {
 }
 
 Params load_params(const std::string& filename);
+
+std::string params_to_string(const Params& params);
 
 }
 }
