@@ -288,6 +288,9 @@ class ParallelCompute:
 
         return slides
 
+def compute(configs, **metadata):
+    pc = ParallelCompute(configs, **metadata)
+    return pc.compute()
 
 def load_data(filename: str) -> DataFrame:
     extension = filename.split(".")[-1]
