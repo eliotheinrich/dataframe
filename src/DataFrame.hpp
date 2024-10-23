@@ -292,7 +292,6 @@ namespace dataframe {
         StandardError,
       };
 
-      typedef std::variant<std::string, std::vector<std::string>> query_key_t;
       std::vector<query_t> query(
         const query_key_t& keys_var, 
         const Params& constraints, 

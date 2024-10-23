@@ -31,5 +31,6 @@ typedef std::map<std::string, std::vector<std::vector<double>>> data_t;
 typedef std::vector<std::vector<std::vector<double>>> nbarray;
 typedef std::variant<std::string, int, double> qvar_t;
 typedef std::variant<qvar_t, std::vector<qvar_t>, nbarray> query_t;
+typedef std::variant<std::string, std::vector<std::string>> query_key_t;
 
 }

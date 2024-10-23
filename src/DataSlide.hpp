@@ -18,6 +18,10 @@ namespace dataframe {
 
       // data and samples are stored in the format rows x length, where
       // rows correspond to sampled properties corresponding to key
+      // i.e. if a vector v = (vx, vy, vz) is sampled, the data is stored as
+      // vx1 vx2 vx3 ...
+      // vy1 vy2 vy3 ...
+      // vz1 vz2 vz3 ...
       std::map<std::string, std::vector<std::vector<Sample>>> data;
       std::map<std::string, std::vector<std::vector<double>>> samples;
 
@@ -255,7 +259,10 @@ namespace dataframe {
         if (!samples.contains(key)) {
           throw std::runtime_error(fmt::format("Samples with key {} does not exist.", key));
         }
-        samples[key].push_back(double_vec);
+
+        for (size_t i = 0; i < samples[key].size(); i++) {
+          samples[key][i].push_back(double_vec[i]);
+        }
       }
 
       void push_samples(const std::string &key, const double d) {
