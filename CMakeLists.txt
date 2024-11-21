@@ -34,13 +34,11 @@ include_directories(
 set(SRC_FILES 
   src/utils.hpp 
   src/utils.cpp
-  src/Config.hpp
   src/Sample.hpp 
   src/DataSlide.hpp 
   src/DataFrame.hpp 
   src/DataFrame.cpp
   src/Simulator.hpp
-  src/TimeSamplingDriver.hpp
   src/types.h
 )
 

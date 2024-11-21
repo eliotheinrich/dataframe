@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from concurrent.futures import ProcessPoolExecutor
 import concurrent
 
@@ -67,78 +66,6 @@ def unbundle_params(param_bundle, p=None):
             params += unbundle_params(param_bundle.copy(), p.copy())
 
     return params
-
-
-class Config(ABC):
-    def __init__(self, params):
-        self.params = params.copy()
-        self.num_runs = params.setdefault("num_runs", 1)
-
-    def __getstate__(self):
-        return self.params,
-
-    def __setstate__(self, state):
-        self.__init__(*state)
-
-    def get_nruns(self):
-        return int(self.params["num_runs"])
-
-    @abstractmethod
-    def compute(self, num_threads):
-        pass
-
-    @abstractmethod
-    def clone(self):
-        pass
-
-
-class TimeConfig(Config):
-    def __init__(self, params, simulator_generator, serialize=False):
-        super().__init__(params)
-
-        self.simulator_generator = simulator_generator
-        self.simulator_driver = simulator_generator(params)
-        self.serialize = serialize
-        self._serialized_simulator = None
-
-    # Allow injection of serialized simulator data
-    def store_serialized_simulator(self, data):
-        self._serialized_simulator = data
-
-    def __getstate__(self):
-        return self.params, self.simulator_generator, self.serialize, self._serialized_simulator
-
-    def __setstate__(self, state):
-        self.__init__(state[0], state[1], state[2])
-        self.store_serialized_simulator(state[3])
-
-    def compute(self, num_threads):
-        self.simulator_driver.init_simulator(num_threads, self._serialized_simulator)
-
-        slide = self.simulator_driver.generate_dataslide(self.serialize)
-
-        self.params = self.simulator_driver.params
-        return slide
-
-    def clone(self):
-        config = TimeConfig(self.params, self.simulator_generator, self.serialize)
-        config.store_serialized_simulator(self._serialized_simulator)
-        return config
-
-
-class FuncConfig(Config):
-    def __init__(self, params, function):
-        super().__init__(params)
-        self.function = function
-
-    def compute(self, num_threads):
-        return self.function(self.params, num_threads)
-
-    def __getstate__(self):
-        return self.params, self.function
-
-    def clone(self):
-        return FuncConfig(self.params, self.function)
 
 
 class ParallelCompute:

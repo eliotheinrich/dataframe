@@ -21,49 +21,37 @@ std::vector<dataframe::byte_t> convert_bytes(const nanobind::bytes& bytes) {
   return bytes_vec;
 }
 
-#define EXPORT_SIMULATOR_DRIVER(A)                                                                   \
-  nanobind::class_<dataframe::TimeSamplingDriver<A>>(m, #A)                                          \
-  .def(nanobind::init<dataframe::Params&>())                                                         \
-  .def_rw("params", &dataframe::TimeSamplingDriver<A>::params)                                       \
-  .def("init_simulator", [](                                                                         \
-      dataframe::TimeSamplingDriver<A>& self,                                                        \
-      uint32_t num_threads,                                                                          \
-      const std::optional<nanobind::bytes>& data = std::nullopt                                      \
-    ) {                                                                                              \
-    std::optional<std::vector<dataframe::byte_t>> _data;                                             \
-    if (data.has_value()) {                                                                          \
-      _data = convert_bytes(data.value());                                                           \
-    } else {                                                                                         \
-      _data = std::nullopt;                                                                          \
-    }                                                                                                \
-    self.init_simulator(num_threads, _data);                                                         \
-  }, "num_threads"_a, "data"_a = nanobind::none())                                                   \
-  .def("generate_dataslide",                                                                         \
-    [](dataframe::TimeSamplingDriver<A>& self, bool serialize) {                                     \
-    dataframe::DataSlide slide = self.generate_dataslide(serialize);                                 \
-                                                                                                     \
-    nanobind::bytes bytes = convert_bytes(slide.to_bytes());                                         \
-    return bytes;                                                                                    \
-  });                                                                              
-
-#define INIT_CONFIG()                                \
-  nanobind::class_<dataframe::Config>(m, "Config")   \
-  .def(nanobind::init<dataframe::Params&>())         \
-  .def_rw("params", &dataframe::Config::params)      \
-  .def("get_nruns", &dataframe::Config::get_nruns);
+#define EXPORT_SIMULATOR(A)                                                     \
+  nanobind::class_<A>(m, #A)                                                    \
+    .def(nanobind::init<dataframe::Params&, uint32_t>())                        \
+    .def("init", [](                                                            \
+          A& self,                                                              \
+          uint32_t num_threads,                                                 \
+          const std::optional<nanobind::bytes>& data = std::nullopt) {          \
+      std::optional<std::vector<dataframe::byte_t>> _data;                      \
+      if (data.has_value()) {                                                   \
+        _data = convert_bytes(data.value());                                    \
+      } else {                                                                  \
+        _data = std::nullopt;                                                   \
+      }                                                                         \
+      if (_data.has_value()) {                                                  \
+        self.deserialize(_data.value());                                        \
+      }                                                                         \
+    }, "num_threads"_a, "data"_a = nanobind::none())                            \
+    .def("timesteps", &A::timesteps)                                            \
+    .def("equilibration_timesteps", &A::equilibration_timesteps)                \
+    .def("take_samples", &A::take_samples)                                      \
+    .def("serialize", &A::serialize)                                            
 
 #define EXPORT_CONFIG(A)                                              \
-  nanobind::class_<A, dataframe::Config>(m, #A)                       \
+  nanobind::class_<A>(m, #A)                                          \
   .def(nanobind::init<dataframe::Params&>())                          \
   .def("compute", [](A& self, uint32_t num_threads) {                 \
       dataframe::DataSlide slide = self.compute(num_threads);         \
       std::vector<dataframe::byte_t> _bytes = slide.to_bytes();       \
       nanobind::bytes bytes = convert_bytes(_bytes);                  \
       return bytes;                                                   \
-    })                                                                \
-  .def("clone", &A::clone)                                            \
-  .def("__getstate__", [](const A& config) { return config.params; }) \
-  .def("__setstate__", [](A& config, dataframe::Params& params){ new (&config) A(params); } )
+    })                                                                
 
 using namespace nanobind::literals;
 
@@ -150,10 +138,12 @@ namespace dataframe {
     void (DataSlide::*push_data2)(const std::string&, const double, const double, const uint32_t) = &DataSlide::push_samples_to_data;
     void (DataSlide::*push_data3)(const std::string&, const std::vector<double>&) = &DataSlide::push_samples_to_data;
     void (DataSlide::*push_data4)(const std::string&, const std::vector<std::vector<double>>&, bool) = &DataSlide::push_samples_to_data;
+    void (DataSlide::*push_data5)(const data_t&, bool) = &DataSlide::push_samples_to_data;
 
     void (DataSlide::*push_samples1)(const std::string&, const double) = &DataSlide::push_samples;
     void (DataSlide::*push_samples2)(const std::string&, const std::vector<double>&) = &DataSlide::push_samples;
     void (DataSlide::*push_samples3)(const std::string&, const std::vector<std::vector<double>>&) = &DataSlide::push_samples;
+    void (DataSlide::*push_samples4)(const data_t&) = &DataSlide::push_samples;
 
     nanobind::class_<Sample>(m, "Sample")
       .def(nanobind::init<>())
@@ -183,16 +173,20 @@ namespace dataframe {
       .def("add_param", ds_add_param1)
       .def("add_param", ds_add_param2)
       .def("add_data", [](DataSlide& self, const std::string& s, size_t width) { self.add_data(s, width); }, "key"_a, "width"_a = 1)
+      .def("add_data", [](DataSlide& self, const data_t& sample) { self.add_data(sample); })
       .def("push_samples_to_data", push_data1)
       .def("push_samples_to_data", push_data2)
       .def("push_samples_to_data", push_data3)
       .def("push_samples_to_data", push_data4, "key"_a, "data"_a, "avg"_a = false)
+      .def("push_samples_to_data", push_data5, "data"_a, "avg"_a = false)
       .def("add_samples", [](DataSlide& self, const std::string& s, size_t width) { self.add_samples(s, width); }, "key"_a, "width"_a = 1)
+      .def("add_samples", [](DataSlide& self, const data_t& sample) { self.add_samples(sample); })
       .def("combine", &DataSlide::combine, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL)
       .def("combine_data", &DataSlide::combine_data)
       .def("push_samples", push_samples1)
       .def("push_samples", push_samples2)
       .def("push_samples", push_samples3)
+      .def("push_samples", push_samples4)
       .def("remove", &DataSlide::remove)
       .def("_get_buffer", [](const DataSlide& slide) {
         return convert_bytes(slide.buffer);
