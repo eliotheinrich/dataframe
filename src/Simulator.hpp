@@ -21,7 +21,8 @@ namespace dataframe {
         seed = utils::get<int>(params, "seed", DEFAULT_RANDOM_SEED);
         if (seed == DEFAULT_RANDOM_SEED) {
           thread_local std::random_device rd;
-          rng.seed(rd());
+          int s = rd();
+          rng.seed(s);
         } else {
           rng.seed(seed);
         }

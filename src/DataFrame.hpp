@@ -164,7 +164,7 @@ namespace dataframe {
         return metadata.erase(s);
       }
 
-      std::string describe() const;
+      std::string describe(size_t num_slides=0) const;
 
       std::string to_json() const;
       std::vector<byte_t> to_bytes() const;

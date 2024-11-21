@@ -264,7 +264,7 @@ namespace dataframe {
       .def("__add__", &DataFrame::combine)
       .def("__getstate__", [](const DataFrame& frame){ return convert_bytes(frame.to_bytes()); })
       .def("__setstate__", [](DataFrame& frame, const nanobind::bytes& bytes){ new (&frame) DataFrame(convert_bytes(bytes)); })
-      .def("describe", &DataFrame::describe)
+      .def("describe", &DataFrame::describe, "num_slides"_a = 0)
       .def("write", &DataFrame::write)
       .def("promote_params", &DataFrame::promote_params)
       .def("reduce", &DataFrame::reduce)

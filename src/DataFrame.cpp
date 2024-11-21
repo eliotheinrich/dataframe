@@ -52,8 +52,11 @@ std::string DataSlide::to_json() const {
   return glz::prettify_json(s);
 }
 
+// TODO redo with fmt
 std::string DataSlide::describe() const {
-  std::string s = "params: " + glz::write_json(params).value_or("error") + "},\n";
+  std::string s = fmt::format("params: {},\n", glz::write_json(params).value_or("error"));
+
+  //std::string s = "params: " + glz::write_json(params).value_or("error") + "},\n";
   s += "data: { ";
   std::vector<std::string> buffer;
   for (auto const& [key, d] : data) {
@@ -119,11 +122,15 @@ DataFrame::DataFrame(const std::string& s) {
   init_qtable();
 }
 
-std::string DataFrame::describe() const {
-  std::string s = "params: " + glz::write_json(params).value_or("error") + ",\n";
-  s += "metadata: " + glz::write_json(metadata).value_or("error") + ",\n";
+std::string DataFrame::describe(size_t num_slides) const {
+  std::string s = fmt::format("params: {},\n", glz::write_json(params).value_or("error"));
+  s += fmt::format("metadata: {},\n", glz::write_json(metadata).value_or("error"));
 
-  s += "number of slides: " + std::to_string(slides.size());
+  s += fmt::format("number of slides: {}\n", slides.size());
+  size_t m = std::min(slides.size(), num_slides);
+  for (size_t i = 0; i < m; i++) {
+    s += fmt::format("\nslide {}: \n{}", i, slides[i].describe());
+  }
   return s;
 }
 
