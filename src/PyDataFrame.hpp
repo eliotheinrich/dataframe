@@ -26,7 +26,6 @@ std::vector<dataframe::byte_t> convert_bytes(const nanobind::bytes& bytes) {
     .def(nanobind::init<dataframe::Params&, uint32_t>())                        \
     .def("init", [](                                                            \
           A& self,                                                              \
-          uint32_t num_threads,                                                 \
           const std::optional<nanobind::bytes>& data = std::nullopt) {          \
       std::optional<std::vector<dataframe::byte_t>> _data;                      \
       if (data.has_value()) {                                                   \
@@ -37,7 +36,7 @@ std::vector<dataframe::byte_t> convert_bytes(const nanobind::bytes& bytes) {
       if (_data.has_value()) {                                                  \
         self.deserialize(_data.value());                                        \
       }                                                                         \
-    }, "num_threads"_a, "data"_a = nanobind::none())                            \
+    }, "data"_a = nanobind::none())                                             \
     .def("timesteps", &A::timesteps)                                            \
     .def("equilibration_timesteps", [](A& self, uint32_t num_steps) {           \
         self.equilibration_timesteps(num_steps);                                \

@@ -84,6 +84,7 @@ class ParallelCompute:
         self.average_congruent_runs = bool(metadata.setdefault("average_congruent_runs", True))
         self.batch_size = int(metadata.setdefault("batch_size", 1024))
         self.verbose = bool(metadata.setdefault("verbose", True))
+        self.dump_errors = bool(metadata.setdefault("dump_errors", False))
 
         self.dataframe = DataFrame(self.atol, self.rtol)
         self.num_slides = None
@@ -134,7 +135,7 @@ class ParallelCompute:
         return self.dataframe
 
     @staticmethod
-    def _do_run(config, num_threads, id):
+    def _do_run(config, num_threads, id, dump_errors):
         try:
             _slide = config.compute(num_threads)
 
@@ -148,13 +149,17 @@ class ParallelCompute:
             return id, slide
 
         except Exception as e:
-            if "SLURM_JOB_ID" in os.environ:
-                filename = f"err_{os.environ['SLURM_JOB_ID']}_{id}.json"
-            else:
-                filename = f"err_{id}.json"
+            if dump_errors:
+                if "SLURM_JOB_ID" in os.environ:
+                    filename = f"err_{os.environ['SLURM_JOB_ID']}_{id}.json"
+                else:
+                    filename = f"err_{id}.json"
 
-            print(f"Encountered an error; saving config params to {filename}!")
-            save_config(config.params, filename)
+                print(f"Encountered an error; saving config params to {filename} and exiting!")
+                save_config(config.params, filename)
+
+            else:
+                print(f"Encountered an error; exiting!")
 
             raise e
 
@@ -168,7 +173,7 @@ class ParallelCompute:
         if self.verbose:
             total_configs = tqdm.tqdm(total_configs)
         for i, config in total_configs:
-            id, slide = ParallelCompute._do_run(config, self.num_threads_per_task, i)
+            id, slide = ParallelCompute._do_run(config, self.num_threads_per_task, i, self.dump_errors)
 
             slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
 
@@ -202,7 +207,7 @@ class ParallelCompute:
                 else:
                     i2 = min((i+1)*self.batch_size, num_configs)
 
-                futures = [pool.submit(ParallelCompute._do_run, config, self.num_threads_per_task, i) for i,config in total_configs[i1:i2]]
+                futures = [pool.submit(ParallelCompute._do_run, config, self.num_threads_per_task, i, self.dump_errors) for i,config in total_configs[i1:i2]]
                 completed_futures = concurrent.futures.as_completed(futures)
 
                 for future in completed_futures:

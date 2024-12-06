@@ -46,19 +46,22 @@ class CppConfig(Config):
 
 class Simulator(ABC):
     @abstractmethod
-    def __init__(self, params):
+    def __init__(self, params, num_threads):
         pass
 
     @abstractmethod
-    def init(self, num_threads, serialized_data):
+    def init(self, serialized_data):
         pass
 
     @abstractmethod
     def timesteps(self, num_steps):
         pass
 
-    @abstractmethod
     def equilibration_timesteps(self, num_steps):
+        self.timesteps(num_steps)
+
+    @abstractmethod
+    def take_samples(self):
         pass
 
     @abstractmethod
@@ -66,7 +69,7 @@ class Simulator(ABC):
         pass
 
 
-class TimeConfig(Config):
+class SimulatorConfig(Config):
     def __init__(self, params, simulator_generator, serialize=False):
         super().__init__(params)
 
@@ -100,7 +103,7 @@ class TimeConfig(Config):
         slide = DataSlide()
 
         simulator = self.simulator_generator(self.params, num_threads)
-        simulator.init(num_threads, self._serialized_simulator)
+        simulator.init(self._serialized_simulator)
 
         if self.sampling_timesteps == 0:
             num_timesteps = 0
@@ -139,7 +142,7 @@ class TimeConfig(Config):
         return slide
 
     def clone(self):
-        config = TimeConfig(self.params, self.simulator_generator, self.serialize)
+        config = SimulatorConfig(self.params, self.simulator_generator, self.serialize)
         config.store_serialized_simulator(self._serialized_simulator)
         return config
 
