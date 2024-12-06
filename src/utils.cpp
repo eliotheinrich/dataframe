@@ -14,9 +14,9 @@ dataframe::Params dataframe::utils::load_params(const std::string& filename) {
   std::string content = buffer.str();
 
   dataframe::Params params;
-  auto pe = glz::read_json(params, content);
-  if (pe) {
-    throw std::invalid_argument(fmt::format("Error parsing Params: \n{}", glz::format_error(pe, content)));
+  auto parse_error = glz::read_json(params, content);
+  if (parse_error) {
+    throw std::invalid_argument(fmt::format("Error parsing Params: \n{}", glz::format_error(parse_error, content)));
   }
   
   return params;
@@ -24,6 +24,9 @@ dataframe::Params dataframe::utils::load_params(const std::string& filename) {
 
 std::string dataframe::utils::params_to_string(const dataframe::Params& params) {
   std::string s;
-  glz::write_json(params, s);
+  auto write_error = glz::write_json(params, s);
+  if (write_error) {
+    throw std::runtime_error(fmt::format("Error writing params to json: \n{}", glz::format_error(write_error, s)));
+  }
   return glz::prettify_json(s);
 }

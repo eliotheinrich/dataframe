@@ -25,22 +25,25 @@ struct glz::meta<DataSlide> {
 };
 
 DataSlide::DataSlide(const std::string &s) {
-  auto pe = glz::read_json(*this, s);
-  if (pe) {
-    throw std::invalid_argument(fmt::format("Error parsing DataSlide: \n{}", glz::format_error(pe, s)));
+  auto parse_error = glz::read_json(*this, s);
+  if (parse_error) {
+    throw std::runtime_error(fmt::format("Error parsing DataSlide: \n{}", glz::format_error(parse_error, s)));
   }
 }
 
 DataSlide::DataSlide(const std::vector<byte_t>& bytes) {
-  auto pe = glz::read_beve(*this, bytes);
-  if (pe) {
-    throw std::invalid_argument("Error parsing DataSlide from binary.");
+  auto parse_error = glz::read_beve(*this, bytes);
+  if (parse_error) {
+    throw std::runtime_error(fmt::format("Error parsing DataSlide from binary: \n{}", glz::format_error(parse_error, bytes)));
   }
 }
 
 std::vector<byte_t> DataSlide::to_bytes() const {
   std::vector<byte_t> data;
-  glz::write_beve(*this, data);
+  auto write_error = glz::write_beve(*this, data);
+  if (write_error) {
+    throw std::runtime_error(fmt::format("Error writing DataSlide to binary: \n{}", glz::format_error(write_error, data)));
+  }
   return data;
 }
 
@@ -48,7 +51,10 @@ std::string DataSlide::to_json() const {
   static constexpr auto partial = glz::json_ptrs("/params", "/data", "/samples");
 
   std::string s;
-  glz::write_json<partial>(*this, s);
+  auto write_error = glz::write_json<partial>(*this, s);
+  if (write_error) {
+    throw std::runtime_error(fmt::format("Error writing DataSlide to json: \n{}", glz::format_error(write_error, s)));
+  }
   return glz::prettify_json(s);
 }
 
@@ -91,9 +97,9 @@ std::string DataSlide::describe() const {
 }
 
 DataFrame::DataFrame(const std::vector<byte_t>& bytes) {
-  auto pe = glz::read_beve(*this, bytes);
-  if (pe) {
-    throw std::invalid_argument("Error parsing DataFrame from binary.");
+  auto parse_error = glz::read_beve(*this, bytes);
+  if (parse_error) {
+    throw std::runtime_error(fmt::format("Error parsing DataFrame from binary: \n{}", glz::format_error(parse_error, bytes)));
   }
 
   init_tolerance();
@@ -101,9 +107,9 @@ DataFrame::DataFrame(const std::vector<byte_t>& bytes) {
 }
 
 DataFrame::DataFrame(const std::string& s) {
-  auto pe = glz::read_json(*this, s); // try json deserialization
-  if (pe) {
-    throw std::invalid_argument(fmt::format("Error parsing DataFrame: \n{}", glz::format_error(pe, s)));
+  auto parse_error = glz::read_json(*this, s); // try json deserialization
+  if (parse_error) {
+    throw std::runtime_error(fmt::format("Error parsing DataFrame: \n{}", glz::format_error(parse_error, s)));
   }
 
   if (metadata.count("atol")) {
@@ -136,7 +142,10 @@ std::string DataFrame::describe(size_t num_slides) const {
 
 std::vector<byte_t> DataFrame::to_bytes() const {
   std::vector<byte_t> data;
-  glz::write_beve(*this, data);
+  auto write_error = glz::write_beve(*this, data);
+  if (write_error) {
+    throw std::runtime_error(fmt::format("Error writing DataFrame to binary: \n{}", glz::format_error(write_error, data)));
+  }
   return data;
 }
 
@@ -145,7 +154,10 @@ std::string DataFrame::to_json() const {
   static constexpr auto partial = glz::json_ptrs("/params", "/metadata");
 
   std::string s;
-  glz::write_json<partial>(*this, s);
+  auto write_error = glz::write_json<partial>(*this, s);
+  if (write_error) {
+    throw std::runtime_error(fmt::format("Error writing DataFrame to json: \n{}", glz::format_error(write_error, s)));
+  }
   return glz::prettify_json(s);
 }
 
