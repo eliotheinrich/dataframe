@@ -21,41 +21,6 @@ std::vector<dataframe::byte_t> convert_bytes(const nanobind::bytes& bytes) {
   return bytes_vec;
 }
 
-#define EXPORT_SIMULATOR(A)                                                     \
-  nanobind::class_<A>(m, #A)                                                    \
-    .def(nanobind::init<dataframe::Params&, uint32_t>())                        \
-    .def("init", [](                                                            \
-          A& self,                                                              \
-          const std::optional<nanobind::bytes>& data = std::nullopt) {          \
-      std::optional<std::vector<dataframe::byte_t>> _data;                      \
-      if (data.has_value()) {                                                   \
-        _data = convert_bytes(data.value());                                    \
-      } else {                                                                  \
-        _data = std::nullopt;                                                   \
-      }                                                                         \
-      if (_data.has_value()) {                                                  \
-        self.deserialize(_data.value());                                        \
-      }                                                                         \
-    }, "data"_a = nanobind::none())                                             \
-    .def("timesteps", &A::timesteps)                                            \
-    .def("equilibration_timesteps", [](A& self, uint32_t num_steps) {           \
-        self.equilibration_timesteps(num_steps);                                \
-    })                                                                          \
-    .def("take_samples", &A::take_samples)                                      \
-    .def("serialize", [](A& self) {                                             \
-      return self.serialize();                                                  \
-    });
-
-#define EXPORT_CONFIG(A)                                              \
-  nanobind::class_<A>(m, #A)                                          \
-  .def(nanobind::init<dataframe::Params&>())                          \
-  .def("compute", [](A& self, uint32_t num_threads) {                 \
-      dataframe::DataSlide slide = self.compute(num_threads);         \
-      std::vector<dataframe::byte_t> _bytes = slide.to_bytes();       \
-      nanobind::bytes bytes = convert_bytes(_bytes);                  \
-      return bytes;                                                   \
-    })                                                                
-
 using namespace nanobind::literals;
 
 namespace dataframe {
@@ -281,5 +246,4 @@ namespace dataframe {
         }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move);
 
   }
-
 }

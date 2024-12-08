@@ -38,7 +38,6 @@ set(SRC_FILES
   src/DataSlide.hpp 
   src/DataFrame.hpp 
   src/DataFrame.cpp
-  src/Simulator.hpp
   src/types.h
 )
 
