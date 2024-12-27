@@ -13,14 +13,19 @@ ATOL = 1e-6
 RTOL = 1e-5
 
 
-def save_config(config, filename):
-    config = json.dumps(config, indent=1)
-    config = config.replace('\\', '').replace(': false', ': 0').replace(': true', ': 1')
-    with open(filename, 'w') as file:
-        file.write(config)
+def save_param_matrix(param_matrix, filename):
+    param_matrix = json.dumps(param_matrix, indent=1)
+    param_matrix = param_matrix.replace('\\', '').replace(': false', ': 0').replace(': true', ': 1')
+    with open(filename, "w") as file:
+        file.write(param_matrix)
+
+def load_param_matrix(filename):
+    with open(filename, "r") as file:
+        param_matrix = json.load(file)
+    return param_matrix
 
 
-def unbundle_params(param_bundle, p=None):
+def unbundle_param_matrix(param_bundle, p=None):
     params = []
     if p is None:
         param_bundle = param_bundle.copy()
@@ -40,7 +45,7 @@ def unbundle_params(param_bundle, p=None):
                     raise ValueError(f"Key {key} passed as a zipped parameter and an unzipped parameter; aborting.")
 
                 p[key] = val
-            params += unbundle_params(param_bundle.copy(), p.copy())
+            params += unbundle_param_matrix(param_bundle.copy(), p.copy())
 
         return params
 
@@ -63,7 +68,7 @@ def unbundle_params(param_bundle, p=None):
         del param_bundle[vector_key]
         for v in vals:
             p[vector_key] = v
-            params += unbundle_params(param_bundle.copy(), p.copy())
+            params += unbundle_param_matrix(param_bundle.copy(), p.copy())
 
     return params
 

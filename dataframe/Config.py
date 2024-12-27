@@ -112,10 +112,24 @@ class SimulatorConfig(Config):
             num_timesteps = self.measurement_freq
             num_intervals = self.sampling_timesteps // self.measurement_freq
 
-        simulator.equilibration_timesteps(self.equilibration_timesteps)
+        def time_func(func, *args, **kwargs):
+            t1 = time.time()
+            return_val = func(*args, **kwargs)
+            t2 = time.time()
+            return return_val, t2 - t1
 
-        simulator.timesteps(num_timesteps)
-        sample = simulator.take_samples()
+        sampling_time = 0.0
+        steps_time = 0.0
+
+        _, dt = time_func(simulator.equilibration_timesteps, self.equilibration_timesteps)
+        steps_time += dt
+
+        _, dt = time_func(simulator.timesteps, num_timesteps)
+        steps_time += dt
+
+        sample, dt = time_func(simulator.take_samples)
+        sampling_time += dt
+
         if self.save_samples:
             slide.add_samples(sample)
             slide.push_samples(sample)
@@ -124,17 +138,27 @@ class SimulatorConfig(Config):
             slide.push_samples_to_data(sample)
 
         for i in range(1, num_intervals):
-            simulator.timesteps(num_timesteps)
-            sample = simulator.take_samples()
+            _, dt = time_func(simulator.timesteps, num_timesteps)
+            steps_time += dt
+
+            sample, dt = time_func(simulator.take_samples)
+            sampling_time += dt
+
             if self.save_samples:
                 slide.push_samples(sample)
             else:
-                slide.push_samples_to_data(sample, self.temporal_avg)
+                slide.push_samples_to_data(sample, bool(self.temporal_avg))
 
         end = time.time()
         duration = end - start
         slide.add_data("time")
         slide.push_samples_to_data("time", duration)
+
+        slide.add_data("sampling_time")
+        slide.push_samples_to_data("sampling_time", sampling_time)
+
+        slide.add_data("steps_time")
+        slide.push_samples_to_data("steps_time", steps_time)
 
         if self.serialize:
             slide.buffer = simulator.serialize()
