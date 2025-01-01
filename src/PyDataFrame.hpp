@@ -5,10 +5,11 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/vector.h>
-#include <nanobind/stl/map.h>
+#include <nanobind/stl/bind_map.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/trampoline.h>
 #include <nanobind/ndarray.h>
+#include <types.h>
 
 nanobind::bytes convert_bytes(const std::vector<dataframe::byte_t>& bytes) {
   nanobind::bytes nb_bytes(bytes.data(), bytes.size());
@@ -26,7 +27,7 @@ using namespace nanobind::literals;
 namespace dataframe {
   // Types which are interfaced with python
   typedef nanobind::ndarray<nanobind::numpy, double> py_nbarray;
-  typedef std::variant<qvar_t, std::vector<qvar_t>, py_nbarray> py_query_t;
+  typedef std::variant<Parameter, std::vector<Parameter>, py_nbarray> py_query_t;
   typedef std::variant<py_query_t, std::vector<py_query_t>> py_query_result;
 
   size_t get_query_size(const query_t& q) {
@@ -57,10 +58,10 @@ namespace dataframe {
       my_data = data;
     }
 
-    py_query_t operator()(const qvar_t& v) const { 
+    py_query_t operator()(const Parameter& v) const { 
       return v;
     }
-    py_query_t operator()(const std::vector<qvar_t>& v) const { 
+    py_query_t operator()(const std::vector<Parameter>& v) const { 
       return v; 
     }
     py_query_t operator()(const nbarray &data) const {
@@ -94,13 +95,45 @@ namespace dataframe {
     }
   };
 
+  using ExperimentPklData = std::vector<std::pair<std::string, Parameter>>;
+
   // Provide this function to initialize dataframe in other projects
   void init_dataframe(nanobind::module_ &m) {
+    nanobind::bind_map<ExperimentParams>(m, "ExperimentParams")
+      .def("setdefault", [](ExperimentParams& self, const std::string& key, Parameter default_val) {
+        if (self.contains(key)) {
+          return self.at(key);
+        } else {
+          self[key] = default_val;
+          return default_val;
+        }
+      });
+      //.def("__getstate__", [](const ExperimentParams& params) {
+      //    std::cout << "Called internal __getstate__\n";
+      //  ExperimentPklData data;
+      //  for (auto const& [key, val] : params) {
+      //    data.push_back({key, val});
+      //  }
+      //    std::cout << "Finished internal __getstate__\n";
+      //  return data;
+      //})
+      //.def("__setstate__", [](ExperimentParams& params, const ExperimentPklData& data) {
+      //  params = {};
+      //  std::cout << fmt::format("Starting __setstate__. size = {}\n", data.size());
+      //  for (size_t i = 0; i < data.size(); i++) {
+      //    auto [key, val] = data[i];
+      //    std::cout << fmt::format("Key = {}\n", key);
+      //    params[key] = val;
+      //    std::cout << fmt::format("Assigned\n");
+      //  }
+      //  std::cout << "Finished __setstate__\n";
+      //});
+
     m.def("load_params", &utils::load_params);
 
     // Need to statically cast overloaded templated methods
-    void (DataSlide::*ds_add_param1)(const Params&) = &DataSlide::add_param;
-    void (DataSlide::*ds_add_param2)(const std::string&, var_t const&) = &DataSlide::add_param;
+    void (DataSlide::*ds_add_param1)(const ExperimentParams&) = &DataSlide::add_param;
+    void (DataSlide::*ds_add_param2)(const std::string&, const Parameter&) = &DataSlide::add_param;
 
     void (DataSlide::*push_data1)(const std::string&, const double) = &DataSlide::push_samples_to_data;
     void (DataSlide::*push_data2)(const std::string&, const double, const double, const uint32_t) = &DataSlide::push_samples_to_data;
@@ -127,7 +160,7 @@ namespace dataframe {
 
     nanobind::class_<DataSlide>(m, "DataSlide")
       .def(nanobind::init<>())
-      .def(nanobind::init<Params&>())
+      .def(nanobind::init<ExperimentParams&>())
       .def(nanobind::init<const std::string&>())
       .def(nanobind::init<const DataSlide&>())
       .def("__init__", [](DataSlide* t, const nanobind::bytes& bytes) {
@@ -169,12 +202,12 @@ namespace dataframe {
       .def("congruent", &DataSlide::congruent)
       .def("combine", &DataSlide::combine, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL);
 
-    void (DataFrame::*df_add_param1)(const Params&) = &DataFrame::add_param;
-    void (DataFrame::*df_add_param2)(const std::string&, var_t const&) = &DataFrame::add_param;
-    void (DataFrame::*df_add_metadata1)(const Params&) = &DataFrame::add_metadata;
-    void (DataFrame::*df_add_metadata2)(const std::string&, var_t const&) = &DataFrame::add_metadata;
+    void (DataFrame::*df_add_param1)(const ExperimentParams&) = &DataFrame::add_param;
+    void (DataFrame::*df_add_param2)(const std::string&, const Parameter&) = &DataFrame::add_param;
+    void (DataFrame::*df_add_metadata1)(const ExperimentParams&) = &DataFrame::add_metadata;
+    void (DataFrame::*df_add_metadata2)(const std::string&, const Parameter&) = &DataFrame::add_metadata;
 
-    auto _query = [](DataFrame& df, const auto& keys, const Params& constraints, bool unique, DataFrame::QueryType query_type) {
+    auto _query = [](DataFrame& df, const auto& keys, const ExperimentParams& constraints, bool unique, DataFrame::QueryType query_type) {
       std::vector<query_t> results = df.query(keys, constraints, unique, query_type);
 
       // Allocate space for query results
@@ -201,7 +234,7 @@ namespace dataframe {
       .def(nanobind::init<>())
       .def(nanobind::init<double, double>())
       .def(nanobind::init<const std::vector<DataSlide>&>())
-      .def(nanobind::init<const Params&, const std::vector<DataSlide>&>())
+      .def(nanobind::init<const ExperimentParams&, const std::vector<DataSlide>&>())
       .def(nanobind::init<const std::string&>())
       .def(nanobind::init<const DataFrame&>())
       .def("__init__", [](DataFrame* t, const nanobind::bytes& bytes) {
@@ -230,20 +263,18 @@ namespace dataframe {
       .def("write", &DataFrame::write)
       .def("promote_params", &DataFrame::promote_params)
       .def("reduce", &DataFrame::reduce)
-      .def("average_samples", &DataFrame::average_samples_inplace)
-      .def("filter", &DataFrame::filter, "constraints"_a, "filter"_a = false)
-      .def("query", [&_query](DataFrame& df, const query_key_t& keys, const Params& constraints, bool unique) {
+      .def("query", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
           return _query(df, keys, constraints, unique, DataFrame::QueryType::Mean);
-        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::copy)
-      .def("query_std", [&_query](DataFrame& df, const query_key_t& keys, const Params& constraints, bool unique) {
+        }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::copy)
+      .def("query_std", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
           return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardDeviation);
-        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move)
-      .def("query_sde", [&_query](DataFrame& df, const query_key_t& keys, const Params& constraints, bool unique) {
+        }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move)
+      .def("query_sde", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
           return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardError);
-        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move)
-      .def("query_nsamples", [&_query](DataFrame& df, const query_key_t& keys, const Params& constraints, bool unique) {
+        }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move)
+      .def("query_nsamples", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
           return _query(df, keys, constraints, unique, DataFrame::QueryType::NumSamples);
-        }, "keys"_a, "constraints"_a = Params(), "unique"_a = false, nanobind::rv_policy::move);
+        }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move);
 
   }
 }

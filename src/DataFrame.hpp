@@ -15,8 +15,8 @@ namespace dataframe {
       double atol;
       double rtol;
 
-      Params params;
-      Params metadata;
+      ExperimentParams params;
+      ExperimentParams metadata;
       std::vector<DataSlide> slides;
 
       DataFrame() {
@@ -35,7 +35,7 @@ namespace dataframe {
         init_qtable();
       }
 
-      DataFrame(const Params& params, const std::vector<DataSlide>& slides) : atol(DF_ATOL), rtol(DF_RTOL) {
+      DataFrame(const ExperimentParams& params, const std::vector<DataSlide>& slides) : atol(DF_ATOL), rtol(DF_RTOL) {
         add_param(params);
         for (uint32_t i = 0; i < slides.size(); i++) {
           add_slide(slides[i]); 
@@ -106,7 +106,7 @@ namespace dataframe {
         metadata[s] = t;
       }
 
-      void add_metadata(const Params &params) {
+      void add_metadata(const ExperimentParams &params) {
         for (auto const &[key, field] : params) {
           add_metadata(key, field);
         }
@@ -119,7 +119,7 @@ namespace dataframe {
       }
 
 
-      void add_param(const Params &params) {
+      void add_param(const ExperimentParams &params) {
         for (auto const &[key, field] : params) {
           add_param(key, field);
         }
@@ -131,7 +131,7 @@ namespace dataframe {
         return params.contains(s);
       }
 
-      var_t get(const std::string& s) const {
+      Parameter get(const std::string& s) const {
         if (params.contains(s)) {
           return get_param(s);
         } else {
@@ -139,11 +139,11 @@ namespace dataframe {
         }
       }
 
-      var_t get_param(const std::string& s) const {
+      Parameter get_param(const std::string& s) const {
         return params.at(s);
       }
 
-      var_t get_metadata(const std::string& s) const {
+      Parameter get_metadata(const std::string& s) const {
         return metadata.at(s);
       }
 
@@ -196,9 +196,9 @@ namespace dataframe {
           return false;
         }
 
-        var_t first_slide_val = first_slide.get_param(s);
+        Parameter first_slide_val = first_slide.get_param(s);
 
-        utils::var_t_eq equality_comparator(atol, rtol);
+        utils::param_eq equality_comparator(atol, rtol);
         for (auto slide : slides) {
           if (!slide.contains(s)) {
             return false;
@@ -213,7 +213,7 @@ namespace dataframe {
       }
 
       void promote_params() {
-        utils::var_t_eq equality_comparator(atol, rtol);
+        utils::param_eq equality_comparator(atol, rtol);
         if (slides.size() == 0) {
           return;
         }
@@ -248,7 +248,7 @@ namespace dataframe {
         return copy;
       }
 
-      DataFrame filter(const std::vector<Params>& constraints, bool invert = false) {
+      DataFrame filter(const std::vector<ExperimentParams>& constraints, bool invert = false) {
         std::set<uint32_t> inds;
         for (auto const &constraint : constraints) {
           auto c_inds = compatible_inds(constraint);
@@ -294,7 +294,7 @@ namespace dataframe {
 
       std::vector<query_t> query(
         const query_key_t& keys_var, 
-        const Params& constraints, 
+        const ExperimentParams& constraints, 
         bool unique=false, 
         QueryType query_type=QueryType::Mean
       ) {
@@ -321,21 +321,16 @@ namespace dataframe {
         // Compile result of query
         std::vector<query_t> result;
 
-        utils::var_to_qvar parser{atol};
-
         for (auto const& key : keys) {
           query_t key_result;
           if (params.contains(key)) { // Frame-level param
-            qvar_t val = std::visit(parser, params[key]);
-            key_result = query_t{val};
+            key_result = query_t{params[key]};
           } else if (metadata.contains(key)) { // Metadata param
-            qvar_t val = std::visit(parser, metadata[key]);
-            key_result = query_t{val};
+            key_result = query_t{metadata[key]};
           } else if (slides[*inds.begin()].params.contains(key)) { // Slide-level param
-            std::vector<qvar_t> param_vals;
+            std::vector<Parameter> param_vals;
             for (auto const i : inds) {
-              qvar_t val = std::visit(parser, slides[i].params[key]);
-              param_vals.push_back(val);
+              param_vals.push_back(slides[i].params[key]);
             }
             key_result = query_t{param_vals};
           } else { // Data
@@ -412,7 +407,7 @@ namespace dataframe {
 
         // Combine matching metadata
         DataFrame df;
-        utils::var_t_eq equality_comparator(atol, rtol);
+        utils::param_eq equality_comparator(atol, rtol);
         for (auto const &[k, v] : metadata) {
           if (other.metadata.contains(k) && equality_comparator(v, other.metadata.at(k))) {
             df.add_metadata(k, v);
@@ -463,8 +458,8 @@ namespace dataframe {
 
         // self_frame_params and other_frame_params now only contain parameters unique to that frame
 
-        Params self_slide_params;
-        Params other_slide_params;
+        ExperimentParams self_slide_params;
+        ExperimentParams other_slide_params;
 
         for (auto const& k : both_frame_params) {
           if (equality_comparator(params.at(k), other.params.at(k))) {
@@ -510,7 +505,7 @@ namespace dataframe {
       bool qtable_initialized;
       // qtable stores a list of key: {val: corresponding_slide_indices}
       std::map<std::string, std::vector<std::vector<uint32_t>>> qtable;
-      std::map<std::string, std::vector<var_t>> key_vals;
+      std::map<std::string, std::vector<Parameter>> key_vals;
 
       void init_tolerance() {
         if (metadata.contains("atol")) {
@@ -527,11 +522,11 @@ namespace dataframe {
       }
 
       uint32_t corresponding_ind(
-        const var_t& v, 
-        const std::vector<var_t>& vals, 
-        const std::optional<utils::var_t_eq>& comp = std::nullopt
+        const Parameter& v, 
+        const std::vector<Parameter>& vals, 
+        const std::optional<utils::param_eq>& comp = std::nullopt
       ) {
-        utils::var_t_eq equality_comparator = comp.value_or(utils::var_t_eq{atol, rtol});
+        utils::param_eq equality_comparator = comp.value_or(utils::param_eq{atol, rtol});
 
         for (uint32_t i = 0; i < vals.size(); i++) {
           if (equality_comparator(v, vals[i])) {
@@ -544,18 +539,18 @@ namespace dataframe {
 
       // Initialize query table; is called anytime a query is made after the frame has been changed.
       void init_qtable() {
-        utils::var_t_eq equality_comparator(atol, rtol);
-        key_vals = std::map<std::string, std::vector<var_t>>();
+        utils::param_eq equality_comparator(atol, rtol);
+        key_vals = std::map<std::string, std::vector<Parameter>>();
 
         for (auto const &slide : slides) {
           for (auto const &[key, tar_val] : slide.params) {
             if (!key_vals.contains(key)) {
-              key_vals[key] = std::vector<var_t>();
+              key_vals[key] = std::vector<Parameter>();
             }
 
             auto result = std::find_if(
               key_vals[key].begin(), key_vals[key].end(), 
-              [tar_val, &equality_comparator](const var_t& val) {
+              [tar_val, &equality_comparator](const Parameter& val) {
                 return equality_comparator(tar_val, val);
               }
             );
@@ -574,7 +569,7 @@ namespace dataframe {
         for (uint32_t n = 0; n < slides.size(); n++) {
           auto slide = slides[n];
           for (auto const &[key, vals] : key_vals) {
-            var_t val = slide.params[key];
+            Parameter val = slide.params[key];
             uint32_t idx = corresponding_ind(val, vals, equality_comparator);
             if (idx == (uint32_t) -1) {
               throw std::invalid_argument("Error in init_qtable.");
@@ -595,13 +590,13 @@ namespace dataframe {
         }
       }
 
-      std::set<uint32_t> compatible_inds(const Params& constraints) {
+      std::set<uint32_t> compatible_inds(const ExperimentParams& constraints) {
         if (!qtable_initialized) {
           init_qtable();
         }
 
         // Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
-        utils::var_t_eq equality_comparator(atol, rtol);
+        utils::param_eq equality_comparator(atol, rtol);
         for (auto const &[key, val] : constraints) {
           if (params.contains(key) && !(equality_comparator(params[key], val))) {
             return std::set<uint32_t>();
@@ -609,7 +604,7 @@ namespace dataframe {
         }
 
         // Determine which constraints are relevant, i.e. correspond to existing Slide-level parameters
-        Params relevant_constraints;
+        ExperimentParams relevant_constraints;
         for (auto const &[key, val] : constraints) {
           if (!params.contains(key)) {
             relevant_constraints[key] = val;

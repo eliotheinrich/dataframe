@@ -17,7 +17,7 @@ namespace utils {
 #define DF_ATOL 1e-6
 #define DF_RTOL 1e-5
 
-struct var_t_to_string {
+struct param_to_string {
   std::string operator()(const std::string& s) {
     return s;
   }
@@ -122,13 +122,13 @@ static bool is_integer(const std::string& str) {
   }
 }
 
-struct qvar_t_eq {
+struct param_eq {
   double atol;
   double rtol;
 
-  qvar_t_eq(double atol=DF_ATOL, double rtol=DF_RTOL) : atol(atol), rtol(rtol) {}
+  param_eq(double atol=DF_ATOL, double rtol=DF_RTOL) : atol(atol), rtol(rtol) {}
 
-  bool operator()(const qvar_t& v, const qvar_t& t) const {
+  bool operator()(const Parameter& v, const Parameter& t) const {
     if (v.index() != t.index()) {
       return false;
     }
@@ -159,42 +159,7 @@ struct qvar_t_eq {
   }
 };
 
-struct var_t_eq {
-  double atol;
-  double rtol;
-
-  var_t_eq(double atol=DF_ATOL, double rtol=DF_RTOL) : atol(atol), rtol(rtol) {}
-
-  bool operator()(const var_t& v, const var_t& t) const {
-    if (v.index() != t.index()) {
-      return false;
-    }
-
-    if (v.index() == 0) { // comparing doubles is the tricky part
-      double vd = std::get<double>(v);
-      double vt = std::get<double>(t);
-
-      // check absolute tolerance first
-      if (std::abs(vd - vt) < atol) {
-        return true;
-      }
-
-      double max_val = std::max(std::abs(vd), std::abs(vt));
-
-      // both numbers are very small; use absolute comparison
-      if (max_val < std::numeric_limits<double>::epsilon()) {
-        return std::abs(vd - vt) < atol;
-      }
-
-      // resort to relative tolerance
-      return std::abs(vd - vt)/max_val < rtol;
-    } else {
-      return std::get<std::string>(v) == std::get<std::string>(t);
-    }
-  }
-};
-
-static bool qvar_t_comparison(const qvar_t& lhs, const qvar_t& rhs) {
+static bool parameter_comparison(const Parameter& lhs, const Parameter& rhs) {
   if (lhs.index() == 0 && rhs.index() == 0) {
     return std::get<std::string>(lhs) < std::get<std::string>(rhs);
   } else if (lhs.index() == 0 && rhs.index() != 0) {
@@ -209,55 +174,23 @@ static bool qvar_t_comparison(const qvar_t& lhs, const qvar_t& rhs) {
   return d1 < d2;
 }
 
-static bool var_t_comparison(const var_t& lhs, const var_t& rhs) {	
-  if (lhs.index() == 1 && rhs.index() == 1) {
-    return std::get<std::string>(lhs) < std::get<std::string>(rhs);
-  } else if (lhs.index() == 1 && rhs.index() != 1) {
-    return true;
-  } else if (lhs.index() != 1 && rhs.index() == 1) {
-    return false;
-  }
-
-  double d1 = std::get<double>(lhs);
-  double d2 = std::get<double>(rhs);
-
-  return d1 < d2;
-}
-
-struct var_to_qvar {
-  double atol;
-
-  qvar_t operator()(const std::string& s) {
-    return qvar_t{s};
-  }
-
-  qvar_t operator()(double d) {
-    int di = std::round(d);
-    if (std::abs(d - static_cast<double>(di)) < atol) {
-      return qvar_t{di};
-    } else {
-      return qvar_t{d};
-    }
-  }
-};
-
 struct make_query_t_unique {
-  qvar_t_eq var_visitor;
+  param_eq var_visitor;
 
   make_query_t_unique(double atol=DF_ATOL, double rtol=DF_RTOL) {
-    var_visitor = qvar_t_eq{atol, rtol};
+    var_visitor = param_eq{atol, rtol};
   }
 
-  query_t operator()(const qvar_t& v) const { 
-    return std::vector<qvar_t>{v}; 
+  query_t operator()(const Parameter& v) const { 
+    return std::vector<Parameter>{v}; 
   }
 
-  query_t operator()(const std::vector<qvar_t>& vec) const {
-    std::vector<qvar_t> return_vals;
+  query_t operator()(const std::vector<Parameter>& vec) const {
+    std::vector<Parameter> return_vals;
 
     for (auto const &tar_val : vec) {
       auto result = std::find_if(return_vals.begin(), return_vals.end(), 
-        [tar_val, &var_visitor=var_visitor](const qvar_t& val) {
+        [tar_val, &var_visitor=var_visitor](const Parameter& val) {
           return var_visitor(tar_val, val);
         }
       );
@@ -267,7 +200,7 @@ struct make_query_t_unique {
       }
     }
 
-    std::sort(return_vals.begin(), return_vals.end(), qvar_t_comparison);
+    std::sort(return_vals.begin(), return_vals.end(), parameter_comparison);
 
     return return_vals;
   }
@@ -287,7 +220,7 @@ static std::vector<query_t> make_query_unique(const std::vector<query_t>& result
   return new_results;
 }
 
-static bool params_eq(const Params& lhs, const Params& rhs, const var_t_eq& equality_comparator) {
+static bool params_eq(const ExperimentParams& lhs, const ExperimentParams& rhs, const param_eq& equality_comparator) {
   if (lhs.size() != rhs.size()) {
     return false;
   }
@@ -306,36 +239,21 @@ static bool params_eq(const Params& lhs, const Params& rhs, const var_t_eq& equa
 }
 
 template <class T>
-T get(Params &params, const std::string& key, T defaultv) {
+T get(ExperimentParams &params, const std::string& key, T defaultv) {
   if (params.count(key)) {
     return std::get<T>(params[key]);
   }
 
-  params[key] = var_t{defaultv};
-  return defaultv;
-}
-
-template <>
-inline int get<int>(Params &params, const std::string& key, int defaultv) { 
-  if (params.count(key)) {
-    return std::round(std::get<double>(params[key]));
-  }
-
-  params[key] = var_t{static_cast<double>(defaultv)};
+  params[key] = Parameter{defaultv};
   return defaultv;
 }
 
 template <class T>
-T get(const Params &params, const std::string& key) {
+T get(const ExperimentParams &params, const std::string& key) {
   if (!params.count(key)) {
-    throw std::runtime_error(fmt::format("Key \"{}\" not found in Params.", key));
+    throw std::runtime_error(fmt::format("Key \"{}\" not found in ExperimentParams.", key));
   }
   return std::get<T>(params.at(key));
-}
-
-template <>
-inline int get<int>(const Params &params, const std::string& key) {
-  return std::round(get<double>(params, key));
 }
 
 static void emplace(data_t& data, const std::string& key, const std::vector<std::vector<double>>& d) {
@@ -354,9 +272,12 @@ static void emplace(data_t& data, const std::string& key, double d) {
   emplace(data, key, std::vector<double>{d});
 }
 
-Params load_params(const std::string& filename);
+ExperimentParams load_params(const std::string& filename);
 
-std::string params_to_string(const Params& params);
+std::string params_to_string(const ExperimentParams& params);
+
+std::vector<byte_t> pkl_params(const ExperimentParams& params);
+void load_params_from_pkl(ExperimentParams& params, const std::vector<byte_t>& data);
 
 }
 }

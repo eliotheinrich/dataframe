@@ -11,26 +11,21 @@
 
 namespace dataframe {
   
-typedef char byte_t;
+using byte_t = char;
 
 // --- DEFINING VALID PARAMETER VALUES ---
-typedef std::variant<double, std::string> var_t;
+using Parameter = std::variant<std::string, int, double>;
+using ExperimentParams = std::map<std::string, Parameter>;
 
-// Need to be provide overloaded constructors so that the Sample interface is hidden and
-// data can be provided as simple doubles or vectors of doubles
-typedef std::map<std::string, var_t> Params;
-
-// For building DataSlides with TimeSamplingDriver
-typedef std::map<std::string, std::vector<std::vector<double>>> data_t;
+using data_t = std::map<std::string, std::vector<std::vector<double>>>;
 
 // --- DEFINING VALID QUERY RESULTS ---
 // Options are:
 // 1.) Frame-level param -> var_t
 // 2.) Slide-level param -> std::vector<var_t>
 // 3.) Vector data -> nbarray
-typedef std::vector<std::vector<std::vector<double>>> nbarray;
-typedef std::variant<std::string, int, double> qvar_t;
-typedef std::variant<qvar_t, std::vector<qvar_t>, nbarray> query_t;
-typedef std::variant<std::string, std::vector<std::string>> query_key_t;
+using nbarray = std::vector<std::vector<std::vector<double>>>;
+using query_t = std::variant<Parameter, std::vector<Parameter>, nbarray>;
+using query_key_t = std::variant<std::string, std::vector<std::string>>;
 
 }

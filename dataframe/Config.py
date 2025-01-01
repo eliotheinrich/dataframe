@@ -1,17 +1,24 @@
 from abc import ABC, abstractmethod
-from .bindings import DataSlide
+from .bindings import DataSlide, ExperimentParams
 import time
+
+
+def experiment_params_to_dict(params):
+    s = {}
+    for key, val in params.items():
+        s[key] = val
+    return s
 
 class Config(ABC):
     def __init__(self, params):
-        self.params = params.copy()
+        self.params = ExperimentParams(params)
         self.num_runs = params.setdefault("num_runs", 1)
 
     def __getstate__(self):
-        return self.params,
+        return experiment_params_to_dict(self.params)
 
-    def __setstate__(self, state):
-        self.__init__(*state)
+    def __setstate__(self, *args):
+        self.__init__(*args)
 
     def get_nruns(self):
         return int(self.params["num_runs"])
@@ -31,7 +38,7 @@ class CppConfig(Config):
         self._internal_config = _internal_config
 
     def __getstate__(self):
-        return self.params, self._internal_config
+        return experiment_params_to_dict(self.params), self._internal_config
 
     def concretize(self):
         return self._internal_config(self.params)
@@ -68,6 +75,13 @@ class Simulator(ABC):
     def serialize(self):
         pass
 
+    def get_texture(self):
+        # Placeholder
+        return [[0]], 1, 1
+
+    def key_callback(self, key):
+        pass
+
 
 class SimulatorConfig(Config):
     def __init__(self, params, simulator_generator, serialize=False):
@@ -92,7 +106,7 @@ class SimulatorConfig(Config):
         self._serialized_simulator = data
 
     def __getstate__(self):
-        return self.params, self.simulator_generator, self.serialize, self._serialized_simulator
+        return experiment_params_to_dict(self.params), self.simulator_generator, self.serialize, self._serialized_simulator
 
     def __setstate__(self, state):
         self.__init__(state[0], state[1], state[2])
@@ -180,7 +194,7 @@ class FuncConfig(Config):
         return self.function(self.params, num_threads)
 
     def __getstate__(self):
-        return self.params, self.function
+        return experiment_params_to_dict(self.params), self.function
 
     def clone(self):
         return FuncConfig(self.params, self.function)

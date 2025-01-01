@@ -14,7 +14,7 @@ namespace dataframe {
     public:
       friend DataFrame;
 
-      Params params;
+      ExperimentParams params;
 
       // data and samples are stored in the format rows x length, where
       // rows correspond to sampled properties corresponding to key
@@ -30,7 +30,7 @@ namespace dataframe {
 
       DataSlide() {}
 
-      DataSlide(Params &params) : params(params) {}
+      DataSlide(ExperimentParams &params) : params(params) {}
 
       DataSlide(const std::string &s);
 
@@ -67,7 +67,7 @@ namespace dataframe {
         return params.contains(key) || data.contains(key) || samples.contains(key);
       }
 
-      var_t get_param(const std::string& key) const {
+      Parameter get_param(const std::string& key) const {
         return params.at(key);
       }
 
@@ -76,7 +76,7 @@ namespace dataframe {
         params[key] = val; 
       }
 
-      void add_param(const Params &params) {
+      void add_param(const ExperimentParams &params) {
         for (auto const &[key, field] : params) {
           add_param(key, field);
         }
@@ -383,12 +383,12 @@ namespace dataframe {
 
       std::string describe() const;
 
-      bool congruent(const DataSlide &ds, const utils::var_t_eq& equality_comparator) {
+      bool congruent(const DataSlide &ds, const utils::param_eq& equality_comparator) {
         auto incongruent_key = first_incongruent_key(ds, equality_comparator);
         return incongruent_key == std::nullopt;
       }
       
-      std::optional<std::string> first_incongruent_key(const DataSlide &other, const utils::var_t_eq& equality_comparator) const {
+      std::optional<std::string> first_incongruent_key(const DataSlide &other, const utils::param_eq& equality_comparator) const {
         for (auto const& [key, val] : params) {
           if (!other.params.contains(key) || !equality_comparator(other.params.at(key), val)) {
             return key;
@@ -487,7 +487,7 @@ namespace dataframe {
       }
 
       DataSlide combine(const DataSlide &other, double atol=DF_ATOL, double rtol=DF_RTOL) {
-        utils::var_t_eq equality_comparator(atol, rtol);
+        utils::param_eq equality_comparator(atol, rtol);
         auto key = first_incongruent_key(other, equality_comparator);
 
         if (key != std::nullopt) {
@@ -506,10 +506,4 @@ namespace dataframe {
         return slide;
       }
   };
-
-  template <>
-  inline void DataSlide::add_param(const std::string& s, const int t) { 
-    params[s] = static_cast<double>(t); 
-  }
-
 }
