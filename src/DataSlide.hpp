@@ -90,13 +90,13 @@ namespace dataframe {
         add_data(key, 1);
       }
 
-      void add_data(const data_t& sample) {
+      void add_data(const SampleMap& sample) {
         for (auto const& [key, vals] : sample) {
           add_data(key, vals.size());
         }
       }
 
-      void push_samples_to_data(const data_t& sample, bool avg=false) {
+      void push_samples_to_data(const SampleMap& sample, bool avg=false) {
         for (auto const& [key, vals] : sample) {
           push_samples_to_data(key, vals, avg);
         }
@@ -221,8 +221,8 @@ namespace dataframe {
         add_samples(key, 1);
       }
 
-      // data_t : num_rows x length
-      void add_samples(const data_t& sample) {
+      // SampleMap : num_rows x length
+      void add_samples(const SampleMap& sample) {
         // vals = vector<vector>
         for (auto const& [key, vals] : sample) {
           add_samples(key, vals.size());
@@ -230,7 +230,7 @@ namespace dataframe {
       }
 
 
-      void push_samples(const data_t& sample) {
+      void push_samples(const SampleMap& sample) {
         for (auto const& [key, vals] : sample) {
           push_samples(key, vals);
         }

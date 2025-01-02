@@ -17,7 +17,7 @@ using byte_t = char;
 using Parameter = std::variant<std::string, int, double>;
 using ExperimentParams = std::map<std::string, Parameter>;
 
-using data_t = std::map<std::string, std::vector<std::vector<double>>>;
+using SampleMap = std::map<std::string, std::vector<std::vector<double>>>;
 
 // --- DEFINING VALID QUERY RESULTS ---
 // Options are:
