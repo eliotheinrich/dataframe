@@ -65,7 +65,7 @@ if (DEFINED DF_BUILDING_PY_BINDINGS)
     NB_STATIC
     ${SRC_FILES}
     src/PyDataFrame.hpp
-    src/PyDataFrameModule.cpp
+    src/PyDataFrame.cpp
   )
 
   target_link_libraries(dataframe_bindings PRIVATE fmt::fmt)
