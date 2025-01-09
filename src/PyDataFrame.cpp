@@ -4,7 +4,6 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/vector.h>
-#include <nanobind/stl/bind_map.h>
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/trampoline.h>
@@ -12,8 +11,6 @@
 
 using namespace nanobind::literals;
 using namespace dataframe;
-
-NB_MAKE_OPAQUE(ExperimentParams);
 
   // Types which are interfaced with python
 using py_nbarray = nanobind::ndarray<nanobind::numpy, double>;
@@ -86,36 +83,6 @@ struct query_t_to_py {
 };
 
 NB_MODULE(dataframe_bindings, m) {
-  nanobind::bind_map<ExperimentParams>(m, "ExperimentParams")
-    .def("setdefault", [](ExperimentParams& self, const std::string& key, Parameter default_val) {
-        if (self.contains(key)) {
-        return self.at(key);
-        } else {
-        self[key] = default_val;
-        return default_val;
-        }
-        });
-  //.def("__getstate__", [](const ExperimentParams& params) {
-  //    std::cout << "Called internal __getstate__\n";
-  //  ExperimentPklData data;
-  //  for (auto const& [key, val] : params) {
-  //    data.push_back({key, val});
-  //  }
-  //    std::cout << "Finished internal __getstate__\n";
-  //  return data;
-  //})
-  //.def("__setstate__", [](ExperimentParams& params, const ExperimentPklData& data) {
-  //  params = {};
-  //  std::cout << fmt::format("Starting __setstate__. size = {}\n", data.size());
-  //  for (size_t i = 0; i < data.size(); i++) {
-  //    auto [key, val] = data[i];
-  //    std::cout << fmt::format("Key = {}\n", key);
-  //    params[key] = val;
-  //    std::cout << fmt::format("Assigned\n");
-  //  }
-  //  std::cout << "Finished __setstate__\n";
-  //});
-
   m.def("load_params", &utils::load_params);
 
   // Need to statically cast overloaded templated methods

@@ -1,21 +1,15 @@
 from abc import ABC, abstractmethod
-from .bindings import DataSlide, ExperimentParams
+from .bindings import DataSlide, register_component
 import time
 
 
-def experiment_params_to_dict(params):
-    s = {}
-    for key, val in params.items():
-        s[key] = val
-    return s
-
 class Config(ABC):
     def __init__(self, params):
-        self.params = ExperimentParams(params)
+        self.params = params
         self.num_runs = params.setdefault("num_runs", 1)
 
     def __getstate__(self):
-        return experiment_params_to_dict(self.params)
+        return self.params
 
     def __setstate__(self, *args):
         self.__init__(*args)
@@ -38,7 +32,7 @@ class CppConfig(Config):
         self._internal_config = _internal_config
 
     def __getstate__(self):
-        return experiment_params_to_dict(self.params), self._internal_config
+        return self.params, self._internal_config
 
     def concretize(self):
         return self._internal_config(self.params)
@@ -106,7 +100,7 @@ class SimulatorConfig(Config):
         self._serialized_simulator = data
 
     def __getstate__(self):
-        return experiment_params_to_dict(self.params), self.simulator_generator, self.serialize, self._serialized_simulator
+        return self.params, self.simulator_generator, self.serialize, self._serialized_simulator
 
     def __setstate__(self, state):
         self.__init__(state[0], state[1], state[2])
@@ -116,7 +110,7 @@ class SimulatorConfig(Config):
         start = time.time()
         slide = DataSlide()
 
-        simulator = self.simulator_generator(self.params, num_threads)
+        simulator = register_component(self.simulator_generator, self.params, num_threads)
         simulator.init(self._serialized_simulator)
 
         if self.sampling_timesteps == 0:

@@ -13,11 +13,24 @@ ATOL = 1e-6
 RTOL = 1e-5
 
 
+def register_component(component_generator, params, *args, **kwargs):
+    if hasattr(component_generator, "create_and_emplace"):
+        component, _params = component_generator.create_and_emplace(params, *args, **kwargs)
+        for key, val in _params.items():
+            if key not in params:
+                params[key] = val
+    else:
+        component = component_generator(params, *args, **kwargs)
+
+    return component
+
+
 def save_param_matrix(param_matrix, filename):
     param_matrix = json.dumps(param_matrix, indent=1)
     param_matrix = param_matrix.replace('\\', '').replace(': false', ': 0').replace(': true', ': 1')
     with open(filename, "w") as file:
         file.write(param_matrix)
+
 
 def load_param_matrix(filename):
     with open(filename, "r") as file:
