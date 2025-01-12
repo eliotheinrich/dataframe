@@ -11,7 +11,7 @@ class Config(ABC):
     def __getstate__(self):
         return self.params
 
-    def __setstate__(self, *args):
+    def __setstate__(self, args):
         self.__init__(*args)
 
     def get_nruns(self):
