@@ -188,7 +188,7 @@ class FuncConfig(Config):
         return self.function(self.params, num_threads)
 
     def __getstate__(self):
-        return experiment_params_to_dict(self.params), self.function
+        return self.params, self.function
 
     def clone(self):
         return FuncConfig(self.params, self.function)

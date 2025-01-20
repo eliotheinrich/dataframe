@@ -118,10 +118,10 @@ NB_MODULE(dataframe_bindings, m) {
     .def(nanobind::init<const std::string&>())
     .def(nanobind::init<const DataSlide&>())
     .def("__init__", [](DataSlide* t, const nanobind::bytes& bytes) {
-        auto byte_vec = convert_bytes(bytes);
-        new (t) DataSlide(byte_vec);
-        })
-  .def_rw("params", &DataSlide::params)
+      auto byte_vec = convert_bytes(bytes);
+      new (t) DataSlide(byte_vec);
+    })
+    .def_rw("params", &DataSlide::params)
     .def_rw("data", &DataSlide::data)
     .def_rw("samples", &DataSlide::samples)
     .def("to_bytes", &DataSlide::to_bytes)
@@ -144,9 +144,9 @@ NB_MODULE(dataframe_bindings, m) {
     .def("push_samples", push_samples4)
     .def("remove", &DataSlide::remove)
     .def("_get_buffer", [](const DataSlide& slide) {
-        return convert_bytes(slide.buffer);
-        })
-  .def("__contains__", &DataSlide::contains)
+      return convert_bytes(slide.buffer);
+    })
+    .def("__contains__", &DataSlide::contains)
     .def("__getitem__", &DataSlide::get_param)
     .def("__setitem__", ds_add_param2)
     .def("__str__", &DataSlide::to_json)
@@ -192,10 +192,10 @@ NB_MODULE(dataframe_bindings, m) {
     .def(nanobind::init<const std::string&>())
     .def(nanobind::init<const DataFrame&>())
     .def("__init__", [](DataFrame* t, const nanobind::bytes& bytes) {
-        auto byte_vec = convert_bytes(bytes);
-        new (t) DataFrame(byte_vec);
-        })
-  .def_rw("params", &DataFrame::params)
+      auto byte_vec = convert_bytes(bytes);
+      new (t) DataFrame(byte_vec);
+    })
+    .def_rw("params", &DataFrame::params)
     .def_rw("metadata", &DataFrame::metadata)
     .def_rw("slides", &DataFrame::slides)
     .def_rw("atol", &DataFrame::atol)
@@ -218,16 +218,16 @@ NB_MODULE(dataframe_bindings, m) {
     .def("promote_params", &DataFrame::promote_params)
     .def("reduce", &DataFrame::reduce)
     .def("query", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
-        return _query(df, keys, constraints, unique, DataFrame::QueryType::Mean);
-        }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::copy)
-  .def("query_std", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
+      return _query(df, keys, constraints, unique, DataFrame::QueryType::Mean);
+    }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::copy)
+    .def("query_std", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
       return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardDeviation);
-      }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move)
-  .def("query_sde", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
+    }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move)
+    .def("query_sde", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
       return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardError);
-      }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move)
-  .def("query_nsamples", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
+    }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move)
+    .def("query_nsamples", [&_query](DataFrame& df, const query_key_t& keys, const ExperimentParams& constraints, bool unique) {
       return _query(df, keys, constraints, unique, DataFrame::QueryType::NumSamples);
-      }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move);
+    }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move);
 
 }
