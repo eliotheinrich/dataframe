@@ -37,6 +37,10 @@ def load_param_matrix(filename):
         param_matrix = json.load(file)
     return param_matrix
 
+class ZippedParams:
+    def __init__(self, data):
+        # TODO add some runtime checks for provided data
+        self.data = data
 
 def unbundle_param_matrix(param_bundle, p=None):
     params = []
@@ -44,15 +48,15 @@ def unbundle_param_matrix(param_bundle, p=None):
         param_bundle = param_bundle.copy()
         p = {}
 
-    zparams = None
-    for key in param_bundle:
-        if key.startswith("zparams"):
-            zparams = param_bundle[key]
+    zipped_params = None
+    for key, val in param_bundle.items():
+        if isinstance(val, ZippedParams):
+            zipped_params = param_bundle[key].data
             del param_bundle[key]
             break
 
-    if zparams is not None:
-        for zp in zparams:
+    if zipped_params is not None:
+        for zp in zipped_params:
             for key, val in zp.items():
                 if key in param_bundle:
                     raise ValueError(f"Key {key} passed as a zipped parameter and an unzipped parameter; aborting.")
