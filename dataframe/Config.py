@@ -1,30 +1,7 @@
 from abc import ABC, abstractmethod
-from .bindings import DataSlide, register_component
 import time
 
-
-class Config(ABC):
-    def __init__(self, params):
-        self.params = params
-        self.num_runs = params.setdefault("num_runs", 1)
-
-    def __getstate__(self):
-        return self.params
-
-    def __setstate__(self, args):
-        self.__init__(*args)
-
-    def get_nruns(self):
-        return int(self.params["num_runs"])
-
-    @abstractmethod
-    def compute(self, num_threads):
-        pass
-
-    @abstractmethod
-    def clone(self):
-        pass
-
+from .bindings import Config, DataSlide, register_component
 
 class CppConfig(Config):
     def __init__(self, params, _internal_config):
@@ -65,9 +42,8 @@ class Simulator(ABC):
     def take_samples(self):
         pass
 
-    @abstractmethod
     def serialize(self):
-        pass
+        raise RuntimeError("serialize called on Simulator which does not implement it.")
 
     def get_texture(self):
         # Placeholder

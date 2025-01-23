@@ -1,16 +1,58 @@
 from concurrent.futures import ProcessPoolExecutor
 import concurrent
+import threading
+import signal
+from contextlib import contextmanager
 
 import os
 import json
 import time
 import tqdm
 
+from abc import ABC, abstractmethod
 from dataframe.dataframe_bindings import *
+
+
+def terminating_thread(ppid):
+    pid = os.getpid()
+
+    def f():
+        while True:
+            try:
+                os.kill(ppid, 0)
+            except OSError:
+                os.kill(pid, signal.SIGTERM)
+            time.sleep(1)
+
+    thread = threading.Thread(target=f, daemon=True)
+    thread.start()
 
 
 ATOL = 1e-6
 RTOL = 1e-5
+
+
+class Config(ABC):
+    def __init__(self, params):
+        self.params = params
+        self.num_runs = params.setdefault("num_runs", 1)
+
+    def __getstate__(self):
+        return self.params
+
+    def __setstate__(self, args):
+        self.__init__(*args)
+
+    def get_nruns(self):
+        return int(self.params["num_runs"])
+
+    @abstractmethod
+    def compute(self, num_threads):
+        pass
+
+    @abstractmethod
+    def clone(self):
+        pass
 
 
 def register_component(component_generator, params, *args, **kwargs):
@@ -96,6 +138,9 @@ class ParallelCompute:
 
     def __init__(self, configs, **metadata):
         self.configs = configs
+        for config in self.configs:
+            if not isinstance(config, Config):
+                raise RuntimeError("compute accepts a list of Config.")
         self._metadata = metadata
 
         self.num_threads = int(metadata.setdefault("num_threads", 1))
@@ -214,7 +259,8 @@ class ParallelCompute:
             progress = tqdm.tqdm(range(num_configs))
         else:
             progress = range(num_configs)
-        with ProcessPoolExecutor(max_workers=self.num_threads) as pool:
+
+        with ProcessPoolExecutor(max_workers=self.num_threads, initializer=terminating_thread, initargs=(os.getpid(),)) as pool:
             # Batch configs; ProcessPoolExecutor needs a copy of every config (total_configs)
             # for each process, so want to avoid creating num_configs**2 copies.
             num_batches = max(num_configs // self.batch_size, 1)
