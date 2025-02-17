@@ -14,9 +14,9 @@ class CppConfig(Config):
     def concretize(self):
         return self._internal_config(self.params)
 
-    def compute(self, num_threads):
+    def compute(self):
         config = self.concretize()
-        return config.compute(num_threads)
+        return config.compute()
 
     def clone(self):
         return CppConfig(self.params, self._internal_config)
@@ -54,11 +54,10 @@ class Simulator(ABC):
 
 
 class SimulatorConfig(Config):
-    def __init__(self, params, simulator_generator, serialize=False):
+    def __init__(self, params, simulator_generator):
         super().__init__(params)
 
         self.simulator_generator = simulator_generator
-        self.serialize = serialize
         self._serialized_simulator = None
 
         self.equilibration_timesteps = params.setdefault("equilibration_timesteps", 0)
@@ -72,21 +71,21 @@ class SimulatorConfig(Config):
             raise RuntimeError("Cannot perform temporal average and save all samples.")
 
     # Allow injection of serialized simulator data
-    def store_serialized_simulator(self, data):
+    def inject_buffer(self, data):
         self._serialized_simulator = data
 
     def __getstate__(self):
-        return self.params, self.simulator_generator, self.serialize, self._serialized_simulator
+        return self.params, self.simulator_generator, self._serialized_simulator
 
     def __setstate__(self, state):
-        self.__init__(state[0], state[1], state[2])
-        self.store_serialized_simulator(state[3])
+        self.__init__(state[0], state[1])
+        self.inject_buffer(state[2])
 
-    def compute(self, num_threads):
+    def compute(self):
         start = time.time()
         slide = DataSlide()
 
-        simulator = register_component(self.simulator_generator, self.params, num_threads)
+        simulator = register_component(self.simulator_generator, self.params, self.num_threads)
         simulator.init(self._serialized_simulator)
 
         if self.sampling_timesteps == 0:
@@ -150,8 +149,8 @@ class SimulatorConfig(Config):
         return slide
 
     def clone(self):
-        config = SimulatorConfig(self.params, self.simulator_generator, self.serialize)
-        config.store_serialized_simulator(self._serialized_simulator)
+        config = SimulatorConfig(self.params, self.simulator_generator)
+        config.inject_buffer(self._serialized_simulator)
         return config
 
 
@@ -160,8 +159,8 @@ class FuncConfig(Config):
         super().__init__(params)
         self.function = function
 
-    def compute(self, num_threads):
-        return self.function(self.params, num_threads)
+    def compute(self):
+        return self.function(self.params, self.num_threads)
 
     def __getstate__(self):
         return self.params, self.function

@@ -97,8 +97,12 @@ namespace dataframe {
       }
 
       void push_samples_to_data(const SampleMap& sample, bool avg=false) {
-        for (auto const& [key, vals] : sample) {
-          push_samples_to_data(key, vals, avg);
+        try {
+          for (auto const& [key, vals] : sample) {
+            push_samples_to_data(key, vals, avg);
+          }
+        } catch (const std::invalid_argument& e) {
+          std::cout << fmt::format("Ecountered a runtime error pushing samples to data. SampleMap = {}\n", sample);
         }
       }
 

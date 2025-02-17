@@ -2,7 +2,6 @@ from concurrent.futures import ProcessPoolExecutor
 import concurrent
 import threading
 import signal
-from contextlib import contextmanager
 
 import os
 import json
@@ -35,7 +34,9 @@ RTOL = 1e-5
 class Config(ABC):
     def __init__(self, params):
         self.params = params
+        self.num_threads = params.setdefault("num_threads", 1)
         self.num_runs = params.setdefault("num_runs", 1)
+        self.serialize = params.setdefault("serialize", False)
 
     def __getstate__(self):
         return self.params
@@ -43,11 +44,14 @@ class Config(ABC):
     def __setstate__(self, args):
         self.__init__(*args)
 
+    def inject_buffer(self, data):
+        pass
+
     def get_nruns(self):
         return int(self.params["num_runs"])
 
     @abstractmethod
-    def compute(self, num_threads):
+    def compute(self):
         pass
 
     @abstractmethod
@@ -79,10 +83,12 @@ def load_param_matrix(filename):
         param_matrix = json.load(file)
     return param_matrix
 
+
 class ZippedParams:
     def __init__(self, data):
         # TODO add some runtime checks for provided data
         self.data = data
+
 
 def unbundle_param_matrix(param_bundle, p=None):
     params = []
@@ -144,7 +150,6 @@ class ParallelCompute:
         self._metadata = metadata
 
         self.num_threads = int(metadata.setdefault("num_threads", 1))
-        self.num_threads_per_task = int(metadata.setdefault("num_threads_per_task", 1))
         self.atol = float(metadata.setdefault("atol", ATOL))
         self.rtol = float(metadata.setdefault("rtol", RTOL))
         self.parallelization_type = int(metadata.setdefault("parallelization_type", self.SERIAL))
@@ -202,9 +207,9 @@ class ParallelCompute:
         return self.dataframe
 
     @staticmethod
-    def _do_run(config, num_threads, id, dump_errors):
+    def _do_run(config, id, dump_errors):
         try:
-            _slide = config.compute(num_threads)
+            _slide = config.compute()
 
             if isinstance(_slide, DataSlide):
                 slide = _slide
@@ -240,7 +245,7 @@ class ParallelCompute:
         if self.verbose:
             total_configs = tqdm.tqdm(total_configs)
         for i, config in total_configs:
-            id, slide = ParallelCompute._do_run(config, self.num_threads_per_task, i, self.dump_errors)
+            id, slide = ParallelCompute._do_run(config, i, self.dump_errors)
 
             slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
 
@@ -275,7 +280,7 @@ class ParallelCompute:
                 else:
                     i2 = min((i+1)*self.batch_size, num_configs)
 
-                futures = [pool.submit(ParallelCompute._do_run, config, self.num_threads_per_task, i, self.dump_errors) for i,config in total_configs[i1:i2]]
+                futures = [pool.submit(ParallelCompute._do_run, config, i, self.dump_errors) for i,config in total_configs[i1:i2]]
                 completed_futures = concurrent.futures.as_completed(futures)
 
                 for future in completed_futures:
