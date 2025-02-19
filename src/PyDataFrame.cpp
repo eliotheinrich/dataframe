@@ -143,6 +143,9 @@ NB_MODULE(dataframe_bindings, m) {
     .def("push_samples", push_samples3)
     .def("push_samples", push_samples4)
     .def("remove", &DataSlide::remove)
+    .def("_inject_buffer", [](DataSlide& slide, const nanobind::bytes& bytes) {
+      slide.buffer = convert_bytes(bytes);
+    })
     .def("_get_buffer", [](const DataSlide& slide) {
       return convert_bytes(slide.buffer);
     })

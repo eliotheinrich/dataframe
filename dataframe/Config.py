@@ -144,7 +144,7 @@ class SimulatorConfig(Config):
         slide.push_samples_to_data("steps_time", steps_time)
 
         if self.serialize:
-            slide.buffer = simulator.serialize()
+            slide._inject_buffer(simulator.serialize())
 
         return slide
 
