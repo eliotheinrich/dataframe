@@ -16,7 +16,7 @@ class CppConfig(Config):
 
     def compute(self):
         config = self.concretize()
-        return config.compute()
+        return config.compute(self.num_threads)
 
     def clone(self):
         return CppConfig(self.params, self._internal_config)
