@@ -144,7 +144,9 @@ class SimulatorConfig(Config):
         slide.push_samples_to_data("steps_time", steps_time)
 
         if self.serialize:
-            slide._inject_buffer(simulator.serialize())
+            bytes = simulator.serialize()
+            if bytes is not None:
+                slide._inject_buffer(bytes)
 
         return slide
 
