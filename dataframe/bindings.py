@@ -35,7 +35,6 @@ class Config(ABC):
     def __init__(self, params):
         self.params = params
         self.num_threads = params.setdefault("num_threads", 1)
-        self.num_runs = params.setdefault("num_runs", 1)
         self.serialize = params.setdefault("serialize", False)
 
     def __getstate__(self):
@@ -46,9 +45,6 @@ class Config(ABC):
 
     def inject_buffer(self, data):
         pass
-
-    def get_nruns(self):
-        return int(self.params["num_runs"])
 
     @abstractmethod
     def compute(self):
@@ -157,6 +153,7 @@ class ParallelCompute:
         self.batch_size = int(metadata.setdefault("batch_size", 1024))
         self.verbose = bool(metadata.setdefault("verbose", True))
         self.dump_errors = bool(metadata.setdefault("dump_errors", False))
+        self.num_runs = int(metadata.setdefault("num_runs", 1))
 
         self.dataframe = DataFrame(self.atol, self.rtol)
         self.num_slides = None
@@ -168,9 +165,8 @@ class ParallelCompute:
         j = 0
         for i, config in enumerate(self.configs):
             config.clone()
-            nruns = config.get_nruns()
 
-            for _ in range(nruns):
+            for _ in range(self.num_runs):
                 id = i if self.average_congruent_runs else j
                 total_configs.append((id, config.clone()))
                 j += 1
@@ -304,7 +300,7 @@ def load_data(filename: str) -> DataFrame:
             s = f.read()
             return DataFrame(s)
 
-    elif extension == "eve":
+    else:
         with open(filename, 'rb') as f:
             s = bytes(f.read())
             return DataFrame(s)

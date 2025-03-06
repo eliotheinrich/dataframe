@@ -24,7 +24,7 @@ struct glz::meta<DataSlide> {
   );
 };
 
-DataSlide::DataSlide(const std::string &s) {
+DataSlide::DataSlide(const std::string& s) {
   auto parse_error = glz::read_json(*this, s);
   if (parse_error) {
     throw std::runtime_error(fmt::format("Error parsing DataSlide: \n{}", glz::format_error(parse_error, s)));
