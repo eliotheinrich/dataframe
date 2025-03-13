@@ -115,6 +115,7 @@ def unbundle_param_matrix(param_bundle, p=None):
     for key, val in param_bundle.items():
         if hasattr(val, "__iter__") and not isinstance(val, str):
             vector_key = key
+            param_bundle[key] = list(param_bundle[key])
         else:
             p[key] = val
             scalar_keys.append(key)
