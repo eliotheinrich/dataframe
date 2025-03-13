@@ -149,7 +149,7 @@ class ParallelCompute:
         self.num_threads = int(metadata.setdefault("num_threads", 1))
         self.atol = float(metadata.setdefault("atol", ATOL))
         self.rtol = float(metadata.setdefault("rtol", RTOL))
-        self.parallelization_type = int(metadata.setdefault("parallelization_type", self.SERIAL))
+        self.parallelization_type = int(metadata.setdefault("parallelization_type", self.POOL))
         self.average_congruent_runs = bool(metadata.setdefault("average_congruent_runs", True))
         self.batch_size = int(metadata.setdefault("batch_size", 1024))
         self.verbose = bool(metadata.setdefault("verbose", True))
@@ -304,12 +304,9 @@ def load_data(filename: str) -> DataFrame:
     else:
         with open(filename, 'rb') as f:
             s = bytes(f.read())
-            return DataFrame(s)
-
-
-def load_json(filename: str, verbose: bool = False) -> list:
-    return parse_config(filename, verbose)
-
-
-def write_param_bundle(params: list) -> str:
-    return paramset_to_string(params)
+            frame = DataFrame(s)
+            if "num_runs" in frame.params:
+                num_runs = frame.params["num_runs"]
+                frame.remove("num_runs")
+                frame.metaparams = {**frame.metaparams, "num_runs": num_runs}
+            return frame
