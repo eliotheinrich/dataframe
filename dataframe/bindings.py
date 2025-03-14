@@ -308,5 +308,5 @@ def load_data(filename: str) -> DataFrame:
             if "num_runs" in frame.params:
                 num_runs = frame.params["num_runs"]
                 frame.remove("num_runs")
-                frame.metaparams = {**frame.metaparams, "num_runs": num_runs}
+                frame.metadata = {**frame.metadata, "num_runs": num_runs}
             return frame
