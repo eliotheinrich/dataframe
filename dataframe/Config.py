@@ -96,7 +96,7 @@ class SimulatorConfig(Config):
 
         if self.sampling_timesteps == 0:
             num_timesteps = 0
-            num_intervals = 1
+            num_intervals = 0
         else:
             num_timesteps = self.measurement_freq
             num_intervals = self.sampling_timesteps // self.measurement_freq
@@ -113,25 +113,23 @@ class SimulatorConfig(Config):
         _, dt = time_func(self.simulator.equilibration_timesteps, self.equilibration_timesteps)
         steps_time += dt
 
-        _, dt = time_func(self.simulator.timesteps, num_timesteps)
-        steps_time += dt
+        added = False
 
-        sample, dt = time_func(self.simulator.take_samples)
-        sampling_time += dt
-
-        if self.save_samples:
-            slide.add_samples(sample)
-            slide.push_samples(sample)
-        else:
-            slide.add_data(sample)
-            slide.push_samples_to_data(sample)
-
-        for i in range(1, num_intervals):
+        for i in range(num_intervals):
             _, dt = time_func(self.simulator.timesteps, num_timesteps)
             steps_time += dt
 
             sample, dt = time_func(self.simulator.take_samples)
             sampling_time += dt
+
+            if not added:
+                added = True
+                if self.save_samples:
+                    slide.add_samples(sample)
+                    slide.push_samples(sample)
+                else:
+                    slide.add_data(sample)
+                    slide.push_samples_to_data(sample)
 
             if self.save_samples:
                 slide.push_samples(sample)
