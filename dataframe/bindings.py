@@ -162,6 +162,9 @@ class ParallelCompute:
         self.dataframe = DataFrame(self.atol, self.rtol)
         self.num_slides = None
 
+    def average(self):
+        return self.average_congruent_runs and not self.serialize
+
     def compute(self):
         start_time = time.time()
 
@@ -171,11 +174,11 @@ class ParallelCompute:
             config.clone()
 
             for _ in range(self.num_runs):
-                id = i if self.average_congruent_runs else j
+                id = i if self.average() else j
                 total_configs.append((id, config.clone()))
                 j += 1
 
-        self.num_slides = len(self.configs) if self.average_congruent_runs else len(total_configs)
+        self.num_slides = len(self.configs) if self.average() else len(total_configs)
 
         if self.parallelization_type == self.SERIAL:
             results = self.compute_serial(total_configs)
@@ -198,7 +201,7 @@ class ParallelCompute:
         self.dataframe.add_metadata(self._metadata)
 
         self.dataframe.promote_params()
-        if self.average_congruent_runs:
+        if self.average():
             self.dataframe.reduce()
 
         if self.verbose:
