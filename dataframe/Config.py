@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from numpy import arange
 import time
 
 from .bindings import Config, DataSlide, register_component
@@ -70,6 +71,11 @@ class SimulatorConfig(Config):
         if self.temporal_avg and self.save_samples:
             raise RuntimeError("Cannot perform temporal average and save all samples.")
 
+        self.simulator = None
+
+    def get_buffer(self):
+        return self.simulator.serialize()
+
     # Allow injection of serialized simulator data
     def inject_buffer(self, data):
         self._serialized_simulator = data
@@ -85,8 +91,8 @@ class SimulatorConfig(Config):
         start = time.time()
         slide = DataSlide()
 
-        simulator = register_component(self.simulator_generator, self.params, self.num_threads)
-        simulator.init(self._serialized_simulator)
+        self.simulator = register_component(self.simulator_generator, self.params, self.num_threads)
+        self.simulator.init(self._serialized_simulator) # If serialized data is available, use it
 
         if self.sampling_timesteps == 0:
             num_timesteps = 0
@@ -104,13 +110,13 @@ class SimulatorConfig(Config):
         sampling_time = 0.0
         steps_time = 0.0
 
-        _, dt = time_func(simulator.equilibration_timesteps, self.equilibration_timesteps)
+        _, dt = time_func(self.simulator.equilibration_timesteps, self.equilibration_timesteps)
         steps_time += dt
 
-        _, dt = time_func(simulator.timesteps, num_timesteps)
+        _, dt = time_func(self.simulator.timesteps, num_timesteps)
         steps_time += dt
 
-        sample, dt = time_func(simulator.take_samples)
+        sample, dt = time_func(self.simulator.take_samples)
         sampling_time += dt
 
         if self.save_samples:
@@ -121,10 +127,10 @@ class SimulatorConfig(Config):
             slide.push_samples_to_data(sample)
 
         for i in range(1, num_intervals):
-            _, dt = time_func(simulator.timesteps, num_timesteps)
+            _, dt = time_func(self.simulator.timesteps, num_timesteps)
             steps_time += dt
 
-            sample, dt = time_func(simulator.take_samples)
+            sample, dt = time_func(self.simulator.take_samples)
             sampling_time += dt
 
             if self.save_samples:
@@ -143,17 +149,18 @@ class SimulatorConfig(Config):
         slide.add_data("steps_time")
         slide.push_samples_to_data("steps_time", steps_time)
 
-        if self.serialize:
-            bytes = simulator.serialize()
-            if bytes is not None:
-                slide._inject_buffer(bytes)
-
         return slide
 
     def clone(self):
         config = SimulatorConfig(self.params, self.simulator_generator)
         config.inject_buffer(self._serialized_simulator)
         return config
+
+
+def get_timesteps(dataframe):
+    keys = ["equilibration_timesteps", "sampling_timesteps", "measurement_freq"]
+    equilibration_timesteps, sampling_timesteps, measurement_freq = dataframe.query(keys)
+    return arange(0, sampling_timesteps, measurement_freq) + equilibration_timesteps + measurement_freq
 
 
 class FuncConfig(Config):

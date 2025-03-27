@@ -35,13 +35,15 @@ class Config(ABC):
     def __init__(self, params):
         self.params = params
         self.num_threads = params.setdefault("num_threads", 1)
-        self.serialize = params.setdefault("serialize", False)
 
     def __getstate__(self):
         return self.params
 
     def __setstate__(self, args):
         self.__init__(*args)
+
+    def get_buffer(self):
+        raise RuntimeError("Called get_buffer on a Config which does not provide an implementation. Do not set serialize = True.")
 
     def inject_buffer(self, data):
         pass
@@ -155,6 +157,7 @@ class ParallelCompute:
         self.verbose = bool(metadata.setdefault("verbose", True))
         self.dump_errors = bool(metadata.setdefault("dump_errors", False))
         self.num_runs = int(metadata.setdefault("num_runs", 1))
+        self.serialize = bool(metadata.setdefault("serialize", False))
 
         self.dataframe = DataFrame(self.atol, self.rtol)
         self.num_slides = None
@@ -204,7 +207,7 @@ class ParallelCompute:
         return self.dataframe
 
     @staticmethod
-    def _do_run(config, id, dump_errors):
+    def _do_run(config, id, dump_errors, serialize):
         try:
             _slide = config.compute()
 
@@ -214,6 +217,10 @@ class ParallelCompute:
                 slide = DataSlide(_slide)
 
             slide.add_param(config.params)
+
+            if serialize:
+                buffer = config.get_buffer()
+                slide._inject_buffer(buffer)
 
             return id, slide
 
@@ -242,7 +249,7 @@ class ParallelCompute:
         if self.verbose:
             total_configs = tqdm.tqdm(total_configs)
         for i, config in total_configs:
-            id, slide = ParallelCompute._do_run(config, i, self.dump_errors)
+            id, slide = ParallelCompute._do_run(config, i, self.dump_errors, self.serialize)
 
             slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
 
@@ -277,7 +284,7 @@ class ParallelCompute:
                 else:
                     i2 = min((i+1)*self.batch_size, num_configs)
 
-                futures = [pool.submit(ParallelCompute._do_run, config, i, self.dump_errors) for i,config in total_configs[i1:i2]]
+                futures = [pool.submit(ParallelCompute._do_run, config, i, self.dump_errors, self.serialize) for i,config in total_configs[i1:i2]]
                 completed_futures = concurrent.futures.as_completed(futures)
 
                 for future in completed_futures:
