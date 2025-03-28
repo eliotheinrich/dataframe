@@ -113,8 +113,6 @@ class SimulatorConfig(Config):
         _, dt = time_func(self.simulator.equilibration_timesteps, self.equilibration_timesteps)
         steps_time += dt
 
-        added = False
-
         for i in range(num_intervals):
             _, dt = time_func(self.simulator.timesteps, num_timesteps)
             steps_time += dt
@@ -122,19 +120,18 @@ class SimulatorConfig(Config):
             sample, dt = time_func(self.simulator.take_samples)
             sampling_time += dt
 
-            if not added:
-                added = True
+            if i == 0:
                 if self.save_samples:
                     slide.add_samples(sample)
                     slide.push_samples(sample)
                 else:
                     slide.add_data(sample)
                     slide.push_samples_to_data(sample)
-
-            if self.save_samples:
-                slide.push_samples(sample)
             else:
-                slide.push_samples_to_data(sample, bool(self.temporal_avg))
+                if self.save_samples:
+                    slide.push_samples(sample)
+                else:
+                    slide.push_samples_to_data(sample, bool(self.temporal_avg))
 
         end = time.time()
         duration = end - start
