@@ -7,7 +7,6 @@
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/trampoline.h>
-#include <nanobind/ndarray.h>
 
 using namespace nanobind::literals;
 using namespace dataframe;
@@ -52,33 +51,7 @@ struct query_t_to_py {
     return v; 
   }
   py_query_t operator()(const nbarray &data) const {
-    size_t N = data.size();
-    if (N == 0) {
-      return py_query_t();
-    }
-
-    size_t M = data[0].size();
-    if (M == 0) {
-      return py_query_t();
-    }
-
-    size_t K = data[0][0].size();
-
-    for (size_t i = 0; i < N; i++) {
-      for (size_t j = 0; j < M; j++) {
-        for (size_t k = 0; k < K; k++) {
-          size_t findex = i*(M*K) + j*K + k;
-          my_data[findex] = data[i][j][k];
-        }
-      }
-    }
-
-    nanobind::capsule owner(my_data, [](void *p) noexcept {
-        delete[] (double *) p;
-    });
-
-    py_nbarray nb_data(my_data, {N, M, K}, owner);
-    return py_query_t{nb_data};
+    return py_query_t{to_nbarray(data)};
   }
 };
 
@@ -129,6 +102,10 @@ NB_MODULE(dataframe_bindings, m) {
     .def("add_param", ds_add_param2)
     .def("add_data", [](DataSlide& self, const std::string& s, size_t width) { self.add_data(s, width); }, "key"_a, "width"_a = 1)
     .def("add_data", [](DataSlide& self, const SampleMap& sample) { self.add_data(sample); })
+    .def("set_data", [](DataSlide& self, const std::string& key, const std::vector<std::vector<Sample>>& samples) {
+      self.add_data(key, samples.size());
+      self.data[key] = samples;
+    })
     .def("push_samples_to_data", push_data1)
     .def("push_samples_to_data", push_data2)
     .def("push_samples_to_data", push_data3)
