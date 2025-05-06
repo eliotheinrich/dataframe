@@ -155,7 +155,8 @@ class SimulatorConfig(Config):
 def get_timesteps(dataframe):
     keys = ["equilibration_timesteps", "sampling_timesteps", "measurement_freq"]
     equilibration_timesteps, sampling_timesteps, measurement_freq = dataframe.query(keys)
-    return arange(0, sampling_timesteps, measurement_freq) + equilibration_timesteps + measurement_freq
+    num_points = sampling_timesteps // measurement_freq
+    return arange(1, num_points + 1) * measurement_freq + equilibration_timesteps
 
 
 class FuncConfig(Config):
