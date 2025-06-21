@@ -37,7 +37,7 @@ class Config(ABC):
         self.num_threads = params.setdefault("num_threads", 1)
 
     def __getstate__(self):
-        return self.params
+        return self.params, 
 
     def __setstate__(self, args):
         self.__init__(*args)
