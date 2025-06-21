@@ -235,7 +235,7 @@ class ParallelCompute:
                     filename = f"err_{id}.json"
 
                 print(f"Encountered an error; saving config params to {filename} and exiting!")
-                save_config(config.params, filename)
+                save_param_matrix(config.params, filename)
 
             else:
                 print(f"Encountered an error; exiting!")
