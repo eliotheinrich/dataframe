@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Frame.h"
 
 #include <nanobind/nanobind.h>
