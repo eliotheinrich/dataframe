@@ -19,9 +19,6 @@ class CppConfig(Config):
         config = self.concretize()
         return config.compute(self.num_threads)
 
-    def clone(self):
-        return CppConfig(self.params, self._internal_config)
-
 
 class Simulator(ABC):
     @abstractmethod
@@ -146,12 +143,6 @@ class SimulatorConfig(Config):
 
         return slide
 
-    def clone(self):
-        config = SimulatorConfig(self.params, self.simulator_generator)
-        config.inject_buffer(self._serialized_simulator)
-        return config
-
-
 def get_timesteps(dataframe):
     keys = ["equilibration_timesteps", "sampling_timesteps", "measurement_freq"]
     equilibration_timesteps, sampling_timesteps, measurement_freq = dataframe.query(keys)
@@ -169,6 +160,3 @@ class FuncConfig(Config):
 
     def __getstate__(self):
         return self.params, self.function
-
-    def clone(self):
-        return FuncConfig(self.params, self.function)

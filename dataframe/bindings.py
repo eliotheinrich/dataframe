@@ -52,9 +52,11 @@ class Config(ABC):
     def compute(self):
         pass
 
-    @abstractmethod
     def clone(self):
-        pass
+        args = self.__getstate__()
+        cls = self.__class__
+        config = cls(*args)
+        return config
 
 
 def register_component(component_generator, params, *args, **kwargs):
