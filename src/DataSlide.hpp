@@ -73,6 +73,9 @@ namespace dataframe {
 
       template <typename T>
       void add_param(const std::string& key, const T val) { 
+        if (contains(key)) {
+          throw std::runtime_error(fmt::format("Tried to add parameter with key {}, but this slide already contains a parameter or data by that key.", key));
+        }
         params[key] = val; 
       }
 
@@ -83,6 +86,9 @@ namespace dataframe {
       }
 
       void add_data(const std::string& key, size_t width) {
+        if (contains(key)) {
+          throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter or data by that key.", key));
+        }
         data.emplace(key, std::vector<std::vector<Sample>>(width));
       }
 

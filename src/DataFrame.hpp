@@ -128,7 +128,7 @@ namespace dataframe {
       }
 
       bool contains(const std::string& s) const {
-        return params.contains(s);
+        return params.contains(s) || metadata.contains(s);
       }
 
       Parameter get(const std::string& s) const {

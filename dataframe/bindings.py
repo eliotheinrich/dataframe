@@ -53,9 +53,8 @@ class Config(ABC):
         pass
 
     def clone(self):
-        args = self.__getstate__()
-        cls = self.__class__
-        config = cls(*args)
+        config = object.__new__(self.__class__)
+        config.__setstate__(self.__getstate__())
         return config
 
 
