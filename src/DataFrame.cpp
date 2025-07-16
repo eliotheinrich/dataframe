@@ -31,7 +31,16 @@ DataSlide::DataSlide(const std::string& s) {
   }
 }
 
-DataSlide::DataSlide(const std::vector<byte_t>& bytes) {
+void DataFrame::construct_from_bytes(const std::vector<byte_t>& bytes) {
+  auto parse_error = glz::read_beve(*this, bytes);
+  if (parse_error) {
+    throw std::runtime_error(fmt::format("Error parsing DataFrame from binary: \n{}", glz::format_error(parse_error, bytes)));
+  }
+
+  init_tolerance();
+}
+
+void DataSlide::construct_from_bytes(const std::vector<byte_t>& bytes) {
   auto parse_error = glz::read_beve(*this, bytes);
   if (parse_error) {
     throw std::runtime_error(fmt::format("Error parsing DataSlide from binary: \n{}", glz::format_error(parse_error, bytes)));
@@ -94,15 +103,6 @@ std::string DataSlide::describe() const {
   s += " }\n";
 
   return s;
-}
-
-DataFrame::DataFrame(const std::vector<byte_t>& bytes) {
-  auto parse_error = glz::read_beve(*this, bytes);
-  if (parse_error) {
-    throw std::runtime_error(fmt::format("Error parsing DataFrame from binary: \n{}", glz::format_error(parse_error, bytes)));
-  }
-
-  init_tolerance();
 }
 
 DataFrame::DataFrame(const std::string& s) {

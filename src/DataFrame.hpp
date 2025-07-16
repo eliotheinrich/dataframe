@@ -25,6 +25,9 @@ namespace dataframe {
 
       DataFrame(double atol, double rtol) : atol(atol), rtol(rtol) {}
 
+      DataFrame(DataFrame&&) noexcept=default;
+      DataFrame& operator=(DataFrame&&) noexcept=default;
+
       DataFrame(const std::vector<DataSlide>& slides) : atol(DF_ATOL), rtol(DF_RTOL) {
         for (uint32_t i = 0; i < slides.size(); i++) {
           add_slide(slides[i]);
@@ -42,7 +45,18 @@ namespace dataframe {
         init_tolerance();
       }
 
-      DataFrame(const std::vector<byte_t>& bytes);
+      void construct_from_bytes(const std::vector<byte_t>& bytes);
+      void construct_from_bytes(std::vector<byte_t>&& bytes) {
+          construct_from_bytes(bytes);  // or parse directly if needed
+      }
+
+      DataFrame(const std::vector<byte_t>& bytes) {
+        construct_from_bytes(bytes);
+      }
+
+      DataFrame(std::vector<byte_t>&& bytes) {
+        construct_from_bytes(std::move(bytes));
+      }
 
       DataFrame(const std::string& s);
 

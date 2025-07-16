@@ -92,7 +92,7 @@ NB_MODULE(dataframe_bindings, m) {
     .def(nanobind::init<const DataSlide&>())
     .def("__init__", [](DataSlide* t, const nanobind::bytes& bytes) {
       auto byte_vec = convert_bytes(bytes);
-      new (t) DataSlide(byte_vec);
+      new (t) DataSlide(std::move(byte_vec));
     })
     .def_rw("params", &DataSlide::params)
     .def_rw("data", &DataSlide::data)
@@ -173,7 +173,7 @@ NB_MODULE(dataframe_bindings, m) {
     .def(nanobind::init<const DataFrame&>())
     .def("__init__", [](DataFrame* t, const nanobind::bytes& bytes) {
       auto byte_vec = convert_bytes(bytes);
-      new (t) DataFrame(byte_vec);
+      new (t) DataFrame(std::move(byte_vec));
     })
     .def_rw("params", &DataFrame::params)
     .def_rw("metadata", &DataFrame::metadata)

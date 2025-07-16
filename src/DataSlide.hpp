@@ -39,7 +39,15 @@ namespace dataframe {
       DataSlide(DataSlide&&) noexcept=default;
       DataSlide& operator=(DataSlide&&) noexcept=default;
 
-      DataSlide(const std::vector<byte_t>& bytes);
+      void construct_from_bytes(const std::vector<byte_t>& bytes);
+
+      DataSlide(const std::vector<byte_t>& bytes) {
+        construct_from_bytes(bytes);
+      }
+
+      DataSlide(std::vector<byte_t>&& bytes) {
+        construct_from_bytes(bytes);
+      }
 
       ~DataSlide()=default;
 
@@ -274,22 +282,29 @@ namespace dataframe {
       std::vector<std::vector<double>> get_data(const std::string& key) const {
         if (data.contains(key)) {
           size_t width = data.at(key).size();
+          const auto& keyed_data = data.at(key);
+
           if (width == 0) {
             return std::vector<std::vector<double>>();
           }
 
-          size_t length = data.at(key)[0].size();
-          std::vector<std::vector<double>> d(width, std::vector<double>(length));
+          size_t length = keyed_data[0].size();
+          std::vector<std::vector<double>> d; //(width, std::vector<double>(length));
+          d.reserve(width);  // Avoids unnecessary reallocations
 
           for (uint32_t i = 0; i < width; i++) {
-            const std::vector<Sample>& di = data.at(key)[i];
+            const std::vector<Sample>& di = keyed_data[i];
             if (di.size() != length) {
               throw std::runtime_error("Stored data is not square.");
             }
 
+            std::vector<double> row;
+            row.reserve(length);
+
             for (uint32_t j = 0; j < length; j++) {
-              d[i][j] = di[j].get_mean();
+              row.emplace_back(di[j].get_mean());
             }
+            d.emplace_back(std::move(row));
           }
 
           return d;
