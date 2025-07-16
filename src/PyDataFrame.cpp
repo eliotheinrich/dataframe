@@ -21,7 +21,7 @@ size_t get_query_size(const query_t& q) {
     return 0;
   }
 
-  nbarray arr = std::get<nbarray>(q);
+  const nbarray& arr = std::get<nbarray>(q);
   size_t N = arr.size();
   if (N == 0) {
     return 0;

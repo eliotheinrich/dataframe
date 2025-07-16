@@ -282,7 +282,7 @@ namespace dataframe {
           std::vector<std::vector<double>> d(width, std::vector<double>(length));
 
           for (uint32_t i = 0; i < width; i++) {
-            std::vector<Sample> di = data.at(key)[i];
+            const std::vector<Sample>& di = data.at(key)[i];
             if (di.size() != length) {
               throw std::runtime_error("Stored data is not square.");
             }

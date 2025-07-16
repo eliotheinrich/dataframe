@@ -311,7 +311,8 @@ namespace dataframe {
         // Compile result of query
         std::vector<query_t> result;
 
-        for (auto const& key : keys) {
+        for (size_t p = 0; p < keys.size(); p++) {
+          const std::string& key = keys[p];
           query_t key_result;
           if (params.contains(key)) { // Frame-level param
             key_result = query_t{params[key]};
@@ -324,15 +325,15 @@ namespace dataframe {
             }
             key_result = query_t{param_vals};
           } else { // Data
-            std::vector<std::vector<std::vector<double>>> data_vals;
+            std::vector<std::vector<std::vector<double>>> data_vals(inds.size());
 
             if (query_type == QueryType::StandardDeviation) {
               for (auto const i : inds) {
-                data_vals.push_back(slides[i].get_std(key));
+                data_vals[i] = slides[i].get_std(key);
               }
             } else if (query_type == QueryType::NumSamples) {
               for (auto const i : inds) {
-                data_vals.push_back(slides[i].get_num_samples(key));
+                data_vals[i] = slides[i].get_num_samples(key);
               }
             } else if (query_type == QueryType::StandardError) {
               for (auto const i : inds) {
@@ -346,18 +347,18 @@ namespace dataframe {
                   }
                   sde[j] = v;
                 }
-                data_vals.push_back(sde);
+                data_vals[i] = sde;
               }
             } else {
               for (auto const i : inds) {
-                data_vals.push_back(slides[i].get_data(key));
+                data_vals[i] = slides[i].get_data(key);
               }
             }
 
-            key_result = data_vals;
+            key_result = std::move(data_vals);
           }
 
-          result.push_back(key_result);
+          result[p] = std::move(key_result);
         }
 
         return result;
