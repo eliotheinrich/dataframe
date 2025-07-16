@@ -21,7 +21,6 @@ namespace dataframe {
 
       DataFrame() {
         init_tolerance();
-        init_qtable();
       }
 
       DataFrame(double atol, double rtol) : atol(atol), rtol(rtol) {}
@@ -32,7 +31,6 @@ namespace dataframe {
         }
 
         init_tolerance();
-        init_qtable();
       }
 
       DataFrame(const ExperimentParams& params, const std::vector<DataSlide>& slides) : atol(DF_ATOL), rtol(DF_RTOL) {
@@ -42,7 +40,6 @@ namespace dataframe {
         }
 
         init_tolerance();
-        init_qtable();
       }
 
       DataFrame(const std::vector<byte_t>& bytes);
@@ -63,7 +60,6 @@ namespace dataframe {
         }
 
         init_tolerance();
-        init_qtable();
       }
 
       ~DataFrame()=default;
@@ -88,7 +84,6 @@ namespace dataframe {
 
       void add_slide(const DataSlide& ds) {
         slides.push_back(ds);
-        qtable_initialized = false;
       }
 
       bool remove_slide(uint32_t i) {
@@ -97,7 +92,6 @@ namespace dataframe {
         }
 
         slides.erase(slides.begin() + i);
-        qtable_initialized = false;
         return true;
       }
 
@@ -115,7 +109,6 @@ namespace dataframe {
       template <typename T>
       void add_param(const std::string& s, const T t) { 
         params[s] = t; 
-        qtable_initialized = false;
       }
 
 
@@ -123,8 +116,6 @@ namespace dataframe {
         for (auto const &[key, field] : params) {
           add_param(key, field);
         }
-
-        qtable_initialized = false;
       }
 
       bool contains(const std::string& s) const {
@@ -156,7 +147,6 @@ namespace dataframe {
       }
 
       bool remove_param(const std::string& s) {
-        qtable_initialized = false;
         return params.erase(s);
       }
 
@@ -502,11 +492,6 @@ namespace dataframe {
       }
 
     private:
-      bool qtable_initialized;
-      // qtable stores a list of key: {val: corresponding_slide_indices}
-      std::map<std::string, std::vector<std::vector<uint32_t>>> qtable;
-      std::map<std::string, std::vector<Parameter>> key_vals;
-
       void init_tolerance() {
         if (metadata.contains("atol")) {
           atol = std::get<double>(metadata.at("atol"));
@@ -537,52 +522,6 @@ namespace dataframe {
         return -1;
       }
 
-      // Initialize query table; is called anytime a query is made after the frame has been changed.
-      void init_qtable() {
-        utils::param_eq equality_comparator(atol, rtol);
-        key_vals = std::map<std::string, std::vector<Parameter>>();
-
-        for (auto const &slide : slides) {
-          for (auto const &[key, tar_val] : slide.params) {
-            if (!key_vals.contains(key)) {
-              key_vals[key] = std::vector<Parameter>();
-            }
-
-            auto result = std::find_if(
-              key_vals[key].begin(), key_vals[key].end(), 
-              [tar_val, &equality_comparator](const Parameter& val) {
-                return equality_comparator(tar_val, val);
-              }
-            );
-
-            if (result == key_vals[key].end()) {
-              key_vals[key].push_back(tar_val);
-            }
-          }
-        }
-
-        // Setting up qtable indices
-        for (auto const &[key, vals] : key_vals) {
-          qtable[key] = std::vector<std::vector<uint32_t>>(vals.size());
-        }
-
-        for (uint32_t n = 0; n < slides.size(); n++) {
-          auto slide = slides[n];
-          for (auto const &[key, vals] : key_vals) {
-            Parameter val = slide.params[key];
-            uint32_t idx = corresponding_ind(val, vals, equality_comparator);
-            if (idx == (uint32_t) -1) {
-              throw std::invalid_argument("Error in init_qtable.");
-            }
-
-            qtable[key][idx].push_back(n);
-          }
-        }
-
-        qtable_initialized = true;
-
-      }
-
       void promote_field(const std::string& s) {
         add_param(s, slides.begin()->get_param(s));
         for (auto &slide : slides) {
@@ -591,10 +530,6 @@ namespace dataframe {
       }
 
       std::set<uint32_t> compatible_inds(const ExperimentParams& constraints) {
-        if (!qtable_initialized) {
-          init_qtable();
-        }
-
         // Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
         utils::param_eq equality_comparator(atol, rtol);
         for (auto const &[key, val] : constraints) {
@@ -616,21 +551,19 @@ namespace dataframe {
           inds.insert(i);
         }
 
-        for (auto const &[key, val] : relevant_constraints) {
-          // Take set intersection
-          std::set<uint32_t> tmp;
-          uint32_t idx = corresponding_ind(val, key_vals[key], equality_comparator);
-          if (idx == (uint32_t) -1) {
-            continue;
-          }
-
-          for (auto const i : qtable[key][idx]) {
-            if (inds.contains(i)) {
-              tmp.insert(i);
+        for (const auto& [key, val] : relevant_constraints) {
+          std::vector<size_t> to_remove;
+          for (const auto i : inds) {
+            if (slides[i].params.contains(key)) {
+              if (!equality_comparator(slides[i].params.get(key), val)) {
+                to_remove.push_back(i);
+              }
             }
           }
 
-          inds = tmp;
+          for (const auto i : to_remove) {
+            inds.erase(i);
+          }
         }
 
         return inds;
