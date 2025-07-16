@@ -372,7 +372,8 @@ namespace dataframe {
             continue;
           }
 
-          DataSlide slide(slides[i]);
+          DataSlide slide = std::move(slides[i]);
+
           auto inds = compatible_inds(slide.params);
           for (auto const j : inds) {
             if (i == j) {
@@ -381,7 +382,7 @@ namespace dataframe {
             slide = slide.combine(slides[j], atol, rtol);
             reduced.insert(j);
           } 
-          new_slides.push_back(slide);
+          new_slides.push_back(std::move(slide));
         }
 
         slides = new_slides;
@@ -555,7 +556,7 @@ namespace dataframe {
           std::vector<size_t> to_remove;
           for (const auto i : inds) {
             if (slides[i].params.contains(key)) {
-              if (!equality_comparator(slides[i].params.get(key), val)) {
+              if (!equality_comparator(slides[i].params.at(key), val)) {
                 to_remove.push_back(i);
               }
             }

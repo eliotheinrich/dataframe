@@ -103,7 +103,6 @@ DataFrame::DataFrame(const std::vector<byte_t>& bytes) {
   }
 
   init_tolerance();
-  init_qtable();
 }
 
 DataFrame::DataFrame(const std::string& s) {
@@ -125,7 +124,6 @@ DataFrame::DataFrame(const std::string& s) {
   }
 
   init_tolerance();
-  init_qtable();
 }
 
 std::string DataFrame::describe(size_t num_slides) const {

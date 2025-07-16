@@ -122,7 +122,9 @@ nanobind::bytes convert_bytes(const std::vector<dataframe::byte_t>& bytes) {
 }
 
 std::vector<dataframe::byte_t> convert_bytes(const nanobind::bytes& bytes) {
-  std::vector<dataframe::byte_t> bytes_vec(bytes.c_str(), bytes.c_str() + bytes.size());
+  std::vector<dataframe::byte_t> bytes_vec;
+  bytes_vec.reserve(bytes.size() + 1);
+  bytes_vec.insert(bytes_vec.end(), bytes.c_str(), bytes.c_str() + bytes.size());
   bytes_vec.push_back('\0');
   return bytes_vec;
 }

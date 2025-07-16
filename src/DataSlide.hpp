@@ -33,12 +33,11 @@ namespace dataframe {
 
       DataSlide(const std::string &s);
 
-      DataSlide(const DataSlide& other) {
-        buffer = other.buffer;
-        params = other.params;
-        data = other.data;
-        samples = other.samples;
-      }
+      DataSlide(const DataSlide&)=default;
+      DataSlide& operator=(const DataSlide&)=default;
+
+      DataSlide(DataSlide&&) noexcept=default;
+      DataSlide& operator=(DataSlide&&) noexcept=default;
 
       DataSlide(const std::vector<byte_t>& bytes);
 
