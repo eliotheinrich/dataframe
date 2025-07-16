@@ -190,7 +190,7 @@ namespace dataframe {
           return true;
         }
 
-        DataSlide first_slide = slides[0];
+        const DataSlide& first_slide = slides[0];
 
         if (!first_slide.contains(s)) {
           return false;
@@ -199,7 +199,7 @@ namespace dataframe {
         Parameter first_slide_val = first_slide.get_param(s);
 
         utils::param_eq equality_comparator(atol, rtol);
-        for (auto slide : slides) {
+        for (const auto& slide : slides) {
           if (!slide.contains(s)) {
             return false;
           }
@@ -218,14 +218,14 @@ namespace dataframe {
           return;
         }
 
-        DataSlide first_slide = slides[0];
+        const DataSlide& first_slide = slides[0];
 
         std::vector<std::string> keys;
         for (auto const &[key, _] : first_slide.params) {
           keys.push_back(key);
         }
 
-        for (auto key : keys) {
+        for (const auto& key : keys) {
           if (field_congruent(key)) { 
             promote_field(key);
           }

@@ -13,7 +13,6 @@ namespace dataframe {
   class DataSlide {
     public:
       friend DataFrame;
-
       ExperimentParams params;
 
       // data and samples are stored in the format rows x length, where
@@ -34,20 +33,11 @@ namespace dataframe {
 
       DataSlide(const std::string &s);
 
-      DataSlide(const DataSlide& other) : buffer(other.buffer) {
-        for (auto const& [key, val]: other.params) {
-          add_param(key, val);
-        }
-
-        for (auto const& [key, vals] : other.data) {
-          add_data(key, vals.size());
-          data[key] = vals;
-        }
-
-        for (auto const& [key, vals] : other.samples) {
-          add_samples(key, vals.size());
-          samples[key] = vals;
-        }
+      DataSlide(const DataSlide& other) {
+        buffer = other.buffer;
+        params = other.params;
+        data = other.data;
+        samples = other.samples;
       }
 
       DataSlide(const std::vector<byte_t>& bytes);
