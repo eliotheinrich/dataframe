@@ -323,7 +323,7 @@ namespace dataframe {
         }
 
         // Compile result of query
-        std::vector<query_t> result;
+        std::vector<query_t> result(keys.size());
 
         for (size_t p = 0; p < keys.size(); p++) {
           const std::string& key = keys[p];
@@ -333,39 +333,44 @@ namespace dataframe {
           } else if (metadata.contains(key)) { // Metadata param
             key_result = query_t{metadata[key]};
           } else if (slides[*inds.begin()].params.contains(key)) { // Slide-level param
-            std::vector<Parameter> param_vals;
-            for (auto const i : inds) {
-              param_vals.push_back(slides[i].params[key]);
+            std::vector<Parameter> param_vals(inds.size());
+            for (size_t i = 0; i < inds.size(); i++) {
+              uint32_t j = inds[i];
+              param_vals[i] = slides[j].params[key];
             }
             key_result = query_t{param_vals};
           } else { // Data
             std::vector<std::vector<std::vector<double>>> data_vals(inds.size());
 
             if (query_type == QueryType::StandardDeviation) {
-              for (auto const i : inds) {
-                data_vals[i] = slides[i].get_std(key);
+              for (size_t i = 0; i < inds.size(); i++) {
+                uint32_t j = inds[i];
+                data_vals[i] = slides[j].get_std(key);
               }
             } else if (query_type == QueryType::NumSamples) {
-              for (auto const i : inds) {
+              for (size_t i = 0; i < inds.size(); i++) {
+                uint32_t j = inds[i];
                 data_vals[i] = slides[i].get_num_samples(key);
               }
             } else if (query_type == QueryType::StandardError) {
-              for (auto const i : inds) {
-                std::vector<std::vector<double>> std = slides[i].get_std(key);
-                std::vector<std::vector<double>> nsamples = slides[i].get_num_samples(key);
+              for (size_t i = 0; i < inds.size(); i++) {
+                uint32_t j = inds[i];
+                std::vector<std::vector<double>> std = slides[j].get_std(key);
+                std::vector<std::vector<double>> nsamples = slides[j].get_num_samples(key);
                 std::vector<std::vector<double>> sde(std.size());
-                for (size_t j = 0; j < std.size(); j++) {
-                  std::vector<double> v(std[j].size());
-                  for (size_t k = 0; k < std[j].size(); k++) {
-                    v[k] = std[j][k]/std::sqrt(nsamples[j][k]);
+                for (size_t k = 0; k < std.size(); k++) {
+                  std::vector<double> v(std[k].size());
+                  for (size_t n = 0; n < std[k].size(); n++) {
+                    v[n] = std[k][n]/std::sqrt(nsamples[k][n]);
                   }
-                  sde[j] = v;
+                  sde[k] = v;
                 }
                 data_vals[i] = sde;
               }
             } else {
-              for (auto const i : inds) {
-                data_vals[i] = slides[i].get_data(key);
+              for (size_t i = 0; i < inds.size(); i++) {
+                uint32_t j = inds[i];
+                data_vals[i] = slides[j].get_data(key);
               }
             }
 
@@ -391,9 +396,10 @@ namespace dataframe {
 
           auto inds = compatible_inds(slide.params);
           for (auto const j : inds) {
-            if (i == j) {
+            if (j == i) {
               continue;
             }
+
             slide = slide.combine(slides[j], atol, rtol);
             reduced.insert(j);
           } 
@@ -545,12 +551,12 @@ namespace dataframe {
         }
       }
 
-      std::set<uint32_t> compatible_inds(const ExperimentParams& constraints) {
+      std::vector<uint32_t> compatible_inds(const ExperimentParams& constraints) {
         // Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
         utils::param_eq equality_comparator(atol, rtol);
         for (auto const &[key, val] : constraints) {
           if (params.contains(key) && !(equality_comparator(params[key], val))) {
-            return std::set<uint32_t>();
+            return std::vector<uint32_t>();
           }
         }
 
@@ -574,6 +580,8 @@ namespace dataframe {
               if (!equality_comparator(slides[i].params.at(key), val)) {
                 to_remove.push_back(i);
               }
+            } else {
+              to_remove.push_back(i);
             }
           }
 
@@ -582,7 +590,9 @@ namespace dataframe {
           }
         }
 
-        return inds;
+        std::vector<uint32_t> inds_vec(inds.begin(), inds.end());
+        std::sort(inds_vec.begin(), inds_vec.end());
+        return inds_vec;
       }
   };
 

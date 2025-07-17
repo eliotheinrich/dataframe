@@ -105,7 +105,7 @@ namespace dataframe {
             push_samples_to_data(key, vals, avg);
           }
         } catch (const std::invalid_argument& e) {
-          std::cout << fmt::format("Ecountered a runtime error pushing samples to data. SampleMap = {}\n", sample);
+          throw std::runtime_error(fmt::format("Ecountered a runtime error pushing samples to data. SampleMap = {}\n", sample));
         }
       }
 
@@ -289,8 +289,8 @@ namespace dataframe {
           }
 
           size_t length = keyed_data[0].size();
-          std::vector<std::vector<double>> d; //(width, std::vector<double>(length));
-          d.reserve(width);  // Avoids unnecessary reallocations
+          std::vector<std::vector<double>> d; 
+          d.reserve(width);  
 
           for (uint32_t i = 0; i < width; i++) {
             const std::vector<Sample>& di = keyed_data[i];
@@ -304,6 +304,7 @@ namespace dataframe {
             for (uint32_t j = 0; j < length; j++) {
               row.emplace_back(di[j].get_mean());
             }
+
             d.emplace_back(std::move(row));
           }
 
