@@ -40,20 +40,11 @@ NB_MODULE(dataframe_bindings, m) {
   void (DataSlide::*ds_add_param2)(const std::string&, const Parameter&) = &DataSlide::add_param;
 
   nanobind::class_<DataObject>(m, "DataObject")
-    .def("__init__", [](DataObject* t, std::vector<double>&& values, std::vector<size_t>&& shape, std::optional<std::vector<double>>&& error, std::optional<std::vector<size_t>>&& nsamples) {
-      std::optional<SamplingData> sampling_data = std::nullopt;
-      if (error && nsamples) {
-        sampling_data = {std::move(error.value()), std::move(nsamples.value())};
-      } else if (error || nsamples) {
-        throw std::runtime_error("Cannot specify only one of standard deviation and nsamples.");
-      }
-      new (t) DataObject{std::move(shape), std::move(values), std::move(sampling_data)};
-    }, "values"_a, "shape"_a, "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
     .def_ro("shape", &DataObject::shape)
     .def_ro("values", &DataObject::values)
     .def_ro("sampling_data", &DataObject::sampling_data);
 
-  nanobind::class_<DataSlide>(m, "DataSlide_")
+  nanobind::class_<DataSlide>(m, "DataSlide")
     .def(nanobind::init<>())
     .def(nanobind::init<ExperimentParams&>())
     .def(nanobind::init<const DataSlide&>())
@@ -65,8 +56,7 @@ NB_MODULE(dataframe_bindings, m) {
     .def_rw("data", &DataSlide::data)
     .def("add_param", ds_add_param1)
     .def("add_param", ds_add_param2)
-    //.def("add_data", [](DataSlide& self, const std::string& key, const DataObject& data) { self.add_data(key, data); })
-    .def("_add_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape, std::optional<std::vector<double>> std, std::optional<std::vector<size_t>> nsamples) { 
+    .def("add_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape, std::optional<std::vector<double>> std, std::optional<std::vector<size_t>> nsamples) { 
       if (std && nsamples) {
         self.add_data(key, values, shape, SamplingData{std.value(), nsamples.value()}); 
       } else if (std || nsamples) {
