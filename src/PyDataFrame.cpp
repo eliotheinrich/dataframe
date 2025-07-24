@@ -65,7 +65,16 @@ NB_MODULE(dataframe_bindings, m) {
     .def_rw("data", &DataSlide::data)
     .def("add_param", ds_add_param1)
     .def("add_param", ds_add_param2)
-    .def("_add_data", [](DataSlide& self, const std::string& key, const DataObject& data) { self.add_data(key, data); })
+    //.def("add_data", [](DataSlide& self, const std::string& key, const DataObject& data) { self.add_data(key, data); })
+    .def("_add_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape, std::optional<std::vector<double>> std, std::optional<std::vector<size_t>> nsamples) { 
+      if (std && nsamples) {
+        self.add_data(key, values, shape, SamplingData{std.value(), nsamples.value()}); 
+      } else if (std || nsamples) {
+        throw std::runtime_error("Cannot pass only one of std and nsamples.");
+      } else {
+        self.add_data(key, values, shape); 
+      }
+    }, "key"_a, "values"_a, "shape"_a = nanobind::none(), "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
     .def("concat_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, const std::vector<size_t>& shape) { 
       self.concat_data(key, values, shape);
     }, "key"_a, "values"_a, "shape"_a)

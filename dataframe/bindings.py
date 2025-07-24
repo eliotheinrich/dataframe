@@ -25,11 +25,7 @@ class DataSlide(DataSlide_):
         if isinstance(values, DataObject):
             self._add_data(key, values)
         else:
-            values = np.asarray(values)
-            if shape is None:
-                shape = list(values.shape)
-
-            self._add_data(key, DataObject(values.flatten(), shape, error, nsamples))
+            self._add_data(key, values, shape, error, nsamples)
 
 def terminating_thread(ppid):
     pid = os.getpid()
