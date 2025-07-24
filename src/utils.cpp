@@ -38,7 +38,7 @@ DataObject dataframe::utils::samples_to_dataobject(const ndarray<std::vector<dou
     std::tie(mean[i], stddev[i], nsamples[i]) = dataframe::utils::sample_statistics(values[i]);
   }
 
-  return DataObject(shape, mean, SamplingData(stddev, nsamples));
+  return DataObject{shape, mean, SamplingData{stddev, nsamples}};
 }
 
 ExperimentParams dataframe::utils::load_params(const std::string& filename) {

@@ -129,13 +129,6 @@ namespace dataframe {
         add_data(key, data.values, data.shape, data.sampling_data);
       }
 
-      void add_data(const SampleMap& samples) {
-        for (const auto &[key, data] : samples) {
-          add_data(key, data.values, data.shape, data.sampling_data);
-        }
-      }
-  
-
       void concat_data(const std::string& key, const std::vector<double>& values, const std::vector<size_t>& shape) {
         if (params.contains(key)) {
           throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));

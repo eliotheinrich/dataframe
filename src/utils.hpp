@@ -265,12 +265,12 @@ static void emplace(SampleMap& data, const std::string& key, DataObject&& sample
   data.emplace(key, std::move(samples));
 }
 
-static void emplace(SampleMap& data, const std::string& key, const std::vector<double>& d, const std::vector<size_t>& shape) {
-  data.emplace(key, DataObject(shape, d, std::nullopt));
+static void emplace(SampleMap& data, const std::string& key, std::vector<double>&& d, const std::vector<size_t>& shape) {
+  data.emplace(key, DataObject{shape, std::move(d), std::nullopt});
 }
 
-static void emplace(SampleMap& data, const std::string& key, const std::vector<double>& d) {
-  emplace(data, key, d, std::vector<size_t>{d.size()});
+static void emplace(SampleMap& data, const std::string& key, std::vector<double>&& d) {
+  emplace(data, key, std::move(d), std::vector<size_t>{d.size()});
 }
 
 static void emplace(SampleMap& data, const std::string& key, double d) {
