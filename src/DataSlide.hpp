@@ -7,6 +7,18 @@
 
 #include <stdexcept>
 
+// Stores shape, values, and optional sampling data (standard error, number of samples) for Gaussian error combination
+struct SamplingData {
+  std::vector<double> std;
+  std::vector<size_t> nsamples;
+};
+
+struct DataObject {
+  std::vector<size_t> shape;
+  std::vector<double> values;
+  std::optional<SamplingData> sampling_values;
+};
+
 namespace dataframe {
   class DataFrame;
 
@@ -15,23 +27,15 @@ namespace dataframe {
       friend DataFrame;
       ExperimentParams params;
 
-      // data and samples are stored in the format rows x length, where
-      // rows correspond to sampled properties corresponding to key
-      // i.e. if a vector v = (vx, vy, vz) is sampled, the data is stored as
-      // vx1 vx2 vx3 ...
-      // vy1 vy2 vy3 ...
-      // vz1 vz2 vz3 ...
-      std::map<std::string, std::vector<std::vector<Sample>>> data;
-      std::map<std::string, std::vector<std::vector<double>>> samples;
+      std::map<std::string, DataObject> data;
 
       // For storing extraneous data, e.g. serialized simulator states associated with this slide
       std::vector<byte_t> buffer;
 
-      DataSlide() {}
+      DataSlide()=default;
+      ~DataSlide()=default;
 
       DataSlide(ExperimentParams &params) : params(params) {}
-
-      DataSlide(const std::string &s);
 
       DataSlide(const DataSlide&)=default;
       DataSlide& operator=(const DataSlide&)=default;
@@ -39,17 +43,7 @@ namespace dataframe {
       DataSlide(DataSlide&&) noexcept=default;
       DataSlide& operator=(DataSlide&&) noexcept=default;
 
-      void construct_from_bytes(const std::vector<byte_t>& bytes);
-
-      DataSlide(const std::vector<byte_t>& bytes) {
-        construct_from_bytes(bytes);
-      }
-
-      DataSlide(std::vector<byte_t>&& bytes) {
-        construct_from_bytes(bytes);
-      }
-
-      ~DataSlide()=default;
+      DataSlide(const std::vector<byte_t>& bytes);
 
       static DataSlide copy_params(const DataSlide& other) {
         DataSlide slide;
@@ -61,7 +55,7 @@ namespace dataframe {
       }
 
       bool contains(const std::string& key) const {
-        return params.contains(key) || data.contains(key) || samples.contains(key);
+        return params.contains(key) || data.contains(key);
       }
 
       Parameter get_param(const std::string& key) const {
@@ -73,6 +67,7 @@ namespace dataframe {
         if (contains(key)) {
           throw std::runtime_error(fmt::format("Tried to add parameter with key {}, but this slide already contains a parameter or data by that key.", key));
         }
+
         params[key] = val; 
       }
 
@@ -82,314 +77,255 @@ namespace dataframe {
         }
       }
 
-      void add_data(const std::string& key, size_t width) {
-        if (contains(key)) {
-          throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter or data by that key.", key));
+      template <typename T>
+      static T product(const std::vector<T>& values) {
+        T n = 1;
+        for (size_t i = 0; i < values.size(); i++) {
+          n *= values[i];
         }
-        data.emplace(key, std::vector<std::vector<Sample>>(width));
+        return n;
       }
 
-      void add_data(const std::string& key) { 
-        add_data(key, 1);
+      std::vector<size_t> get_shape(const std::string& key) const {
+        const auto& [shape, values, sampling_data] = data.at(key);
+        return shape;
       }
 
-      void add_data(const SampleMap& sample) {
-        for (auto const& [key, vals] : sample) {
-          add_data(key, vals.size());
-        }
+      size_t get_size(const std::string& key) const {
+        std::vector<size_t> shape = get_shape(key);
+        return product(shape);
       }
 
-      void push_samples_to_data(const SampleMap& sample, bool avg=false) {
-        try {
-          for (auto const& [key, vals] : sample) {
-            push_samples_to_data(key, vals, avg);
-          }
-        } catch (const std::invalid_argument& e) {
-          throw std::runtime_error(fmt::format("Ecountered a runtime error pushing samples to data. SampleMap = {}\n", sample));
-        }
-      }
-
-      void push_samples_to_data(const std::string& key, const std::vector<std::vector<double>>& sample, bool avg=false) {
-        if (!data.contains(key)) {
-          throw std::runtime_error(fmt::format("Data with key {} does not exist.", key));
-        }
-        size_t width = data[key].size();
-        if (sample.size() != width) {
-          throw std::runtime_error(
-            fmt::format(
-              "Error pushing sample at key {}; data[{}] has width {} but provided sample has width {}",
-              key, key, width, sample.size()
-            )
-          );
+      static bool shapes_equal(const std::vector<size_t>& s1, const std::vector<size_t>& s2) {
+        if (s1.size() != s2.size()) {
+          return false;
         }
 
-        std::vector<Sample> sample_vec(width);
-        for (size_t i = 0; i < width; i++) {
-          sample_vec[i] = Sample(sample[i]);
-        }
-
-        if (avg) {
-          for (size_t i = 0; i < width; i++) {
-            size_t num_samples = data[key][i].size();
-            if (num_samples == 0) { // Data is empty; emplace
-              data[key][i].push_back(sample_vec[i]);
-            } else if (num_samples == 1) { // Average with (single) existing sample
-              Sample s1 = data[key][i][0];
-              Sample s2 = sample_vec[i];
-              data[key][i][0] = s1.combine(s2);
-            } else { // Otherwise, throw an error
-              throw std::runtime_error(
-                fmt::format(
-                  "data[{}][{}] has width {}; cannot perform average.",
-                  key, i, data[key][i].size()
-                )
-              );
-            }
-          }
-        } else {
-          push_samples_to_data(key, sample_vec);
-        }
-      }
-
-      void push_samples_to_data(const std::string& key, const std::vector<std::vector<Sample>>& sample) {
-        if (!data.contains(key)) {
-          throw std::runtime_error(fmt::format("Data with key {} does not exist.", key));
-        }
-        size_t width = data[key].size();
-        if (sample.size() != width) {
-          throw std::runtime_error(
-            fmt::format(
-              "Error pushing sample at key {}; data[{}] has width {} but provided sample has width {}.",
-              key, key, width, sample.size()
-            )
-          );
-        }
-
-        for (size_t i = 0; i < width; i++) {
-          size_t num_samples = data[key][i].size();
-          if (num_samples != sample[i].size()) {
-            throw std::runtime_error(
-              fmt::format(
-                "Error pushing sample at key {}; data[{}][{}] has length {} but provided sample[{}] has length {}.",
-                key, key, i, num_samples, i, sample.size()
-              )
-            );
-          }
-          for (size_t j = 0; j < num_samples; j++) {
-            data[key][i][j] = data[key][i][j].combine(sample[i][j]);
+        for (size_t i = 0; i < s1.size(); i++) {
+          if (s1[i] != s2[i]) {
+            return false;
           }
         }
-      }
 
-      void push_samples_to_data(const std::string& key, const std::vector<Sample>& sample_vec) {
-        if (!data.contains(key)) {
-          throw std::runtime_error(fmt::format("Data with key {} does not exist.", key));
-        }
-        size_t width = data[key].size();
-        if (sample_vec.size() != width) {
-          throw std::runtime_error(
-            fmt::format(
-              "Error pushing sample at key {}; data[{}] has width {} but provided sample has width {}.",
-              key, key, width, sample_vec.size()
-            )
-          );
+        return true;
+      }
+  
+      void add_data(const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape_opt=std::nullopt) {
+        if (params.contains(key)) {
+          throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));
         }
 
-        for (size_t i = 0; i < width; i++) {
-          data[key][i].push_back(sample_vec[i]);
-        }
-      }
-      
-      void push_samples_to_data(const std::string& key, const std::vector<double>& double_vec) {
-          std::vector<Sample> sample_vec(double_vec.size());
-          for (uint32_t i = 0; i < sample_vec.size(); i++) {
-            sample_vec[i] = Sample(double_vec[i]);
+        if (shape_opt) {
+          std::vector<size_t> shape = shape_opt.value();
+          if (product(shape) != values.size()) {
+            throw std::runtime_error(fmt::format("Shape {} provided for data with size {}.", shape, values.size()));
           }
-          push_samples_to_data(key, sample_vec);
-      }
-
-      void push_samples_to_data(const std::string& key, const Sample& sample) {
-        push_samples_to_data(key, std::vector<Sample>{sample});
-      }
-
-      void push_samples_to_data(const std::string& key, const double d) {
-        push_samples_to_data(key, Sample(d));
-      }
-
-      void push_samples_to_data(const std::string& key, const double mean, const double std, const uint32_t length) {
-        push_samples_to_data(key, Sample(mean, std, length));
-      }
-
-      void add_samples(const std::string& key, size_t width) {
-        samples.emplace(key, std::vector<std::vector<double>>(width));
-      }
-
-      void add_samples(const std::string& key) {
-        add_samples(key, 1);
-      }
-
-      // SampleMap : num_rows x length
-      void add_samples(const SampleMap& sample) {
-        // vals = vector<vector>
-        for (auto const& [key, vals] : sample) {
-          add_samples(key, vals.size());
-        }
-      }
-
-
-      void push_samples(const SampleMap& sample) {
-        for (auto const& [key, vals] : sample) {
-          push_samples(key, vals);
-        }
-      }
-
-      void push_samples(const std::string& key, const std::vector<std::vector<double>>& sample) {
-        if (!samples.contains(key)) {
-          throw std::runtime_error(fmt::format("Samples with key {} does not exist.", key));
-        }
-        size_t width = samples[key].size();
-        if (sample.size() != width) {
-          throw std::runtime_error(
-            fmt::format(
-              "Error pushing sample at key {}; samples[{}] has width {} but provided sample has width {}.",
-              key, key, width, sample.size()
-            )
-          );
         }
 
-        for (size_t i = 0; i < width; i++) {
-          samples[key][i].insert(samples[key][i].end(), sample[i].begin(), sample[i].end());
-        }
-      }
-
-      void push_samples(const std::string& key, const std::vector<double>& double_vec) {
-        if (!samples.contains(key)) {
-          throw std::runtime_error(fmt::format("Samples with key {} does not exist.", key));
-        }
-
-        for (size_t i = 0; i < samples[key].size(); i++) {
-          samples[key][i].push_back(double_vec[i]);
-        }
-      }
-
-      void push_samples(const std::string &key, const double d) {
-        if (!samples.contains(key)) {
-          throw std::runtime_error(fmt::format("Samples with key {} does not exist.", key));
-        }
-        samples[key].push_back(std::vector<double>(d));
-      }
-
-      std::vector<std::vector<double>> get_data(const std::string& key) const {
         if (data.contains(key)) {
-          size_t width = data.at(key).size();
-          const auto& keyed_data = data.at(key);
-
-          if (width == 0) {
-            return std::vector<std::vector<double>>();
+          const auto& [existing_shape, existing_values, sampling_values] = data.at(key);
+          if (shape_opt) {
+            if (!shapes_equal(existing_shape, shape_opt.value())) {
+              throw std::runtime_error("Mismatched shape in add_data.");
+            }
           }
 
-          size_t length = keyed_data[0].size();
-          std::vector<std::vector<double>> d; 
-          d.reserve(width);  
-
-          for (uint32_t i = 0; i < width; i++) {
-            const std::vector<Sample>& di = keyed_data[i];
-            if (di.size() != length) {
-              throw std::runtime_error("Stored data is not square.");
-            }
-
-            std::vector<double> row;
-            row.reserve(length);
-
-            for (uint32_t j = 0; j < length; j++) {
-              row.emplace_back(di[j].get_mean());
-            }
-
-            d.emplace_back(std::move(row));
-          }
-
-          return d;
-        } else if (samples.contains(key)) {
-          return samples.at(key);
+          auto [new_values, new_error, new_nsamples] = combine_values(values, existing_values, std::nullopt, sampling_values);
+          data[key] = {existing_shape, new_values, SamplingData{new_error, new_nsamples}};
         } else {
-          return std::vector<std::vector<double>>();
+          std::vector<size_t> shape;
+          if (shape_opt) {
+            shape = shape_opt.value();
+          } else {
+            shape = {values.size()};
+          }
+
+          DataObject obj = {shape, values, std::nullopt};
+          data.emplace(key, obj);
         }
       }
 
-      std::vector<std::vector<double>> get_std(const std::string& key) const {
-        if (!data.contains(key)) {
-          return std::vector<std::vector<double>>();
+      void concat_data(const std::string& key, const std::vector<double>& values, const std::vector<size_t>& shape) {
+        if (params.contains(key)) {
+          throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));
         }
 
-        size_t width = data.at(key).size();
-        if (width == 0) {
-          return std::vector<std::vector<double>>();
+        size_t data_size = product(shape);
+        size_t num_new_samples = values.size() / data_size;
+        
+        if (num_new_samples * data_size != values.size()) {
+          throw std::runtime_error("Passed data of invalid shape to concat_data.");
         }
 
-        size_t length = data.at(key)[0].size();
-        std::vector<std::vector<double>> d(width, std::vector<double>(length));
 
-        for (uint32_t i = 0; i < width; i++) {
-          std::vector<Sample> di = data.at(key)[i];
-          if (di.size() != length) {
-            throw std::runtime_error("Stored data is not square.");
+        if (data.contains(key)) {
+          auto& [existing_shape, existing_values, sampling_values] = data.at(key);
+
+          std::vector<size_t> real_existing_shape;
+          size_t num_existing_samples;
+          if (existing_shape.size() == shape.size()) {
+            real_existing_shape = existing_shape;
+            num_existing_samples = 1;
+          } else if (existing_shape.size() == shape.size() + 1) {
+            real_existing_shape = std::vector<size_t>(existing_shape.begin() + 1, existing_shape.end());
+            num_existing_samples = existing_shape[0];
           }
 
-          for (uint32_t j = 0; j < length; j++) {
-            d[i][j] = di[j].get_std();
+          if (!shapes_equal(real_existing_shape, shape)) {
+            throw std::runtime_error("Passed data of invalid shape to concat_data.");
           }
-        }
 
-        return d;
+          existing_values.insert(existing_values.end(), values.begin(), values.end());
+
+          std::vector<size_t> new_shape = shape;
+          new_shape.insert(new_shape.begin(), num_new_samples + num_existing_samples);
+          existing_shape = new_shape;
+
+          if (sampling_values) {
+            auto& [error, nsamples] = sampling_values.value();
+            std::vector<double> zeros(num_new_samples * data_size, 0.0);
+            error.insert(error.end(), zeros.begin(), zeros.end());
+
+            std::vector<size_t> ones(num_new_samples * data_size, 1);
+            nsamples.insert(nsamples.end(), ones.begin(), ones.end());
+          }
+        } else {
+          std::vector<size_t> new_shape = shape;
+          new_shape.insert(new_shape.begin(), num_new_samples);
+          add_data(key, values, new_shape);
+        }
       }
 
-      std::vector<std::vector<double>> get_num_samples(const std::string& key) const {
-        if (!data.contains(key)) {
-          return std::vector<std::vector<double>>();
+      static std::tuple<std::vector<double>, std::vector<double>, std::vector<size_t>> combine_values(
+          const std::vector<double>& values1, const std::vector<double>& values2, 
+          std::optional<SamplingData> sampling_data1, std::optional<SamplingData> sampling_data2
+      ) {
+        size_t N = values1.size();
+        if (values2.size() != N) {
+          throw std::runtime_error("Mismatched values size.");
         }
 
-        size_t width = data.at(key).size();
-        if (width == 0) {
-          return std::vector<std::vector<double>>();
+        std::vector<double> error1;
+        std::vector<size_t> nsamples1;
+        if (sampling_data1) {
+          error1 = sampling_data1->std;
+          nsamples1 = sampling_data1->nsamples;
+        } else {
+          error1 = std::vector<double>(N, 0.0);
+          nsamples1 = std::vector<size_t>(N, 1);
         }
 
-        size_t length = data.at(key)[0].size();
-        std::vector<std::vector<double>> d(width, std::vector<double>(length));
+        std::vector<double> error2;
+        std::vector<size_t> nsamples2;
+        if (sampling_data2) {
+          error2 = sampling_data2->std;
+          nsamples2 = sampling_data2->nsamples;
+        } else {
+          error2 = std::vector<double>(N, 0.0);
+          nsamples2 = std::vector<size_t>(N, 1);
+        }
 
-        for (uint32_t i = 0; i < width; i++) {
-          std::vector<Sample> di = data.at(key)[i];
-          if (di.size() != length) {
-            throw std::runtime_error("Stored data is not square.");
+        std::vector<double> new_values(N);
+        std::vector<double> new_std(N);
+        std::vector<size_t> new_nsamples(N);
+
+        for (size_t i = 0; i < N; i++) {
+          size_t N1 = nsamples1[i];
+          size_t N2 = nsamples2[i];
+          size_t total_num_samples = N1 + N2;
+
+          double v = (values1[i]*nsamples1[i] + values2[i]*nsamples2[i]) / total_num_samples;
+          double s1 = std::pow(error1[i], 2);
+          double s2 = std::pow(error2[i], 2);
+          double s = std::pow(((N1 - 1) * s1 + (N2 - 1) * s2 + double(N1*N2)/(N1 + N2) * std::pow(values1[i] - values2[i], 2))/(total_num_samples - 1), 0.5);
+
+          new_values[i] = v;
+          new_std[i] = s;
+          new_nsamples[i] = total_num_samples;
+        }
+
+        return {new_values, new_std, new_nsamples};
+      }
+
+      void combine(const DataSlide &other, double atol=DF_ATOL, double rtol=DF_RTOL) {
+        utils::param_eq equality_comparator(atol, rtol);
+        auto key = first_incongruent_key(other, equality_comparator);
+
+        if (key != std::nullopt) {
+          throw std::runtime_error(fmt::format("DataSlides not congruent at key \"{}\"", key.value()));
+        }
+
+        // Slides are now guaranteed to be congruent
+        for (auto const& [key, val] : other.data) {
+          auto const& [shape1, values1, sampling_data1] = data.at(key);
+          auto const& [shape2, values2, sampling_data2] = val;
+          auto [values, error, num_samples] = combine_values(values1, values2, sampling_data1, sampling_data2);
+          DataObject obj = {shape1, values, SamplingData{error, num_samples}};
+          data[key] = obj;
+        }
+      }
+
+      std::vector<double> get_data(const std::string& key) const {
+        if (data.contains(key)) {
+          const auto& [shape, values, sampling_data] = data.at(key);
+          return values;
+        } else {
+          throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
+        }
+      }
+
+      std::vector<double> get_std(const std::string& key) const {
+        if (data.contains(key)) {
+          const auto& [shape, values, sampling_data] = data.at(key);
+          if (sampling_data) {
+            const auto& [error, nsamples] = sampling_data.value();
+            return error;
+          } else {
+            return std::vector<double>(product(shape), 0.0);
           }
-
-          for (uint32_t j = 0; j < length; j++) {
-            d[i][j] = di[j].get_num_samples();
-          }
+        } else {
+          throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
         }
+      }
 
-        return d;
+      std::vector<double> get_standard_error(const std::string& key) const {
+        if (data.contains(key)) {
+          const auto& [shape, values, sampling_data] = data.at(key);
+          if (sampling_data) {
+            const auto& [error, nsamples] = sampling_data.value();
+            std::vector<double> sderror(error.begin(), error.end());
+            for (size_t i = 0; i < error.size(); i++) {
+              sderror[i] /= std::sqrt(nsamples[i]);
+            }
+            return sderror;
+          } else {
+            return std::vector<double>(product(shape), 0.0);
+          }
+        } else {
+          throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
+        }
+      }
+
+      std::vector<size_t> get_num_samples(const std::string& key) const {
+        if (data.contains(key)) {
+          const auto& [shape, values, sampling_data] = data.at(key);
+          if (sampling_data) {
+            const auto& [error, nsamples] = sampling_data.value();
+            return nsamples;
+          } else {
+            return std::vector<size_t>(product(shape), 1);
+          }
+        } else {
+          throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
+        }
       }
 
       bool remove_param(const std::string& key) {
         return params.erase(key);
       }
 
-      bool remove_samples(const std::string& key) {
-        return samples.erase(key);
-      }
-
       bool remove_data(const std::string& key) {
         return data.erase(key);
-      }
-
-      bool remove(const std::string& key) {
-        if (params.contains(key)) { 
-          return remove_param(key);
-        } else if (data.contains(key)) {
-          return remove_data(key);
-        } else { 
-          return remove_samples(key);
-        }
       }
 
       std::vector<byte_t> to_bytes() const;
@@ -421,104 +357,46 @@ namespace dataframe {
           if (!other.data.contains(key)) {
             return key;
           }
-          if (other.data.at(key).size() != data.at(key).size()) {
+
+          const auto& [shape1, values1, sampling_data1] = data.at(key);
+          const auto& [shape2, values2, sampling_data2] = other.data.at(key);
+
+          // Dimension mismatch
+          if (shape1.size() != shape2.size()) {
             return key;
           }
+
+          // Shape mismatch
+          for (size_t i = 0; i < shape1.size(); i++) {
+            if (shape1[i] != shape2[i]) {
+              return key;
+            }
+          }
         }
+
         for (auto const &[key, _] : other.data) {
           if (!data.contains(key)) {
             return key;
           }
-        }
 
-        for (auto const &[key, _] : samples) {
-          if (!other.samples.contains(key)) {
+          // TODO check if this section is redundant
+          const auto& [shape1, values1, sampling_data1] = other.data.at(key);
+          const auto& [shape2, values2, sampling_data2] = data.at(key);
+
+          // Dimension mismatch
+          if (shape1.size() != shape2.size()) {
             return key;
           }
-        }
-        for (auto const &[key, _] : other.samples) {
-          if (!samples.contains(key)) {
-            return key;
+
+          // Shape mismatch
+          for (size_t i = 0; i < shape1.size(); i++) {
+            if (shape1[i] != shape2[i]) {
+              return key;
+            }
           }
         }
         
         return std::nullopt;
-      }
-
-      void average_samples_inplace() {
-        for (auto const &[key, val] : data) {
-          data[key] = Sample::collapse_samples(val);
-        }
-
-        std::vector<std::string> to_delete;
-        for (auto const &[key, val] : samples) {
-          add_data(key, val.size());
-          push_samples_to_data(key, val, true);
-          to_delete.push_back(key);
-        }
-
-
-        for (auto const& key : to_delete) {
-          remove_samples(key);
-        }
-      }
-
-      DataSlide average_samples() const {
-        DataSlide copy(*this);
-        copy.average_samples_inplace();
-        return copy;
-      }
-
-      void combine_data(const DataSlide& other) {
-        for (auto const &[key, val] : other.data) {
-          size_t width1 = val.size();
-          size_t width2 = data.at(key).size();
-          if (width1 != width2) {
-            throw std::runtime_error(
-              fmt::format(
-                "Data with key {} have incongruent width ({} and {}) and connot be combined.",
-                key, width1, width2
-              )
-            );
-          }
-
-          push_samples_to_data(key, val);
-        }
-
-        for (auto const &[key, val] : other.samples) {
-          size_t width1 = val.size();
-          size_t width2 = samples.at(key).size();
-          if (width1 != width2) {
-            throw std::runtime_error(
-              fmt::format(
-                "Samples with key {} have incongruent width ({} and {}) and connot be combined.",
-                key, width1, width2
-              )
-            );
-          }
-
-          push_samples(key, val);
-        }
-      }
-
-      DataSlide combine(const DataSlide &other, double atol=DF_ATOL, double rtol=DF_RTOL) {
-        utils::param_eq equality_comparator(atol, rtol);
-        auto key = first_incongruent_key(other, equality_comparator);
-
-        if (key != std::nullopt) {
-          throw std::runtime_error(
-            fmt::format(
-              "DataSlides not congruent at key \"{}\".\n{}\n\n\n{}\n",
-              key.value(), to_json(), other.to_json()
-            )
-          );
-
-        }
-        
-        DataSlide slide(*this); 
-        slide.combine_data(other);
-
-        return slide;
       }
   };
 }

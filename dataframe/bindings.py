@@ -33,6 +33,8 @@ RTOL = 1e-5
 
 class Config(ABC):
     def __init__(self, params):
+        if not isinstance(params, dict):
+            raise ValueError(f"Invalid type {type(params)} passed to Config.__init__. Must pass a dictionary.")
         self.params = params
         self.num_threads = params.setdefault("num_threads", 1)
 
@@ -252,10 +254,14 @@ class ParallelCompute:
         slides = [None for _ in range(self.num_slides)]
         if self.verbose:
             total_configs = tqdm.tqdm(total_configs)
+
         for i, config in total_configs:
             id, slide = ParallelCompute._do_run(config, i, self.dump_errors, self.serialize)
 
-            slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
+            if slides[id] is None:
+                slides[id] = slide
+            else:
+                slides[id].combine(slide, self.atol, self.rtol)
 
         return slides
 
@@ -294,7 +300,10 @@ class ParallelCompute:
                 for future in completed_futures:
                     id, slide = future.result()
 
-                    slides[id] = slide if slides[id] is None else slides[id].combine(slide, self.atol, self.rtol)
+                    if slides[id] is None:
+                        slides[id] = slide
+                    else:
+                        slides[id].combine(slide, self.atol, self.rtol)
 
                     if self.verbose:
                         progress.update(1)

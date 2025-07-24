@@ -24,8 +24,9 @@ using SampleMap = std::map<std::string, std::vector<std::vector<double>>>;
 // 1.) Frame-level param -> var_t
 // 2.) Slide-level param -> std::vector<var_t>
 // 3.) Vector data -> nbarray
-using nbarray = std::vector<std::vector<std::vector<double>>>;
-using query_t = std::variant<Parameter, std::vector<Parameter>, nbarray>;
-using query_key_t = std::variant<std::string, std::vector<std::string>>;
+
+template <typename T=double>
+using ndarray = std::pair<std::vector<size_t>, std::vector<T>>;
+using query_t = std::variant<Parameter, std::vector<Parameter>, ndarray<double>, ndarray<size_t>>;
 
 }

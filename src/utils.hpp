@@ -205,7 +205,11 @@ struct make_query_t_unique {
     return return_vals;
   }
 
-  query_t operator()(const nbarray& data) const { 
+  query_t operator()(const ndarray<double>& data) const { 
+    return data;
+  }
+
+  query_t operator()(const ndarray<size_t>& data) const { 
     return data;
   }
 };

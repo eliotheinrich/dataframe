@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from numpy import arange
+from numpy import arange, array
 import time
 
 from .bindings import Config, DataSlide, register_component
@@ -25,7 +25,6 @@ class Simulator(ABC):
     def __init__(self, params, num_threads):
         pass
 
-    @abstractmethod
     def init(self, serialized_data):
         pass
 
@@ -41,11 +40,10 @@ class Simulator(ABC):
         pass
 
     def serialize(self):
-        raise RuntimeError("serialize called on Simulator which does not implement it.")
+        raise NotImplementedError("serialize not implemented for this Simulator.")
 
     def get_texture(self):
-        # Placeholder
-        return [[0]], 1, 1
+        raise NotImplementedError("get_texture not implemented for this Simulator.")
 
     def key_callback(self, key):
         pass
@@ -62,11 +60,6 @@ class SimulatorConfig(Config):
         self.sampling_timesteps = params.setdefault("sampling_timesteps", 0)
         self.measurement_freq = params.setdefault("measurement_freq", 1)
         self.temporal_avg = params.setdefault("temporal_avg", False)
-
-        self.save_samples = params.setdefault("save_samples", False)
-
-        if self.temporal_avg and self.save_samples:
-            raise RuntimeError("Cannot perform temporal average and save all samples.")
 
         self.simulator = None
 
@@ -117,29 +110,21 @@ class SimulatorConfig(Config):
             sample, dt = time_func(self.simulator.take_samples)
             sampling_time += dt
 
-            if i == 0:
-                if self.save_samples:
-                    slide.add_samples(sample)
-                    slide.push_samples(sample)
+
+            for key,values in sample.items():
+                if isinstance(values, list):
+                    values = array(values)
+                shape = list(values.shape)
+                if self.temporal_avg:
+                    slide.add_data(key, values.flatten(), shape)
                 else:
-                    slide.add_data(sample)
-                    slide.push_samples_to_data(sample)
-            else:
-                if self.save_samples:
-                    slide.push_samples(sample)
-                else:
-                    slide.push_samples_to_data(sample, bool(self.temporal_avg))
+                    slide.concat_data(key, values.flatten(), shape)
 
         end = time.time()
         duration = end - start
-        slide.add_data("time")
-        slide.push_samples_to_data("time", duration)
-
-        slide.add_data("sampling_time")
-        slide.push_samples_to_data("sampling_time", sampling_time)
-
-        slide.add_data("steps_time")
-        slide.push_samples_to_data("steps_time", steps_time)
+        slide.add_data("time", [duration])
+        slide.add_data("sampling_time", [sampling_time])
+        slide.add_data("steps_time", [steps_time])
 
         return slide
 

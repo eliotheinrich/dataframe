@@ -23,6 +23,8 @@ namespace dataframe {
         init_tolerance();
       }
 
+      ~DataFrame()=default;
+
       DataFrame(double atol, double rtol) : atol(atol), rtol(rtol) {}
 
       DataFrame(DataFrame&&) noexcept=default;
@@ -45,38 +47,11 @@ namespace dataframe {
         init_tolerance();
       }
 
-      void construct_from_bytes(const std::vector<byte_t>& bytes);
-      void construct_from_bytes(std::vector<byte_t>&& bytes) {
-          construct_from_bytes(bytes);  // or parse directly if needed
-      }
+      DataFrame(const std::vector<byte_t>& bytes);
 
-      DataFrame(const std::vector<byte_t>& bytes) {
-        construct_from_bytes(bytes);
-      }
-
-      DataFrame(std::vector<byte_t>&& bytes) {
-        construct_from_bytes(std::move(bytes));
-      }
-
-      DataFrame(const std::string& s);
-
-      DataFrame(const DataFrame& other) : atol(other.atol), rtol(other.rtol) {
-        for (auto const& [key, val] : other.params) {
-          params[key] = val;
-        }
-
-        for (auto const& [key, val] : other.metadata) {
-          metadata[key] = val;
-        }
-
-        for (auto const& slide : other.slides) {
-          add_slide(DataSlide(slide));
-        }
-
+      DataFrame(const DataFrame& other) : atol(other.atol), rtol(other.rtol), params(other.params), metadata(other.metadata), slides(other.slides) {
         init_tolerance();
       }
-
-      ~DataFrame()=default;
 
       static DataFrame from_file(const std::string& filename) {
         std::ifstream file(filename, std::ios::binary | std::ios::ate);
@@ -125,7 +100,6 @@ namespace dataframe {
         params[s] = t; 
       }
 
-
       void add_param(const ExperimentParams &params) {
         for (auto const &[key, field] : params) {
           add_param(key, field);
@@ -136,28 +110,12 @@ namespace dataframe {
         return params.contains(s) || metadata.contains(s);
       }
 
-      Parameter get(const std::string& s) const {
-        if (params.contains(s)) {
-          return get_param(s);
-        } else {
-          return get_metadata(s);
-        }
-      }
-
       Parameter get_param(const std::string& s) const {
         return params.at(s);
       }
 
       Parameter get_metadata(const std::string& s) const {
         return metadata.at(s);
-      }
-
-      bool remove(const std::string& s) {
-        if (params.contains(s)) {
-          return remove_param(s);
-        } else {
-          return remove_metadata(s);
-        }
       }
 
       bool remove_param(const std::string& s) {
@@ -171,6 +129,7 @@ namespace dataframe {
       std::string describe(size_t num_slides=0) const;
 
       std::string to_json() const;
+
       std::vector<byte_t> to_bytes() const;
 
       void write(const std::string& filename) const {
@@ -204,7 +163,7 @@ namespace dataframe {
 
         utils::param_eq equality_comparator(atol, rtol);
         for (const auto& slide : slides) {
-          if (!slide.contains(s)) {
+          if (!slide.params.contains(s)) {
             return false;
           }
 
@@ -234,22 +193,6 @@ namespace dataframe {
             promote_field(key);
           }
         }
-      }
-
-      void average_samples_inplace() {
-        for (size_t i = 0; i < slides.size(); i++) {
-          slides[i].average_samples_inplace();
-        }
-      }
-
-      DataFrame average_samples() const {
-        DataFrame copy(*this);
-        
-        for (size_t i = 0; i < slides.size(); i++) {
-          copy.slides[i].average_samples_inplace();
-        }
-
-        return copy;
       }
 
       DataFrame filter(const std::vector<ExperimentParams>& constraints, bool invert = false) {
@@ -297,18 +240,11 @@ namespace dataframe {
       };
 
       std::vector<query_t> query(
-        const query_key_t& keys_var, 
+        const std::vector<std::string>& keys, 
         const ExperimentParams& constraints, 
         bool unique=false, 
         QueryType query_type=QueryType::Mean
       ) {
-        std::vector<std::string> keys;
-        if (keys_var.index() == 0) {
-          keys = std::vector<std::string>{std::get<std::string>(keys_var)};
-        } else {
-          keys = std::get<std::vector<std::string>>(keys_var);
-        }
-
         if (unique) {
           auto result = query(keys, constraints);
           return utils::make_query_unique(result, utils::make_query_t_unique(atol, rtol));
@@ -332,54 +268,59 @@ namespace dataframe {
             key_result = query_t{params[key]};
           } else if (metadata.contains(key)) { // Metadata param
             key_result = query_t{metadata[key]};
-          } else if (slides[*inds.begin()].params.contains(key)) { // Slide-level param
+          } else if (slides[inds[0]].params.contains(key)) { // Slide-level param
             std::vector<Parameter> param_vals(inds.size());
             for (size_t i = 0; i < inds.size(); i++) {
               uint32_t j = inds[i];
               param_vals[i] = slides[j].params[key];
             }
             key_result = query_t{param_vals};
-          } else { // Data
-            std::vector<std::vector<std::vector<double>>> data_vals(inds.size());
+          } else { // Data; check on query_type
+            std::vector<size_t> shape = slides[inds[0]].get_shape(key);
+            size_t data_size = DataSlide::product(shape);
 
-            if (query_type == QueryType::StandardDeviation) {
+            if (query_type == QueryType::NumSamples) {
+              std::vector<size_t> values(inds.size() * data_size);
               for (size_t i = 0; i < inds.size(); i++) {
                 uint32_t j = inds[i];
-                data_vals[i] = slides[j].get_std(key);
-              }
-            } else if (query_type == QueryType::NumSamples) {
-              for (size_t i = 0; i < inds.size(); i++) {
-                uint32_t j = inds[i];
-                data_vals[i] = slides[i].get_num_samples(key);
-              }
-            } else if (query_type == QueryType::StandardError) {
-              for (size_t i = 0; i < inds.size(); i++) {
-                uint32_t j = inds[i];
-                std::vector<std::vector<double>> std = slides[j].get_std(key);
-                std::vector<std::vector<double>> nsamples = slides[j].get_num_samples(key);
-                std::vector<std::vector<double>> sde(std.size());
-                for (size_t k = 0; k < std.size(); k++) {
-                  std::vector<double> v(std[k].size());
-                  for (size_t n = 0; n < std[k].size(); n++) {
-                    v[n] = std[k][n]/std::sqrt(nsamples[k][n]);
-                  }
-                  sde[k] = v;
+                auto const& [shapej, valuesj, sampling_dataj] = slides[j].data.at(key);
+                if (!DataSlide::shapes_equal(shape, shapej)) {
+                  throw std::runtime_error(fmt::format("Ragged shapes detected: {} and {}", shape, shapej));
                 }
-                data_vals[i] = sde;
+                const auto& nsamples = slides[j].get_num_samples(key);
+                std::copy(nsamples.begin(), nsamples.end(), values.begin() + i * data_size);
               }
+
+              shape.insert(shape.begin(), inds.size());
+              key_result = std::make_pair(shape, std::move(values));
             } else {
+              std::vector<double> values(inds.size() * data_size);
               for (size_t i = 0; i < inds.size(); i++) {
                 uint32_t j = inds[i];
-                data_vals[i] = slides[j].get_data(key);
-              }
-            }
+                auto const& [shapej, valuesj, sampling_dataj] = slides[j].data.at(key);
+                if (!DataSlide::shapes_equal(shape, shapej)) {
+                  throw std::runtime_error(fmt::format("Ragged shapes detected: {} and {}", shape, shapej));
+                }
 
-            key_result = std::move(data_vals);
+                if (query_type == QueryType::StandardDeviation) {
+                  const auto& std = slides[j].get_std(key);
+                  std::copy(std.begin(), std.end(), values.begin() + i * data_size);
+                } else if (query_type == QueryType::StandardError) {
+                  const auto& sderror = slides[j].get_standard_error(key);
+                  std::copy(sderror.begin(), sderror.end(), values.begin() + i * data_size);
+                } else {
+                  const auto& mean = slides[j].get_data(key);
+                  std::copy(mean.begin(), mean.end(), values.begin() + i * data_size);
+                }
+              }
+
+              shape.insert(shape.begin(), inds.size());
+              key_result = std::make_pair(shape, std::move(values));
+            }
           }
 
           result[p] = std::move(key_result);
         }
-
         return result;
       }
 
@@ -400,13 +341,14 @@ namespace dataframe {
               continue;
             }
 
-            slide = slide.combine(slides[j], atol, rtol);
+            slide.combine(slides[j]);
             reduced.insert(j);
           } 
           new_slides.push_back(std::move(slide));
         }
 
         slides = new_slides;
+        promote_params();
       }
 
       DataFrame combine(const DataFrame &other) const {
@@ -508,8 +450,6 @@ namespace dataframe {
           df.add_slide(ds);
         }
 
-        df.promote_params();
-
         return df;
       }
 
@@ -547,7 +487,7 @@ namespace dataframe {
       void promote_field(const std::string& s) {
         add_param(s, slides.begin()->get_param(s));
         for (auto &slide : slides) {
-          slide.remove(s);
+          slide.remove_param(s);
         }
       }
 
@@ -605,6 +545,5 @@ namespace dataframe {
   inline void DataFrame::add_param<int>(const std::string& s, const int t) { 
     add_param(s, static_cast<double>(t));
   }
-
 }
 
