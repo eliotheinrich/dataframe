@@ -109,7 +109,7 @@ template <typename T=double>
 nanobind::ndarray<nanobind::numpy, T> to_nbarray(dataframe::ndarray<T>&& data) {
   auto [shape, values] = std::move(data);
 
-  size_t k = dataframe::DataSlide::product(shape);
+  size_t k = dataframe::utils::shape_size(shape);
 
   T* buffer = new T[k];
   std::move(values.begin(), values.end(), buffer); 

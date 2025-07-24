@@ -277,7 +277,7 @@ namespace dataframe {
             key_result = query_t{param_vals};
           } else { // Data; check on query_type
             std::vector<size_t> shape = slides[inds[0]].get_shape(key);
-            size_t data_size = DataSlide::product(shape);
+            size_t data_size = dataframe::utils::shape_size(shape);
 
             if (query_type == QueryType::NumSamples) {
               std::vector<size_t> values(inds.size() * data_size);

@@ -7,6 +7,7 @@
 #include <fstream>
 #include <cmath>
 #include <stdexcept>
+#include <numeric>
 
 #include <fmt/format.h>
 
@@ -260,21 +261,27 @@ T get(const ExperimentParams &params, const std::string& key) {
   return std::get<T>(params.at(key));
 }
 
-static void emplace(SampleMap& data, const std::string& key, const std::vector<std::vector<double>>& d) {
-  data.emplace(key, d);
+static void emplace(SampleMap& data, const std::string& key, DataObject&& samples) {
+  data.emplace(key, std::move(samples));
+}
+
+static void emplace(SampleMap& data, const std::string& key, const std::vector<double>& d, const std::vector<size_t>& shape) {
+  data.emplace(key, DataObject(shape, d, std::nullopt));
 }
 
 static void emplace(SampleMap& data, const std::string& key, const std::vector<double>& d) {
-  std::vector<std::vector<double>> d_transpose(d.size(), std::vector<double>(1));
-  for (size_t i = 0; i < d.size(); i++) {
-    d_transpose[i][0] = d[i];
-  }
-  emplace(data, key, d_transpose);
+  emplace(data, key, d, std::vector<size_t>{d.size()});
 }
 
 static void emplace(SampleMap& data, const std::string& key, double d) {
   emplace(data, key, std::vector<double>{d});
 }
+
+size_t shape_size(const std::vector<size_t>& shape);
+
+std::tuple<double, double, size_t> sample_statistics(const std::vector<double>& values);
+
+DataObject samples_to_dataobject(const ndarray<std::vector<double>>& data);
 
 ExperimentParams load_params(const std::string& filename);
 

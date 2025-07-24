@@ -114,6 +114,8 @@ class SimulatorConfig(Config):
             for key,values in sample.items():
                 if isinstance(values, list):
                     values = array(values)
+                elif isinstance(values, _DataObject):
+                    print(f"Detected _DataObject: {key}")
                 shape = list(values.shape)
                 if self.temporal_avg:
                     slide.add_data(key, values.flatten(), shape)

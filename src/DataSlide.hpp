@@ -7,18 +7,6 @@
 
 #include <stdexcept>
 
-// Stores shape, values, and optional sampling data (standard error, number of samples) for Gaussian error combination
-struct SamplingData {
-  std::vector<double> std;
-  std::vector<size_t> nsamples;
-};
-
-struct DataObject {
-  std::vector<size_t> shape;
-  std::vector<double> values;
-  std::optional<SamplingData> sampling_values;
-};
-
 namespace dataframe {
   class DataFrame;
 
@@ -77,15 +65,6 @@ namespace dataframe {
         }
       }
 
-      template <typename T>
-      static T product(const std::vector<T>& values) {
-        T n = 1;
-        for (size_t i = 0; i < values.size(); i++) {
-          n *= values[i];
-        }
-        return n;
-      }
-
       std::vector<size_t> get_shape(const std::string& key) const {
         const auto& [shape, values, sampling_data] = data.at(key);
         return shape;
@@ -93,7 +72,7 @@ namespace dataframe {
 
       size_t get_size(const std::string& key) const {
         std::vector<size_t> shape = get_shape(key);
-        return product(shape);
+        return dataframe::utils::shape_size(shape);
       }
 
       static bool shapes_equal(const std::vector<size_t>& s1, const std::vector<size_t>& s2) {
@@ -109,28 +88,28 @@ namespace dataframe {
 
         return true;
       }
-  
-      void add_data(const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape_opt=std::nullopt) {
+
+      void add_data(const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape_opt=std::nullopt, std::optional<SamplingData> sampling_data_opt=std::nullopt) {
         if (params.contains(key)) {
           throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));
         }
 
         if (shape_opt) {
           std::vector<size_t> shape = shape_opt.value();
-          if (product(shape) != values.size()) {
+          if (dataframe::utils::shape_size(shape) != values.size()) {
             throw std::runtime_error(fmt::format("Shape {} provided for data with size {}.", shape, values.size()));
           }
         }
 
         if (data.contains(key)) {
-          const auto& [existing_shape, existing_values, sampling_values] = data.at(key);
+          const auto& [existing_shape, existing_values, existing_sampling_data] = data.at(key);
           if (shape_opt) {
             if (!shapes_equal(existing_shape, shape_opt.value())) {
               throw std::runtime_error("Mismatched shape in add_data.");
             }
           }
 
-          auto [new_values, new_error, new_nsamples] = combine_values(values, existing_values, std::nullopt, sampling_values);
+          auto [new_values, new_error, new_nsamples] = combine_values(values, existing_values, sampling_data_opt, existing_sampling_data);
           data[key] = {existing_shape, new_values, SamplingData{new_error, new_nsamples}};
         } else {
           std::vector<size_t> shape;
@@ -145,12 +124,24 @@ namespace dataframe {
         }
       }
 
+      // TODO avoid copying
+      void add_data(const std::string& key, const DataObject& data) {
+        add_data(key, data.values, data.shape, data.sampling_data);
+      }
+
+      void add_data(const SampleMap& samples) {
+        for (const auto &[key, data] : samples) {
+          add_data(key, data.values, data.shape, data.sampling_data);
+        }
+      }
+  
+
       void concat_data(const std::string& key, const std::vector<double>& values, const std::vector<size_t>& shape) {
         if (params.contains(key)) {
           throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));
         }
 
-        size_t data_size = product(shape);
+        size_t data_size = dataframe::utils::shape_size(shape);
         size_t num_new_samples = values.size() / data_size;
         
         if (num_new_samples * data_size != values.size()) {
@@ -159,7 +150,7 @@ namespace dataframe {
 
 
         if (data.contains(key)) {
-          auto& [existing_shape, existing_values, sampling_values] = data.at(key);
+          auto& [existing_shape, existing_values, sampling_data] = data.at(key);
 
           std::vector<size_t> real_existing_shape;
           size_t num_existing_samples;
@@ -181,8 +172,8 @@ namespace dataframe {
           new_shape.insert(new_shape.begin(), num_new_samples + num_existing_samples);
           existing_shape = new_shape;
 
-          if (sampling_values) {
-            auto& [error, nsamples] = sampling_values.value();
+          if (sampling_data) {
+            auto& [error, nsamples] = sampling_data.value();
             std::vector<double> zeros(num_new_samples * data_size, 0.0);
             error.insert(error.end(), zeros.begin(), zeros.end());
 
@@ -281,7 +272,7 @@ namespace dataframe {
             const auto& [error, nsamples] = sampling_data.value();
             return error;
           } else {
-            return std::vector<double>(product(shape), 0.0);
+            return std::vector<double>(dataframe::utils::shape_size(shape), 0.0);
           }
         } else {
           throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
@@ -299,7 +290,7 @@ namespace dataframe {
             }
             return sderror;
           } else {
-            return std::vector<double>(product(shape), 0.0);
+            return std::vector<double>(dataframe::utils::shape_size(shape), 0.0);
           }
         } else {
           throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
@@ -313,7 +304,7 @@ namespace dataframe {
             const auto& [error, nsamples] = sampling_data.value();
             return nsamples;
           } else {
-            return std::vector<size_t>(product(shape), 1);
+            return std::vector<size_t>(dataframe::utils::shape_size(shape), 1);
           }
         } else {
           throw std::runtime_error(fmt::format("Could not find data with key {}.", key));

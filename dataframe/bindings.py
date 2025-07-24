@@ -10,7 +10,26 @@ import tqdm
 
 from abc import ABC, abstractmethod
 from dataframe.dataframe_bindings import *
+import numpy as np
 
+class DataSlide(DataSlide_):
+    def invalid_argument():
+        raise ValueError("Invalid arguments passed.")
+
+    def add_data(self, key, values=None, shape=None, error=None, nsamples=None):
+        if isinstance(key, dict):
+            for k,val in key.items():
+                self._add_data(k, val)
+            return
+
+        if isinstance(values, DataObject):
+            self._add_data(key, values)
+        else:
+            values = np.asarray(values)
+            if shape is None:
+                shape = list(values.shape)
+
+            self._add_data(key, DataObject(values.flatten(), shape, error, nsamples))
 
 def terminating_thread(ppid):
     pid = os.getpid()
