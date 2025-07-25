@@ -129,9 +129,16 @@ namespace dataframe {
         add_data(key, data.values, data.shape, data.sampling_data);
       }
 
-      void concat_data(const std::string& key, const std::vector<double>& values, const std::vector<size_t>& shape) {
+      void concat_data(const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape_opt, std::optional<SamplingData> sampling_data_opt=std::nullopt) {
         if (params.contains(key)) {
           throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));
+        }
+
+        std::vector<size_t> shape;
+        if (shape_opt) {
+          shape = shape_opt.value();
+        } else {
+          shape = {values.size()};
         }
 
         size_t data_size = dataframe::utils::shape_size(shape);
@@ -141,9 +148,8 @@ namespace dataframe {
           throw std::runtime_error("Passed data of invalid shape to concat_data.");
         }
 
-
         if (data.contains(key)) {
-          auto& [existing_shape, existing_values, sampling_data] = data.at(key);
+          auto& [existing_shape, existing_values, existing_sampling_data] = data.at(key);
 
           std::vector<size_t> real_existing_shape;
           size_t num_existing_samples;
@@ -156,7 +162,7 @@ namespace dataframe {
           }
 
           if (!shapes_equal(real_existing_shape, shape)) {
-            throw std::runtime_error("Passed data of invalid shape to concat_data.");
+            throw std::runtime_error("Mismatched shape in add_data.");
           }
 
           existing_values.insert(existing_values.end(), values.begin(), values.end());
@@ -165,19 +171,23 @@ namespace dataframe {
           new_shape.insert(new_shape.begin(), num_new_samples + num_existing_samples);
           existing_shape = new_shape;
 
-          if (sampling_data) {
-            auto& [error, nsamples] = sampling_data.value();
-            std::vector<double> zeros(num_new_samples * data_size, 0.0);
-            error.insert(error.end(), zeros.begin(), zeros.end());
-
-            std::vector<size_t> ones(num_new_samples * data_size, 1);
-            nsamples.insert(nsamples.end(), ones.begin(), ones.end());
+          // Append to sampling data (if it exists)
+          // TODO pad with zeros/ones if previously sampling_data did not exist
+          if (existing_sampling_data && sampling_data_opt) {
+            auto& [existing_error, existing_nsamples] = existing_sampling_data.value();
+            auto& [error, nsamples] = sampling_data_opt.value();
+            existing_error.insert(existing_error.end(), error.begin(), error.end());
+            existing_nsamples.insert(existing_nsamples.end(), nsamples.begin(), nsamples.end());
           }
         } else {
           std::vector<size_t> new_shape = shape;
           new_shape.insert(new_shape.begin(), num_new_samples);
           add_data(key, values, new_shape);
         }
+      }
+
+      void concat_data(const std::string& key, const DataObject& data) {
+        concat_data(key, data.values, data.shape, data.sampling_data);
       }
 
       static std::tuple<std::vector<double>, std::vector<double>, std::vector<size_t>> combine_values(
