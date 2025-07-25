@@ -224,7 +224,9 @@ class TestConfig(Config):
         super().__init__(params)
         self.p = params["p"]
         self.num_samples = params["n"]
+        #self.sampler = register_component(TestSampler, params)
 
+    @profiler
     def compute(self):
         r = self.p*np.random.rand(self.num_samples)
 
@@ -240,6 +242,7 @@ class TestParallelCompute(unittest.TestCase):
         self.params_matrix = {"p": np.arange(0.0, 100.0, 0.5), "n": 1000}
         self.configs = [TestConfig(p) for p in unbundle_param_matrix(self.params_matrix)]
 
+    @profiler
     def test_compute_serial(self):
         nruns = 10
         frame = compute(self.configs, num_threads=1, parallelization_type=0, num_runs=nruns, verbose=False)
@@ -263,7 +266,10 @@ class TestParallelCompute(unittest.TestCase):
 
         _, r_nsamples = frame.query_nsamples(keys)
         self.assertTrue(np.allclose(r_nsamples, nruns * self.params_matrix["n"]))
-    
 
+    @classmethod
+    def tearDownClass(cls):  
+        profiler.print_stats() 
+    
 if __name__ == "__main__":
     unittest.main()

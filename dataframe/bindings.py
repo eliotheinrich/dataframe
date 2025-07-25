@@ -29,7 +29,45 @@ def terminating_thread(ppid):
 
 ATOL = 1e-6
 RTOL = 1e-5
+import line_profiler
+profiler = line_profiler.LineProfiler()
+class DataSlide(DataSlide_):
+    @profiler
+    def add_data(self, key, values=None, shape=None, error=None, nsamples=None):
+        if isinstance(key, dict):
+            for key,v in key.items():
+                self.add_data(key, v)
+        elif isinstance(values, DataObject):
+            self._add_data(key, v)
+        else:
+            if isinstance(values, list):
+                values = np.array(values)
 
+            dim = len(values.shape)
+            if dim != 1:
+                if shape is None:
+                    shape = values.shape
+                values = values.reshape(-1)
+
+            self._add_data(key, values, shape, error, nsamples)
+
+    def concat_data(self, key, values=None, shape=None, error=None, nsamples=None):
+        if isinstance(key, dict):
+            for key,v in key.items():
+                self.concat_data(key, v)
+        elif isinstance(values, DataObject):
+            self._concat_data(key, v)
+        else:
+            if isinstance(values, list):
+                values = np.array(values)
+
+            dim = len(values.shape)
+            if dim != 1:
+                if shape is None:
+                    shape = values.shape
+                values = values.reshape(-1)
+
+            self._concat_data(key, values, shape, error, nsamples)
 
 class Config(ABC):
     def __init__(self, params):

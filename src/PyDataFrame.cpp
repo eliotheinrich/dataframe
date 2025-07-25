@@ -8,6 +8,8 @@
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/trampoline.h>
 
+#include "test.hpp"
+
 using namespace nanobind::literals;
 using namespace dataframe;
 
@@ -35,6 +37,14 @@ struct query_t_to_py {
 NB_MODULE(dataframe_bindings, m) {
   m.def("load_params", &utils::load_params);
 
+  nanobind::class_<TestSampler>(m, "TestSampler")
+    .def(nanobind::init<ExperimentParams&>())
+    .def("get_samples", [](TestSampler& self, int t) {
+      SampleMap samples;
+      self.add_samples(t, samples);
+      return samples;
+    });
+
   // Need to statically cast overloaded templated methods
   void (DataSlide::*ds_add_param1)(const ExperimentParams&) = &DataSlide::add_param;
   void (DataSlide::*ds_add_param2)(const std::string&, const Parameter&) = &DataSlide::add_param;
@@ -44,7 +54,7 @@ NB_MODULE(dataframe_bindings, m) {
     .def_ro("values", &DataObject::values)
     .def_ro("sampling_data", &DataObject::sampling_data);
 
-  nanobind::class_<DataSlide>(m, "DataSlide")
+  nanobind::class_<DataSlide>(m, "DataSlide_")
     .def(nanobind::init<>())
     .def(nanobind::init<ExperimentParams&>())
     .def(nanobind::init<const DataSlide&>())
@@ -56,7 +66,7 @@ NB_MODULE(dataframe_bindings, m) {
     .def_rw("data", &DataSlide::data)
     .def("add_param", ds_add_param1)
     .def("add_param", ds_add_param2)
-    .def("add_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape, std::optional<std::vector<double>> std, std::optional<std::vector<size_t>> nsamples) { 
+    .def("_add_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape, std::optional<std::vector<double>> std, std::optional<std::vector<size_t>> nsamples) { 
       if (std && nsamples) {
         self.add_data(key, values, shape, SamplingData{std.value(), nsamples.value()}); 
       } else if (std || nsamples) {
@@ -65,10 +75,10 @@ NB_MODULE(dataframe_bindings, m) {
         self.add_data(key, values, shape); 
       }
     }, "key"_a, "values"_a, "shape"_a = nanobind::none(), "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
-    .def("add_data", [](DataSlide& self, const std::string& key, const DataObject& data) {
+    .def("_add_data", [](DataSlide& self, const std::string& key, const DataObject& data) {
       self.add_data(key, data);
     })
-    .def("concat_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape, std::optional<std::vector<double>> std, std::optional<std::vector<size_t>> nsamples) { 
+    .def("_concat_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape, std::optional<std::vector<double>> std, std::optional<std::vector<size_t>> nsamples) { 
       if (std && nsamples) {
         self.concat_data(key, values, shape, SamplingData{std.value(), nsamples.value()}); 
       } else if (std || nsamples) {
@@ -77,7 +87,7 @@ NB_MODULE(dataframe_bindings, m) {
         self.concat_data(key, values, shape); 
       }
     }, "key"_a, "values"_a, "shape"_a = nanobind::none(), "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
-    .def("concat_data", [](DataSlide& self, const std::string& key, const DataObject& data) {
+    .def("_concat_data", [](DataSlide& self, const std::string& key, const DataObject& data) {
       self.concat_data(key, data);
     }, "key"_a, "data"_a)
     .def("get_data", [](const DataSlide& self, const std::string& key) {
@@ -116,7 +126,7 @@ NB_MODULE(dataframe_bindings, m) {
       }
     })
     .def("__setitem__", ds_add_param2)
-    .def("__str__", &DataSlide::to_json)
+    .def("__str__", &DataSlide::describe)
     .def("__getstate__", [](const DataSlide& slide){ return convert_bytes(slide.to_bytes()); })
     .def("__setstate__", [](DataSlide& slide, const nanobind::bytes& bytes){ new (&slide) DataSlide(convert_bytes(bytes)); })
     .def("describe", &DataSlide::describe)

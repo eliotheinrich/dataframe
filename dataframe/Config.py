@@ -110,18 +110,10 @@ class SimulatorConfig(Config):
             sample, dt = time_func(self.simulator.take_samples)
             sampling_time += dt
 
-
-            for key,values in sample.items():
-                if isinstance(values, list):
-                    values = array(values)
-
-                if isinstance(values, DataObject):
-
-                shape = list(values.shape)
-                if self.temporal_avg:
-                    slide.add_data(key, *values)
-                else:
-                    slide.concat_data(key, *values)
+            if self.temporal_avg:
+                slide.add_data(sample)
+            else:
+                slide.concat_data(sample)
 
         end = time.time()
         duration = end - start

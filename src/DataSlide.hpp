@@ -324,8 +324,6 @@ namespace dataframe {
 
       std::vector<byte_t> to_bytes() const;
 
-      std::string to_json() const;
-
       std::string describe() const;
 
       bool congruent(const DataSlide &ds, const utils::param_eq& equality_comparator) {
