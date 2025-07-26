@@ -9,6 +9,18 @@
 #include <type_traits>
 #include <stdexcept>
 
+#include <nanobind/nanobind.h>
+#include <nanobind/ndarray.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/optional.h>
+#include <nanobind/stl/variant.h>
+#include <nanobind/stl/vector.h>
+#include <nanobind/stl/map.h>
+#include <nanobind/stl/pair.h>
+#include <nanobind/stl/tuple.h>
+#include <nanobind/stl/shared_ptr.h>
+
+
 //// --- Type trait to detect std::vector ---
 //template<typename T>
 //struct is_std_vector : std::false_type {};
@@ -102,6 +114,36 @@
 //std::initializer_list<T> make_init_list(const std::array<T, D>& arr, std::index_sequence<Idx...>) {
 //  return {arr[Idx] ... };
 //}
+
+template <typename T=double>
+using ndarray = nanobind::ndarray<nanobind::numpy, T>;
+
+template <typename T=double>
+ndarray<T> to_ndarray(const std::vector<T>& values, const std::vector<size_t>& shape) {
+  size_t k = dataframe::utils::shape_size(shape);
+
+  T* buffer = new T[k];
+  std::move(values.begin(), values.end(), buffer); 
+
+  nanobind::capsule owner(buffer, [](void* p) noexcept {
+    delete static_cast<T*>(p);
+  });
+
+  return ndarray<T>(buffer, shape.size(), shape.data(), owner);
+}
+
+template <typename T>
+static std::vector<size_t> get_shape(ndarray<T> arr) {
+  size_t dim = arr.ndim();
+  std::vector<size_t> shape(dim);
+  for (size_t i = 0; i < dim; i++) {
+    shape[i] = arr.shape(i);
+  }
+
+  return shape;
+}
+
+
 
 nanobind::bytes convert_bytes(const std::vector<dataframe::byte_t>& bytes) {
   nanobind::bytes nb_bytes(bytes.data(), bytes.size());

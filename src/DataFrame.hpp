@@ -236,7 +236,6 @@ namespace dataframe {
         Mean,
         StandardDeviation,
         NumSamples,
-        StandardError,
       };
 
       std::vector<query_t> query(
@@ -289,12 +288,16 @@ namespace dataframe {
                   throw std::runtime_error(fmt::format("Ragged shapes detected: {} and {}", shape, shapej));
                 }
 
-                const auto& nsamples = slides[j].get_num_samples(key);
-                std::memcpy(&values[i * data_size], nsamples.data(), data_size * sizeof(size_t));
+                const std::vector<size_t>* nsamples = slides[j].get_num_samples(key);
+                if (nsamples) {
+                  std::memcpy(&values[i * data_size], nsamples->data(), data_size * sizeof(size_t));
+                } else {
+                  std::fill(&values[i * data_size], &values[i * data_size] + data_size, 1);
+                }
               }
 
               shape.insert(shape.begin(), inds.size());
-              key_result = dataframe::utils::to_ndarray(values, shape);
+              key_result = std::make_pair(std::move(values), std::move(shape));
             } else {
               std::vector<double> values(inds.size() * data_size);
               for (size_t i = 0; i < inds.size(); i++) {
@@ -305,19 +308,20 @@ namespace dataframe {
                 }
 
                 if (query_type == QueryType::StandardDeviation) {
-                  const auto& std = slides[j].get_std(key);
-                  std::memcpy(&values[i * data_size], std.data(), data_size * sizeof(double));
-                } else if (query_type == QueryType::StandardError) {
-                  const auto& sderror = slides[j].get_standard_error(key);
-                  std::memcpy(&values[i * data_size], sderror.data(), data_size * sizeof(double));
+                  const std::vector<double>* std = slides[j].get_std(key);
+                  if (std) {
+                    std::memcpy(&values[i * data_size], std->data(), data_size * sizeof(double));
+                  } else {
+                    std::fill(&values[i * data_size], &values[i * data_size] + data_size, 0.0);
+                  }
                 } else {
-                  const auto& mean = slides[j].get_data(key);
-                  std::memcpy(&values[i * data_size], mean.data(), data_size * sizeof(double));
+                  const std::vector<double>* mean = slides[j].get_data(key);
+                  std::memcpy(&values[i * data_size], mean->data(), data_size * sizeof(double));
                 }
               }
 
               shape.insert(shape.begin(), inds.size());
-              key_result = dataframe::utils::to_ndarray(values, shape);
+              key_result = std::make_pair(std::move(values), std::move(shape));
             }
           }
 

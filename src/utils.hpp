@@ -206,11 +206,11 @@ struct make_query_t_unique {
     return return_vals;
   }
 
-  query_t operator()(const ndarray<double>& data) const { 
+  query_t operator()(const std::pair<std::vector<double>, std::vector<size_t>>& data) const { 
     return data;
   }
 
-  query_t operator()(const ndarray<size_t>& data) const { 
+  query_t operator()(const std::pair<std::vector<size_t>, std::vector<size_t>>& data) const { 
     return data;
   }
 };
@@ -262,32 +262,6 @@ T get(const ExperimentParams &params, const std::string& key) {
 }
 
 size_t shape_size(const std::vector<size_t>& shape);
-
-template <typename T=double>
-nanobind::ndarray<nanobind::numpy, T> to_ndarray(const std::vector<T>& values, const std::vector<size_t>& shape) {
-  size_t k = dataframe::utils::shape_size(shape);
-
-  T* buffer = new T[k];
-  std::move(values.begin(), values.end(), buffer); 
-
-  nanobind::capsule owner(buffer, [](void* p) noexcept {
-    delete static_cast<T*>(p);
-  });
-
-  return nanobind::ndarray<nanobind::numpy, T>(buffer, shape.size(), shape.data(), owner);
-}
-
-template <typename T>
-static std::vector<size_t> get_shape(ndarray<T> arr) {
-  size_t dim = arr.ndim();
-  std::vector<size_t> shape(dim);
-  for (size_t i = 0; i < dim; i++) {
-    shape[i] = arr.shape(i);
-  }
-
-  return shape;
-}
-
 
 static void emplace(SampleMap& data, const std::string& key, DataObject&& samples) {
   data.emplace(key, std::move(samples));

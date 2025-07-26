@@ -1,21 +1,26 @@
 #include "PyDataFrame.hpp"
 
-#include <nanobind/stl/string.h>
-#include <nanobind/stl/optional.h>
-#include <nanobind/stl/variant.h>
-#include <nanobind/stl/vector.h>
-#include <nanobind/stl/map.h>
-#include <nanobind/stl/pair.h>
-#include <nanobind/stl/tuple.h>
-#include <nanobind/stl/shared_ptr.h>
-
 #include "test.hpp"
 
 using namespace nanobind::literals;
 using namespace dataframe;
 using namespace dataframe::utils;
 
-using py_query_result = std::variant<query_t, std::vector<query_t>>;
+using py_query_t = std::variant<Parameter, std::vector<Parameter>, ndarray<double>, ndarray<size_t>>;
+using py_query_result = std::variant<py_query_t, std::vector<py_query_t>>;
+
+struct query_t_to_py {
+  py_query_t operator()(const Parameter& p) { return p; }
+  py_query_t operator()(const std::vector<Parameter>& p) { return p; }
+  py_query_t operator()(const std::pair<std::vector<double>, std::vector<size_t>>& arg) {
+    const auto& [values, shape] = arg;
+    return to_ndarray(values, shape);
+  }
+  py_query_t operator()(const std::pair<std::vector<size_t>, std::vector<size_t>>& arg) {
+    const auto& [values, shape] = arg;
+    return to_ndarray(values, shape);
+  }
+};
 
 NB_MODULE(dataframe_bindings, m) {
   m.def("load_params", &utils::load_params);
@@ -44,20 +49,47 @@ NB_MODULE(dataframe_bindings, m) {
     //.def_rw("data", &DataSlide::data)
     .def("add_param", [](DataSlide& self, const std::string& key, const Parameter& param) { self.add_param(key, param); })
     .def("add_param", [](DataSlide& self, const ExperimentParams& params) { self.add_param(params); })
-    .def("_add_data", [](DataSlide& self, const std::string& key, ndarray<double> values, std::optional<ndarray<double>> errors_opt, std::optional<ndarray<size_t>> nsamples_opt) { 
-      self.add_data(key, values, errors_opt, nsamples_opt);
+    .def("_add_data", [](DataSlide& self, const std::string& key, ndarray<double> values, std::optional<ndarray<double>> error_opt, std::optional<ndarray<size_t>> nsamples_opt) { 
+      size_t N = values.size();
+      std::vector<size_t> shape = get_shape(values);
+
+      std::vector<double> values_copy(values.data(), values.data() + N);
+
+      std::optional<std::vector<double>> error = std::nullopt;
+      if (error_opt) {
+        error = std::vector<double>(error_opt->data(), error_opt->data() + N);
+      }
+
+      std::optional<std::vector<size_t>> nsamples = std::nullopt;
+      if (nsamples_opt) {
+        nsamples = std::vector<size_t>(nsamples_opt->data(), nsamples_opt->data() + N);
+      }
+
+      self.add_data(key, std::move(shape), std::move(values_copy), std::move(error), std::move(nsamples));
     }, "key"_a, "values"_a, "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
-    .def("_concat_data", [](DataSlide& self, const std::string& key, ndarray<double> values, std::optional<std::vector<size_t>> shape_opt, std::optional<ndarray<double>> errors_opt, std::optional<ndarray<size_t>> nsamples_opt) { 
-      self.concat_data(key, values, shape_opt, errors_opt, nsamples_opt);
+    .def("_concat_data", [](DataSlide& self, const std::string& key, ndarray<double> values, std::vector<size_t> shape, std::optional<ndarray<double>> error_opt, std::optional<ndarray<size_t>> nsamples_opt) { 
+      size_t N = values.size();
+
+      std::vector<double> values_copy(values.data(), values.data() + N);
+
+      std::optional<std::vector<double>> error = std::nullopt;
+      if (error_opt) {
+        error = std::vector<double>(error_opt->data(), error_opt->data() + N);
+      }
+
+      std::optional<std::vector<size_t>> nsamples = std::nullopt;
+      if (nsamples_opt) {
+        nsamples = std::vector<size_t>(nsamples_opt->data(), nsamples_opt->data() + N);
+      }
+
+      self.concat_data(key, std::move(shape), std::move(values_copy), std::move(error), std::move(nsamples));
     }, "key"_a, "values"_a, "shape"_a, "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
+    // TODO make these python-friendly with ndarrays
     .def("get_data", [](const DataSlide& self, const std::string& key) {
       return self.get_data(key);
     })
     .def("get_std", [](const DataSlide& self, const std::string& key) {
       return self.get_std(key);
-    })
-    .def("get_standard_error", [](const DataSlide& self, const std::string& key) {
-      return self.get_standard_error(key);
     })
     .def("get_num_samples", [](const DataSlide& self, const std::string& key) {
       return self.get_num_samples(key);
@@ -87,12 +119,18 @@ NB_MODULE(dataframe_bindings, m) {
 
   auto _query = [](DataFrame& df, const std::vector<std::string>& keys, const ExperimentParams& constraints, bool unique, DataFrame::QueryType query_type) {
     std::vector<query_t> results = df.query(keys, constraints, unique, query_type);
+    size_t num_queries = results.size();
 
-    if (results.size() == 1) {
-      return py_query_result{results[0]};
+    std::vector<py_query_t> py_results(num_queries);
+    for (size_t i = 0; i < num_queries; i++) {
+      py_results[i] = std::visit(query_t_to_py(), results[i]);
     }
 
-    return py_query_result{results};
+    if (num_queries == 1) {
+      return py_query_result{py_results[0]};
+    }
+
+    return py_query_result{py_results};
   };
 
   nanobind::class_<DataFrame>(m, "DataFrame")
@@ -142,9 +180,6 @@ NB_MODULE(dataframe_bindings, m) {
     }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::copy)
     .def("query_std", [&_query](DataFrame& df, const std::vector<std::string>& keys, const ExperimentParams& constraints, bool unique) {
       return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardDeviation);
-    }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move)
-    .def("query_sde", [&_query](DataFrame& df, const std::vector<std::string>& keys, const ExperimentParams& constraints, bool unique) {
-      return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardError);
     }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move)
     .def("query_nsamples", [&_query](DataFrame& df, const std::vector<std::string>& keys, const ExperimentParams& constraints, bool unique) {
       return _query(df, keys, constraints, unique, DataFrame::QueryType::NumSamples);

@@ -71,7 +71,7 @@ class TestDataFrame(unittest.TestCase):
         pickled = pkl.dumps(self.slide)
         unpickled = pkl.loads(pickled)
         self.assertAlmostEqual(unpickled["alpha"], self.slide["alpha"])
-        self.assertEqual(unpickled.get_data("values").shape, (2, 2))
+        self.assertEqual(len(unpickled.get_data("values")), 2*2)
 
     def test_frame_pickle_roundtrip(self):
         pickled = pkl.dumps(self.frame)

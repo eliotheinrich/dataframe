@@ -5,8 +5,6 @@
 #include "utils.hpp"
 #include "Sample.hpp"
 
-#include <nanobind/intrusive/counter.h>
-
 #include <stdexcept>
 
 namespace dataframe {
@@ -64,23 +62,8 @@ namespace dataframe {
         }
       }
 
-      void add_data(const std::string& key, ndarray<double>& values, std::optional<ndarray<double>> error_opt=std::nullopt, std::optional<ndarray<size_t>> nsamples_opt=std::nullopt) {
-        size_t N = values.size();
-        std::vector<size_t> shape = dataframe::utils::get_shape(values);
-
-        std::optional<std::vector<double>> error = std::nullopt;
-        if (error_opt) {
-          error = std::vector<double>(error_opt->data(), error_opt->data() + N);
-        }
-
-        std::optional<std::vector<size_t>> nsamples = std::nullopt;
-        if (nsamples_opt) {
-          nsamples = std::vector<size_t>(nsamples_opt->data(), nsamples_opt->data() + N);
-        }
-
-        std::vector<double> values_copy(values.data(), values.data() + N);
-
-        add_data(key, std::make_tuple(std::move(shape), std::move(values_copy), std::move(error), std::move(nsamples)));
+      void add_data(const std::string& key, std::vector<size_t>&& shape, std::vector<double>&& values, std::optional<std::vector<double>>&& error, std::optional<std::vector<size_t>>&& nsamples) {
+        add_data(key, std::make_tuple(std::move(shape), std::move(values), std::move(error), std::move(nsamples)));
       }
 
       void add_data(const std::string& key, DataObject&& object) {
@@ -95,21 +78,8 @@ namespace dataframe {
         }
       }
 
-      void concat_data(const std::string& key, ndarray<double>& values, std::optional<std::vector<size_t>> shape_opt=std::nullopt, std::optional<ndarray<double>> error_opt=std::nullopt, std::optional<ndarray<size_t>> nsamples_opt=std::nullopt) {
-        size_t N = values.size();
-        std::vector<size_t> shape = shape_opt ? shape_opt.value() : dataframe::utils::get_shape(values);
-
-        std::optional<std::vector<double>> error = std::nullopt;
-        if (error_opt) {
-          error = std::vector<double>(error_opt->data(), error_opt->data() + N);
-        }
-
-        std::optional<std::vector<size_t>> nsamples = std::nullopt;
-        if (nsamples_opt) {
-          nsamples = std::vector<size_t>(nsamples_opt->data(), nsamples_opt->data() + N);
-        }
-
-        concat_data(key, std::make_tuple(std::move(shape), std::vector<double>(values.data(), values.data() + N), std::move(error), std::move(nsamples)));
+      void concat_data(const std::string& key, std::vector<size_t>&& shape, std::vector<double>&& values, std::optional<std::vector<double>> error, std::optional<std::vector<size_t>> nsamples) {
+        concat_data(key, std::make_tuple(std::move(shape), std::move(values), std::move(error), std::move(nsamples)));
       }
 
       void concat_data(const std::string& key, DataObject&& object) {
@@ -215,61 +185,37 @@ namespace dataframe {
         }
       }
 
-      ndarray<double> get_data(const std::string& key) const {
+      const std::vector<double>* get_data(const std::string& key) const {
         if (data.contains(key)) {
           const auto& [shape, values, error, nsamples] = data.at(key);
-          return dataframe::utils::to_ndarray(values, shape);
+          return &values;
         } else {
           throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
         }
       }
 
-      ndarray<double> get_std(const std::string& key) const {
+      const std::vector<double>* get_std(const std::string& key) const {
         if (data.contains(key)) {
           const auto& [shape, values, error, nsamples] = data.at(key);
           size_t N = values.size();
           if (error) {
-            return dataframe::utils::to_ndarray(error.value(), shape);
+            return &error.value();
           } else {
-            std::vector<double> zeros(N, 0.0);
-            return dataframe::utils::to_ndarray(zeros, shape);
+            return nullptr;
           }
         } else {
           throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
         }
       }
 
-      ndarray<double> get_standard_error(const std::string& key) const {
-        if (data.contains(key)) {
-          const auto& [shape, values, error_opt, nsamples_opt] = data.at(key);
-          size_t N = values.size();
-          if (error_opt && nsamples_opt) {
-            const std::vector<double>& error = error_opt.value();
-            const std::vector<size_t>& nsamples = nsamples_opt.value();
-
-            std::vector<double> sderror(N);
-            for (size_t i = 0; i < N; i++) {
-              sderror[i] = error[i] / std::sqrt(nsamples[i]);
-            }
-            return dataframe::utils::to_ndarray(sderror, shape);
-          } else {
-            std::vector<double> zeros(N, 0.0);
-            return dataframe::utils::to_ndarray(zeros, shape);
-          }
-        } else {
-          throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
-        }
-      }
-
-      ndarray<size_t> get_num_samples(const std::string& key) const {
+      const std::vector<size_t>* get_num_samples(const std::string& key) const {
         if (data.contains(key)) {
           const auto& [shape, values, error, nsamples] = data.at(key);
           size_t N = values.size();
           if (nsamples) {
-            return dataframe::utils::to_ndarray(nsamples.value(), shape);
+            return &nsamples.value();
           } else {
-            std::vector<size_t> ones(N, 1);
-            return dataframe::utils::to_ndarray(ones, shape);
+            return nullptr;
           }
         } else {
           throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
