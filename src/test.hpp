@@ -9,24 +9,24 @@ namespace dataframe {
 
 class TestSampler {
   public:
-    double p;
+    double g;
     int num_samples;
 
     TestSampler(ExperimentParams& params) {
-      num_samples = utils::get<int>(params, "num_samples", 1);
-      p = utils::get<double>(params, "p", 1.0);
+      num_samples = utils::get<int>(params, "sampler_num_samples", 10);
+      g = utils::get<double>(params, "g", 1.0);
     }
 
     void add_samples(int t, SampleMap& samples) {
-      std::vector<std::vector<double>> m(num_samples);
+      std::vector<std::vector<double>> m(2, std::vector<double>(num_samples));
       for (int i = 0; i < num_samples; i++) {
-        m[0][i] = p*i*t;
-        m[1][i] = p*std::pow(i, 2)*t;
+        m[0][i] = g*i*t;
+        m[1][i] = g*std::pow(i, 2)*t;
       }
 
-      std::vector<size_t> shape = {2, static_cast<size_t>(num_samples)};
+      std::vector<size_t> shape = {2};
       utils::emplace(samples, "avg", utils::samples_to_dataobject(m, shape));
-      utils::emplace(samples, "t", double(t));
+      utils::emplace(samples, "t_sampled", double(t));
     }
 };
 

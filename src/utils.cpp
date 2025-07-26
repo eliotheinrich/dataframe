@@ -37,7 +37,7 @@ DataObject dataframe::utils::samples_to_dataobject(const std::vector<std::vector
     std::tie(mean[i], error[i], nsamples[i]) = dataframe::utils::sample_statistics(data[i]);
   }
 
-  return {dataframe::utils::to_ndarray(mean, shape), dataframe::utils::to_ndarray(error, shape), dataframe::utils::to_ndarray(nsamples, shape)};
+  return {shape, mean, error, nsamples};
 }
 
 ExperimentParams dataframe::utils::load_params(const std::string& filename) {

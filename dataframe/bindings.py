@@ -29,10 +29,8 @@ def terminating_thread(ppid):
 
 ATOL = 1e-6
 RTOL = 1e-5
-import line_profiler
-profiler = line_profiler.LineProfiler()
+
 class DataSlide(DataSlide_):
-    @profiler
     def add_data(self, key, values=None, error=None, nsamples=None):
         if isinstance(key, dict):
             for key,v in key.items():
@@ -40,37 +38,38 @@ class DataSlide(DataSlide_):
         else:
             if isinstance(values, list):
                 values = np.array(values)
+            elif isinstance(values, tuple):
+                self.add_data(key, *values[1:])
+                return
             values = values.copy()
 
             if isinstance(error, list):
                 error = np.array(error)
-            elif error is None:
-                error = np.zeros_like(values, dtype=float)
 
             if isinstance(nsamples, list):
-                nsamples = np.array(samples)
-            elif nsamples is None:
-                nsamples = np.ones_like(values, dtype=int)
+                nsamples = np.array(nsamples)
 
             self._add_data(key, values, error, nsamples)
 
-    #def concat_data(self, key, values=None, shape=None, error=None, nsamples=None):
-    #    if isinstance(key, dict):
-    #        for key,v in key.items():
-    #            self.concat_data(key, v)
-    #    elif isinstance(values, DataObject):
-    #        self._concat_data(key, v)
-    #    else:
-    #        if isinstance(values, list):
-    #            values = np.array(values)
+    def concat_data(self, key, values=None, shape=None, error=None, nsamples=None):
+        if isinstance(key, dict):
+            for key,v in key.items():
+                self.concat_data(key, v)
+        else:
+            if isinstance(values, list):
+                values = np.array(values)
+            values = values.copy()
 
-    #        dim = len(values.shape)
-    #        if dim != 1:
-    #            if shape is None:
-    #                shape = values.shape
-    #            values = values.reshape(-1)
+            if shape is None:
+                shape = values.shape
 
-    #        self._concat_data(key, values, shape, error, nsamples)
+            if isinstance(error, list):
+                error = np.array(error)
+
+            if isinstance(nsamples, list):
+                nsamples = np.array(samples)
+
+            self._concat_data(key, values, shape, error, nsamples)
 
 class Config(ABC):
     def __init__(self, params):

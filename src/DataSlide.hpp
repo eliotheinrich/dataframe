@@ -10,7 +10,7 @@
 #include <stdexcept>
 
 namespace dataframe {
-  class DataSlide : public nanobind::intrusive_base {
+  class DataSlide {
     public:
       ExperimentParams params;
 
@@ -41,23 +41,6 @@ namespace dataframe {
         return slide;
       }
 
-      // Copy and take ownership of a raw pointer
-      template <typename T=double>
-      nanobind::ndarray<nanobind::numpy, T> to_ndarray(const T* values, const std::vector<size_t>& shape) const {
-        size_t k = dataframe::utils::shape_size(shape);
-
-        T* buffer = new T[k];
-        std::memcpy(buffer, values, k * sizeof(T));
-
-        return nanobind::ndarray<nanobind::numpy, T>(buffer, shape.size(), shape.data(), nanobind::find(*this));
-      }
-
-      // Copy and take ownership of a vector
-      template <typename T=double>
-      nanobind::ndarray<nanobind::numpy, T> to_ndarray(const std::vector<T>& values, const std::vector<size_t>& shape) const {
-        return to_ndarray(values.data(), shape);
-      }
-
       bool contains(const std::string& key) const {
         return params.contains(key) || data.contains(key);
       }
@@ -81,169 +64,141 @@ namespace dataframe {
         }
       }
 
-      void add_data(const std::string& key, ndarray<double>& values, std::optional<ndarray<double>> error=std::nullopt, std::optional<ndarray<size_t>> nsamples=std::nullopt) {
-        add_data(key, std::make_tuple(values, error, nsamples));
-      }
-
-      DataObject take_ownership(const DataObject& object) {
-        const auto& [values, error_opt, nsamples_opt] = object; 
-
+      void add_data(const std::string& key, ndarray<double>& values, std::optional<ndarray<double>> error_opt=std::nullopt, std::optional<ndarray<size_t>> nsamples_opt=std::nullopt) {
+        size_t N = values.size();
         std::vector<size_t> shape = dataframe::utils::get_shape(values);
 
-        size_t N = values.size();
-
-        ndarray<double> owned_values = to_ndarray(values.data(), shape);
-        std::optional<ndarray<double>> owned_error = std::nullopt;
+        std::optional<std::vector<double>> error = std::nullopt;
         if (error_opt) {
-          owned_error = to_ndarray(error_opt->data(), shape);
+          error = std::vector<double>(error_opt->data(), error_opt->data() + N);
         }
 
-        std::optional<ndarray<size_t>> owned_nsamples = std::nullopt;
-        if (error_opt) {
-          owned_nsamples = to_ndarray(nsamples_opt->data(), shape);
+        std::optional<std::vector<size_t>> nsamples = std::nullopt;
+        if (nsamples_opt) {
+          nsamples = std::vector<size_t>(nsamples_opt->data(), nsamples_opt->data() + N);
         }
 
-        return std::make_tuple(owned_values, owned_error, owned_nsamples);
+        std::vector<double> values_copy(values.data(), values.data() + N);
+
+        add_data(key, std::make_tuple(std::move(shape), std::move(values_copy), std::move(error), std::move(nsamples)));
       }
 
-      void add_data(const std::string& key, const DataObject& object_) {
-        DataObject object = take_ownership(object_);
-
+      void add_data(const std::string& key, DataObject&& object) {
         if (params.contains(key)) {
           throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));
         }
 
         if (data.contains(key)) {
-          combine_values(key, object);
-          //data[key] = combine_values(data.at(key), data_object);
+          combine_values(key, std::move(object));
         } else {
-          data.emplace(key, object);
+          data[key] = std::move(object);
         }
       }
 
-      //void concat_data(const std::string& key, ndarray<double>& values, std::optional<ndarray<double>> error_opt=std::nullopt, std::optional<ndarray<size_t>> nsamples_opt=std::nullopt) {
-      //  if (params.contains(key)) {
-      //    throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));
-      //  }
+      void concat_data(const std::string& key, ndarray<double>& values, std::optional<std::vector<size_t>> shape_opt=std::nullopt, std::optional<ndarray<double>> error_opt=std::nullopt, std::optional<ndarray<size_t>> nsamples_opt=std::nullopt) {
+        size_t N = values.size();
+        std::vector<size_t> shape = shape_opt ? shape_opt.value() : dataframe::utils::get_shape(values);
 
-      //  size_t data_size = values.size();
-      //  size_t num_new_samples = values.size() / data_size;
-      //  
-      //  if (num_new_samples * data_size != values.size()) {
-      //    throw std::runtime_error("Passed data of invalid shape to concat_data.");
-      //  }
+        std::optional<std::vector<double>> error = std::nullopt;
+        if (error_opt) {
+          error = std::vector<double>(error_opt->data(), error_opt->data() + N);
+        }
 
-      //  if (data.contains(key)) {
-      //    auto& [existing_shape, existing_values, existing_sampling_data] = data.at(key);
+        std::optional<std::vector<size_t>> nsamples = std::nullopt;
+        if (nsamples_opt) {
+          nsamples = std::vector<size_t>(nsamples_opt->data(), nsamples_opt->data() + N);
+        }
 
-      //    std::vector<size_t> real_existing_shape;
-      //    size_t num_existing_samples;
-      //    if (existing_shape.size() == shape.size()) {
-      //      real_existing_shape = existing_shape;
-      //      num_existing_samples = 1;
-      //    } else if (existing_shape.size() == shape.size() + 1) {
-      //      real_existing_shape = std::vector<size_t>(existing_shape.begin() + 1, existing_shape.end());
-      //      num_existing_samples = existing_shape[0];
-      //    }
+        concat_data(key, std::make_tuple(std::move(shape), std::vector<double>(values.data(), values.data() + N), std::move(error), std::move(nsamples)));
+      }
 
-      //    if (!shapes_equal(real_existing_shape, shape)) {
-      //      throw std::runtime_error("Mismatched shape in add_data.");
-      //    }
+      void concat_data(const std::string& key, DataObject&& object) {
+        if (params.contains(key)) {
+          throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));
+        }
 
-      //    existing_values.insert(existing_values.end(), values.begin(), values.end());
+        const auto& [shape, values, error_opt, nsamples_opt] = object;
+        size_t data_size = dataframe::utils::shape_size(shape);
+        size_t num_new_samples = values.size() / data_size;
 
-      //    std::vector<size_t> new_shape = shape;
-      //    new_shape.insert(new_shape.begin(), num_new_samples + num_existing_samples);
-      //    existing_shape = new_shape;
+        if (data.contains(key)) {
+          if (num_new_samples * data_size != values.size()) {
+            throw std::runtime_error("Passed data of invalid shape to concat_data.");
+          }
 
-      //    // Append to sampling data (if it exists)
-      //    // TODO pad with zeros/ones if previously sampling_data did not exist
-      //    if (existing_sampling_data && sampling_data_opt) {
-      //      auto& [existing_error, existing_nsamples] = existing_sampling_data.value();
-      //      auto& [error, nsamples] = sampling_data_opt.value();
-      //      existing_error.insert(existing_error.end(), error.begin(), error.end());
-      //      existing_nsamples.insert(existing_nsamples.end(), nsamples.begin(), nsamples.end());
-      //    }
-      //  } else {
-      //    std::vector<size_t> new_shape = shape;
-      //    new_shape.insert(new_shape.begin(), num_new_samples);
-      //    add_data(key, values, new_shape);
-      //  }
-      //}
+          auto& [existing_shape, existing_values, existing_error_opt, existing_nsamples_opt] = data.at(key);
 
-      //void concat_data(const std::string& key, const DataObject& data) {
-      //  auto& [values, shape, sampling_data] = data;
-      //  concat_data(key, values, shape, sampling_data);
-      //}
+          std::vector<size_t> real_existing_shape;
+          size_t num_existing_samples;
+          if (existing_shape.size() == shape.size()) {
+            real_existing_shape = existing_shape;
+            num_existing_samples = 1;
+          } else if (existing_shape.size() == shape.size() + 1) {
+            real_existing_shape = std::vector<size_t>(existing_shape.begin() + 1, existing_shape.end());
+            num_existing_samples = existing_shape[0];
+          }
+
+          if (!shapes_equal(real_existing_shape, shape)) {
+            throw std::runtime_error("Mismatched shape in add_data.");
+          }
+
+          existing_values.insert(existing_values.end(), values.begin(), values.end());
+
+          std::vector<size_t> new_shape = shape;
+          new_shape.insert(new_shape.begin(), num_new_samples + num_existing_samples);
+          existing_shape = new_shape;
+
+          // Append to sampling data (if it exists)
+          // TODO pad with zeros/ones if previously sampling_data did not exist
+          if (existing_error_opt && existing_nsamples_opt && error_opt && nsamples_opt) {
+            existing_error_opt->insert(existing_error_opt->end(), error_opt->begin(), error_opt->end());
+            existing_nsamples_opt->insert(existing_nsamples_opt->end(), nsamples_opt->begin(), nsamples_opt->end());
+          }
+        } else {
+          std::vector<size_t> new_shape = shape;
+          new_shape.insert(new_shape.begin(), num_new_samples);
+          add_data(key, std::make_tuple(std::move(new_shape), std::move(values), std::move(error_opt), std::move(nsamples_opt)));
+        }
+      }
 
       void combine_values(const std::string& key, const DataObject& obj) {
-        auto& [values1, error1_opt, nsamples1_opt] = data.at(key);
-        auto& [values2, error2_opt, nsamples2_opt] = obj;
+        auto& [shape,  values1, error1_opt, nsamples1_opt] = data.at(key);
+        const auto& [shape_, values2, error2_opt, nsamples2_opt] = obj;
 
         size_t N = values1.size();
-        if (values2.size() != N) {
+        if (!shapes_equal(shape, shape_)) {
           throw std::runtime_error("Mismatched values size in combine_values.");
         }
 
-        std::vector<size_t> shape = dataframe::utils::get_shape(values1);
+        const std::vector<double>& error1 = error1_opt ? error1_opt.value() : std::vector<double>(N, 0.0);
+        const std::vector<double>& error2 = error2_opt ? error2_opt.value() : std::vector<double>(N, 0.0);
 
-        std::vector<double> zeros(N, 0.0);
-        std::vector<size_t> ones(N, 0);
+        const std::vector<size_t>& nsamples1 = nsamples1_opt ? *nsamples1_opt : std::vector<size_t>(N, 1);
+        const std::vector<size_t>& nsamples2 = nsamples2_opt ? *nsamples2_opt : std::vector<size_t>(N, 1);
 
-        ndarray<double> error1    = to_ndarray(zeros, shape);
-        ndarray<size_t> nsamples1 = to_ndarray(ones, shape);
-
-        if (error1_opt) {
-          error1 = error1_opt.value();
-        }
-
-        if (nsamples1_opt) {
-          nsamples1 = nsamples1_opt.value();
-        }
-
-        ndarray<double> error2    = to_ndarray(zeros, shape);
-        ndarray<size_t> nsamples2 = to_ndarray(ones, shape);
-
-        if (error2_opt) {
-          error2 = error2_opt.value();
-        }
-
-        if (nsamples2_opt) {
-          nsamples2 = nsamples2_opt.value();
-        }
-
-        ndarray<double> new_values   = to_ndarray(zeros, shape);
-        ndarray<double> new_std      = to_ndarray(zeros, shape);
-        ndarray<size_t> new_nsamples = to_ndarray(ones, shape);
-
-        double* values1_ptr = values1.data();
-        double* error1_ptr = error1.data();
-        size_t* nsamples1_ptr = nsamples1.data();
-
-        double* values2_ptr = values2.data();
-        double* error2_ptr = error2.data();
-        size_t* nsamples2_ptr = nsamples2.data();
-
-        double* new_values_ptr = new_values.data();
-        double* new_std_ptr = new_std.data();
-        size_t* new_nsamples_ptr = new_nsamples.data();
+        std::vector<double> new_std;
+        std::vector<size_t> new_nsamples;
+        new_std.reserve(N);
+        new_nsamples.reserve(N);
 
         for (size_t i = 0; i < N; i++) {
-          size_t N1 = nsamples1_ptr[i];
-          size_t N2 = nsamples2_ptr[i];
-          size_t total_num_samples = N1 + N2;
+          const size_t N1 = nsamples1[i];
+          const size_t N2 = nsamples2[i];
+          const size_t total_num_samples = N1 + N2;
 
-          double v = (values1_ptr[i]*nsamples1_ptr[i] + values2_ptr[i]*nsamples2_ptr[i]) / total_num_samples;
-          double s1 = std::pow(error1_ptr[i], 2);
-          double s2 = std::pow(error2_ptr[i], 2);
-          double s = std::pow(((N1 - 1) * s1 + (N2 - 1) * s2 + double(N1*N2)/(N1 + N2) * std::pow(values1_ptr[i] - values2_ptr[i], 2))/(total_num_samples - 1), 0.5);
+          const double v = (values1[i]*nsamples1[i] + values2[i]*nsamples2[i]) / total_num_samples;
+          const double s1 = error1[i] * error1[i];
+          const double s2 = error2[i] * error2[i];
+          const double diff = values1[i] - values2[i];
+          const double s = ((N1 - 1) * s1 + (N2 - 1) * s2 + static_cast<double>(N1*N2)/(N1 + N2) * diff * diff)/(total_num_samples - 1);
 
-          new_values_ptr[i] = v;
-          new_std_ptr[i] = s;
-          new_nsamples_ptr[i] = total_num_samples;
+          values1[i] = v;
+          new_std.push_back(std::sqrt(s));
+          new_nsamples.push_back(total_num_samples);
         }
 
-        data[key] = std::make_tuple(new_values, new_std, new_nsamples);
+        error1_opt = std::move(new_std);
+        nsamples1_opt = std::move(new_nsamples);
       }
 
       void combine(const DataSlide &other, double atol=DF_ATOL, double rtol=DF_RTOL) {
@@ -257,14 +212,13 @@ namespace dataframe {
         // Slides are now guaranteed to be congruent
         for (auto const& [key, val] : other.data) {
           combine_values(key, val);
-          //data[key] = combine_values(data.at(key), val);
         }
       }
 
       ndarray<double> get_data(const std::string& key) const {
         if (data.contains(key)) {
-          const auto& [values, error, nsamples] = data.at(key);
-          return values;
+          const auto& [shape, values, error, nsamples] = data.at(key);
+          return dataframe::utils::to_ndarray(values, shape);
         } else {
           throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
         }
@@ -272,13 +226,13 @@ namespace dataframe {
 
       ndarray<double> get_std(const std::string& key) const {
         if (data.contains(key)) {
-          const auto& [values, error, nsamples] = data.at(key);
+          const auto& [shape, values, error, nsamples] = data.at(key);
+          size_t N = values.size();
           if (error) {
-            return error.value();
+            return dataframe::utils::to_ndarray(error.value(), shape);
           } else {
-            auto shape = dataframe::utils::get_shape(values);
-            std::vector<double> zeros(dataframe::utils::shape_size(shape), 0.0);
-            return to_ndarray(zeros, shape);
+            std::vector<double> zeros(N, 0.0);
+            return dataframe::utils::to_ndarray(zeros, shape);
           }
         } else {
           throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
@@ -287,21 +241,20 @@ namespace dataframe {
 
       ndarray<double> get_standard_error(const std::string& key) const {
         if (data.contains(key)) {
-          const auto& [values, error_opt, nsamples_opt] = data.at(key);
+          const auto& [shape, values, error_opt, nsamples_opt] = data.at(key);
           size_t N = values.size();
-          auto shape = dataframe::utils::get_shape(values);
           if (error_opt && nsamples_opt) {
-            double* error = error_opt->data();
-            size_t* nsamples = nsamples_opt->data();
+            const std::vector<double>& error = error_opt.value();
+            const std::vector<size_t>& nsamples = nsamples_opt.value();
 
             std::vector<double> sderror(N);
             for (size_t i = 0; i < N; i++) {
               sderror[i] = error[i] / std::sqrt(nsamples[i]);
             }
-            return to_ndarray(sderror, shape);
+            return dataframe::utils::to_ndarray(sderror, shape);
           } else {
-            std::vector<double> zeros(dataframe::utils::shape_size(shape), 0.0);
-            return to_ndarray(zeros, shape);
+            std::vector<double> zeros(N, 0.0);
+            return dataframe::utils::to_ndarray(zeros, shape);
           }
         } else {
           throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
@@ -310,13 +263,13 @@ namespace dataframe {
 
       ndarray<size_t> get_num_samples(const std::string& key) const {
         if (data.contains(key)) {
-          const auto& [values, error, nsamples] = data.at(key);
+          const auto& [shape, values, error, nsamples] = data.at(key);
+          size_t N = values.size();
           if (nsamples) {
-            return nsamples.value();
+            return dataframe::utils::to_ndarray(nsamples.value(), shape);
           } else {
-            auto shape = dataframe::utils::get_shape(values);
-            std::vector<size_t> ones(dataframe::utils::shape_size(shape), 1);
-            return to_ndarray(ones, shape);
+            std::vector<size_t> ones(N, 1);
+            return dataframe::utils::to_ndarray(ones, shape);
           }
         } else {
           throw std::runtime_error(fmt::format("Could not find data with key {}.", key));
@@ -373,11 +326,8 @@ namespace dataframe {
             return key;
           }
 
-          const auto& [values1, error1, nsamples1] = data.at(key);
-          const auto& [values2, error2, nsamples2] = other.data.at(key);
-
-          auto shape1 = dataframe::utils::get_shape(values1);
-          auto shape2 = dataframe::utils::get_shape(values2);
+          const auto& [shape1, values1, error1, nsamples1] = data.at(key);
+          const auto& [shape2, values2, error2, nsamples2] = other.data.at(key);
 
           if (!shapes_equal(shape1, shape2)) {
             return key;
@@ -390,11 +340,8 @@ namespace dataframe {
           }
 
           // TODO check if this section is redundant
-          const auto& [values1, error1, nsamples1] = other.data.at(key);
-          const auto& [values2, error2, nsamples2] = data.at(key);
-
-          auto shape1 = dataframe::utils::get_shape(values1);
-          auto shape2 = dataframe::utils::get_shape(values2);
+          const auto& [shape1, values1, error1, nsamples1] = other.data.at(key);
+          const auto& [shape2, values2, error2, nsamples2] = data.at(key);
 
           if (!shapes_equal(shape1, shape2)) {
             return key;

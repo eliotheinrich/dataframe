@@ -293,17 +293,16 @@ static void emplace(SampleMap& data, const std::string& key, DataObject&& sample
   data.emplace(key, std::move(samples));
 }
 
-static void emplace(SampleMap& data, const std::string& key, const std::vector<double>& d, const std::vector<size_t>& shape) {
-  ndarray<double> values = to_ndarray(d, shape);
-  data.emplace(key, std::make_tuple(values, std::nullopt, std::nullopt));
+static void emplace(SampleMap& data, const std::string& key, const std::vector<double>& values, const std::vector<size_t>& shape) {
+  data.emplace(key, std::make_tuple(shape, values, std::nullopt, std::nullopt));
 }
 
-static void emplace(SampleMap& data, const std::string& key, const std::vector<double>& d) {
-  emplace(data, key, d, std::vector<size_t>{d.size()});
+static void emplace(SampleMap& data, const std::string& key, const std::vector<double>& values) {
+  emplace(data, key, values, std::vector<size_t>{values.size()});
 }
 
-static void emplace(SampleMap& data, const std::string& key, double d) {
-  emplace(data, key, std::vector<double>{d});
+static void emplace(SampleMap& data, const std::string& key, double value) {
+  emplace(data, key, std::vector<double>{value});
 }
 
 std::tuple<double, double, size_t> sample_statistics(const std::vector<double>& values);

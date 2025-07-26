@@ -10,7 +10,7 @@
 
 namespace dataframe {
 
-  class DataFrame : public nanobind::intrusive_base {
+  class DataFrame {
     public:
       double atol;
       double rtol;
@@ -276,16 +276,15 @@ namespace dataframe {
             }
             key_result = query_t{param_vals};
           } else { // Data; check on query_type
-            const auto& [values, error, nsamples] = slides[inds[0]].data.at(key);
-            std::vector<size_t> shape = dataframe::utils::get_shape(values);
-            size_t data_size = dataframe::utils::shape_size(shape);
+            const auto& [shape_, values, error, nsamples] = slides[inds[0]].data.at(key);
+            std::vector<size_t> shape = shape_;
+            size_t data_size = values.size();
 
             if (query_type == QueryType::NumSamples) {
               std::vector<size_t> values(inds.size() * data_size);
               for (size_t i = 0; i < inds.size(); i++) {
                 uint32_t j = inds[i];
-                auto const& [valuesj, errorj, nsamplesj] = slides[j].data.at(key);
-                const auto& shapej = dataframe::utils::get_shape(valuesj);
+                auto const& [shapej, valuesj, errorj, nsamplesj] = slides[j].data.at(key);
                 if (!DataSlide::shapes_equal(shape, shapej)) {
                   throw std::runtime_error(fmt::format("Ragged shapes detected: {} and {}", shape, shapej));
                 }
@@ -300,8 +299,7 @@ namespace dataframe {
               std::vector<double> values(inds.size() * data_size);
               for (size_t i = 0; i < inds.size(); i++) {
                 uint32_t j = inds[i];
-                auto const& [valuesj, errorj, nsamplesj] = slides[j].data.at(key);
-                const auto& shapej = dataframe::utils::get_shape(valuesj);
+                auto const& [shapej, valuesj, errorj, nsamplesj] = slides[j].data.at(key);
                 if (!DataSlide::shapes_equal(shape, shapej)) {
                   throw std::runtime_error(fmt::format("Ragged shapes detected: {} and {}", shape, shapej));
                 }
@@ -351,7 +349,7 @@ namespace dataframe {
           new_slides.push_back(std::move(slide));
         }
 
-        slides = new_slides;
+        slides = std::move(new_slides);
         promote_params();
       }
 
@@ -361,7 +359,6 @@ namespace dataframe {
         } else if (other.params.empty() && other.slides.empty()) {
           return DataFrame(*this);
         }
-
 
         // Combine matching metadata
         DataFrame df;

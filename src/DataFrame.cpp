@@ -6,75 +6,69 @@
 using namespace dataframe;
 using namespace dataframe::utils;
 
-using DataObjectSerialized = std::tuple<
-  std::vector<size_t>,
-  std::vector<double>,
-  std::optional<std::vector<double>>,
-  std::optional<std::vector<size_t>>
->;
-
-DataObject from_serialized(const DataObjectSerialized& serialized) {
-  auto& [shape, values, error_opt, nsamples_opt] = serialized;
-
-  ndarray<double> values_ = to_ndarray(values, shape);
-  std::optional<ndarray<double>> error_opt_ = std::nullopt;
-  if (error_opt) {
-    error_opt_ = to_ndarray(error_opt.value(), shape);
-  }
-
-  std::optional<ndarray<size_t>> nsamples_opt_ = std::nullopt;
-  if (nsamples_opt) {
-    nsamples_opt_ = to_ndarray(nsamples_opt.value(), shape);
-  }
-
-  return std::make_tuple(values_, error_opt_, nsamples_opt_); 
-}
-
-DataObjectSerialized to_serialized(const DataObject& data) {
-  const auto& [values, error_opt, nsamples_opt] = data;
-
-  size_t N = values.size();
-
-  double* values_ptr = values.data();
-  std::vector<double> values_(values_ptr, values_ptr + N);
-
-  std::optional<std::vector<double>> error_opt_ = std::nullopt;
-  if (error_opt) {
-    double* error_ptr = error_opt->data();
-    error_opt_ = std::vector<double>(error_ptr, error_ptr + N);
-  }
-
-  std::optional<std::vector<size_t>> nsamples_opt_ = std::nullopt;
-  if (nsamples_opt) {
-    size_t* nsamples_ptr = nsamples_opt->data();
-    nsamples_opt_ = std::vector<size_t>(nsamples_ptr, nsamples_ptr + N);
-  }
-
-  std::vector<size_t> shape = get_shape(values);
-
-  return std::make_tuple(shape, values_, error_opt_, nsamples_opt_); 
-}
+//using DataObjectSerialized = std::tuple<
+//  std::vector<size_t>,
+//  std::vector<double>,
+//  std::optional<std::vector<double>>,
+//  std::optional<std::vector<size_t>>
+//>;
+//
+//DataObject from_serialized(const DataObjectSerialized& serialized) {
+//  auto& [shape, values, error_opt, nsamples_opt] = serialized;
+//
+//  ndarray<double> values_ = to_ndarray(values, shape);
+//  std::optional<ndarray<double>> error_opt_ = std::nullopt;
+//  if (error_opt) {
+//    error_opt_ = to_ndarray(error_opt.value(), shape);
+//  }
+//
+//  std::optional<ndarray<size_t>> nsamples_opt_ = std::nullopt;
+//  if (nsamples_opt) {
+//    nsamples_opt_ = to_ndarray(nsamples_opt.value(), shape);
+//  }
+//
+//  return std::make_tuple(values_, error_opt_, nsamples_opt_); 
+//}
+//
+//DataObjectSerialized to_serialized(const DataObject& data) {
+//  const auto& [values, error_opt, nsamples_opt] = data;
+//
+//  size_t N = values.size();
+//
+//  double* values_ptr = values.data();
+//  std::vector<double> values_(values_ptr, values_ptr + N);
+//
+//  std::optional<std::vector<double>> error_opt_ = std::nullopt;
+//  if (error_opt) {
+//    double* error_ptr = error_opt->data();
+//    error_opt_ = std::vector<double>(error_ptr, error_ptr + N);
+//  }
+//
+//  std::optional<std::vector<size_t>> nsamples_opt_ = std::nullopt;
+//  if (nsamples_opt) {
+//    size_t* nsamples_ptr = nsamples_opt->data();
+//    nsamples_opt_ = std::vector<size_t>(nsamples_ptr, nsamples_ptr + N);
+//  }
+//
+//  std::vector<size_t> shape = get_shape(values);
+//
+//  return std::make_tuple(shape, values_, error_opt_, nsamples_opt_); 
+//}
 
 struct DataSlideSerialized {
   std::map<std::string, Parameter> params;
   std::vector<byte_t> buffer;
-  std::map<std::string, DataObjectSerialized> data;
+  std::map<std::string, DataObject> data;
 
   DataSlideSerialized()=default;
-  DataSlideSerialized(const DataSlide& slide) : params(slide.params), buffer(slide.buffer) {
-    for (const auto& [key, values] : slide.data) {
-      data.emplace(key, to_serialized(values));
-    }
-  }
+  DataSlideSerialized(const DataSlide& slide) : params(slide.params), buffer(slide.buffer), data(slide.data) {}
 };
 
 DataSlide from_serialized(const DataSlideSerialized& serialized) {
   DataSlide slide;
   slide.params = serialized.params;
   slide.buffer = serialized.buffer;
-  for (const auto& [key, values] : serialized.data) {
-    slide.data.emplace(key, from_serialized(values));
-  }
+  slide.data = serialized.data;
   return slide;
 }
 

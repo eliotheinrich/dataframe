@@ -25,9 +25,10 @@ using ndarray = nanobind::ndarray<nanobind::numpy, T>;
 
 // Stores shape, values, and optional sampling data (standard error, number of samples) for Gaussian error combination
 using DataObject = std::tuple<
-  ndarray<double>,
-  std::optional<ndarray<double>>,
-  std::optional<ndarray<size_t>>
+  std::vector<size_t>,
+  std::vector<double>,
+  std::optional<std::vector<double>>,
+  std::optional<std::vector<size_t>>
 >;
 
 using SampleMap = std::map<std::string, DataObject>;
