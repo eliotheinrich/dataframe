@@ -261,12 +261,41 @@ T get(const ExperimentParams &params, const std::string& key) {
   return std::get<T>(params.at(key));
 }
 
+size_t shape_size(const std::vector<size_t>& shape);
+
+template <typename T=double>
+nanobind::ndarray<nanobind::numpy, T> to_ndarray(const std::vector<T>& values, const std::vector<size_t>& shape) {
+  size_t k = dataframe::utils::shape_size(shape);
+
+  T* buffer = new T[k];
+  std::move(values.begin(), values.end(), buffer); 
+
+  nanobind::capsule owner(buffer, [](void* p) noexcept {
+    delete static_cast<T*>(p);
+  });
+
+  return nanobind::ndarray<nanobind::numpy, T>(buffer, shape.size(), shape.data(), owner);
+}
+
+template <typename T>
+static std::vector<size_t> get_shape(ndarray<T> arr) {
+  size_t dim = arr.ndim();
+  std::vector<size_t> shape(dim);
+  for (size_t i = 0; i < dim; i++) {
+    shape[i] = arr.shape(i);
+  }
+
+  return shape;
+}
+
+
 static void emplace(SampleMap& data, const std::string& key, DataObject&& samples) {
   data.emplace(key, std::move(samples));
 }
 
 static void emplace(SampleMap& data, const std::string& key, const std::vector<double>& d, const std::vector<size_t>& shape) {
-  data.emplace(key, DataObject{shape, d, std::nullopt});
+  ndarray<double> values = to_ndarray(d, shape);
+  data.emplace(key, std::make_tuple(values, std::nullopt, std::nullopt));
 }
 
 static void emplace(SampleMap& data, const std::string& key, const std::vector<double>& d) {
@@ -277,11 +306,9 @@ static void emplace(SampleMap& data, const std::string& key, double d) {
   emplace(data, key, std::vector<double>{d});
 }
 
-size_t shape_size(const std::vector<size_t>& shape);
-
 std::tuple<double, double, size_t> sample_statistics(const std::vector<double>& values);
 
-DataObject samples_to_dataobject(const ndarray<std::vector<double>>& data);
+DataObject samples_to_dataobject(const std::vector<std::vector<double>>& data, const std::vector<size_t>& shape);
 
 ExperimentParams load_params(const std::string& filename);
 

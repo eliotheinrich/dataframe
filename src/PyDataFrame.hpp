@@ -2,8 +2,6 @@
 
 #include "Frame.h"
 
-#include <nanobind/nanobind.h>
-#include <nanobind/ndarray.h>
 #include <types.h>
 
 #include <iostream>
@@ -104,22 +102,6 @@
 //std::initializer_list<T> make_init_list(const std::array<T, D>& arr, std::index_sequence<Idx...>) {
 //  return {arr[Idx] ... };
 //}
-
-template <typename T=double>
-nanobind::ndarray<nanobind::numpy, T> to_nbarray(dataframe::ndarray<T>&& data) {
-  auto [shape, values] = std::move(data);
-
-  size_t k = dataframe::utils::shape_size(shape);
-
-  T* buffer = new T[k];
-  std::move(values.begin(), values.end(), buffer); 
-
-  nanobind::capsule owner(buffer, [](void* p) noexcept {
-    delete static_cast<T*>(p);
-  });
-
-  return nanobind::ndarray<nanobind::numpy, T>(buffer, shape.size(), shape.data(), owner);
-}
 
 nanobind::bytes convert_bytes(const std::vector<dataframe::byte_t>& bytes) {
   nanobind::bytes nb_bytes(bytes.data(), bytes.size());

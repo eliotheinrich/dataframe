@@ -10,7 +10,7 @@
 
 namespace dataframe {
 
-  class DataFrame {
+  class DataFrame : public nanobind::intrusive_base {
     public:
       double atol;
       double rtol;
@@ -276,50 +276,54 @@ namespace dataframe {
             }
             key_result = query_t{param_vals};
           } else { // Data; check on query_type
-            std::vector<size_t> shape = slides[inds[0]].get_shape(key);
+            const auto& [values, error, nsamples] = slides[inds[0]].data.at(key);
+            std::vector<size_t> shape = dataframe::utils::get_shape(values);
             size_t data_size = dataframe::utils::shape_size(shape);
 
             if (query_type == QueryType::NumSamples) {
               std::vector<size_t> values(inds.size() * data_size);
               for (size_t i = 0; i < inds.size(); i++) {
                 uint32_t j = inds[i];
-                auto const& [shapej, valuesj, sampling_dataj] = slides[j].data.at(key);
+                auto const& [valuesj, errorj, nsamplesj] = slides[j].data.at(key);
+                const auto& shapej = dataframe::utils::get_shape(valuesj);
                 if (!DataSlide::shapes_equal(shape, shapej)) {
                   throw std::runtime_error(fmt::format("Ragged shapes detected: {} and {}", shape, shapej));
                 }
+
                 const auto& nsamples = slides[j].get_num_samples(key);
-                std::copy(nsamples.begin(), nsamples.end(), values.begin() + i * data_size);
+                std::memcpy(&values[i * data_size], nsamples.data(), data_size * sizeof(size_t));
               }
 
               shape.insert(shape.begin(), inds.size());
-              key_result = std::make_pair(shape, std::move(values));
+              key_result = dataframe::utils::to_ndarray(values, shape);
             } else {
               std::vector<double> values(inds.size() * data_size);
               for (size_t i = 0; i < inds.size(); i++) {
                 uint32_t j = inds[i];
-                auto const& [shapej, valuesj, sampling_dataj] = slides[j].data.at(key);
+                auto const& [valuesj, errorj, nsamplesj] = slides[j].data.at(key);
+                const auto& shapej = dataframe::utils::get_shape(valuesj);
                 if (!DataSlide::shapes_equal(shape, shapej)) {
                   throw std::runtime_error(fmt::format("Ragged shapes detected: {} and {}", shape, shapej));
                 }
 
                 if (query_type == QueryType::StandardDeviation) {
                   const auto& std = slides[j].get_std(key);
-                  std::copy(std.begin(), std.end(), values.begin() + i * data_size);
+                  std::memcpy(&values[i * data_size], std.data(), data_size * sizeof(double));
                 } else if (query_type == QueryType::StandardError) {
                   const auto& sderror = slides[j].get_standard_error(key);
-                  std::copy(sderror.begin(), sderror.end(), values.begin() + i * data_size);
+                  std::memcpy(&values[i * data_size], sderror.data(), data_size * sizeof(double));
                 } else {
                   const auto& mean = slides[j].get_data(key);
-                  std::copy(mean.begin(), mean.end(), values.begin() + i * data_size);
+                  std::memcpy(&values[i * data_size], mean.data(), data_size * sizeof(double));
                 }
               }
 
               shape.insert(shape.begin(), inds.size());
-              key_result = std::make_pair(shape, std::move(values));
+              key_result = dataframe::utils::to_ndarray(values, shape);
             }
           }
 
-          result[p] = std::move(key_result);
+          result[p] = key_result;
         }
         return result;
       }

@@ -7,31 +7,58 @@
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/trampoline.h>
+#include <nanobind/intrusive/counter.inl>
 
 #include "test.hpp"
 
 using namespace nanobind::literals;
 using namespace dataframe;
+using namespace dataframe::utils;
 
-// Types which are interfaced with python
-template <typename T=double>
-using py_nbarray = nanobind::ndarray<nanobind::numpy, T>;
-using py_query_t = std::variant<Parameter, std::vector<Parameter>, py_nbarray<double>, py_nbarray<size_t>>;
-using py_query_result = std::variant<py_query_t, std::vector<py_query_t>>;
+using py_query_result = std::variant<query_t, std::vector<query_t>>;
 
-struct query_t_to_py {
-  py_query_t operator()(Parameter&& v) const { 
-    return std::move(v);
+int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
+#if PY_VERSION_HEX >= 0x03090000
+  Py_VISIT(Py_TYPE(self));
+#endif
+
+  if (!nanobind::inst_ready(self)) {
+    return 0;
   }
-  py_query_t operator()(std::vector<Parameter>&& v) const { 
-    return std::move(v); 
+
+  // Get the C++ object associated with 'self' (this always succeeds)
+  DataSlide* slide = nanobind::inst_ptr<DataSlide>(self);
+
+  for (const auto& [key, obj] : slide->data) {
+    const auto& [values, error_opt, nsamples_opt] = obj;
+    nanobind::handle value = nanobind::find(values);
+    Py_VISIT(value.ptr());
+
+    if (error_opt) {
+      value = nanobind::find(error_opt.value());
+      Py_VISIT(value.ptr());
+    }
+
+    if (nsamples_opt) {
+      value = nanobind::find(nsamples_opt.value());
+      Py_VISIT(value.ptr());
+    }
   }
-  py_query_t operator()(ndarray<double>&& data) const {
-    return py_query_t{to_nbarray(std::move(data))};
-  }
-  py_query_t operator()(ndarray<size_t>&& data) const {
-    return py_query_t{to_nbarray(std::move(data))};
-  }
+
+  return 0;
+}
+
+int wrapper_tp_clear(PyObject *self) {
+  DataSlide* slide = nanobind::inst_ptr<DataSlide>(self);
+  slide->data = {};
+  return 0;
+}
+
+// Table of custom type slots we want to install
+PyType_Slot wrapper_slots[] = {
+  { Py_tp_traverse, (void *) wrapper_tp_traverse },
+  { Py_tp_clear, (void *) wrapper_tp_clear },
+  { 0, 0 }
 };
 
 NB_MODULE(dataframe_bindings, m) {
@@ -45,16 +72,12 @@ NB_MODULE(dataframe_bindings, m) {
       return samples;
     });
 
-  // Need to statically cast overloaded templated methods
-  void (DataSlide::*ds_add_param1)(const ExperimentParams&) = &DataSlide::add_param;
-  void (DataSlide::*ds_add_param2)(const std::string&, const Parameter&) = &DataSlide::add_param;
-
-  nanobind::class_<DataObject>(m, "DataObject")
-    .def_ro("shape", &DataObject::shape)
-    .def_ro("values", &DataObject::values)
-    .def_ro("sampling_data", &DataObject::sampling_data);
-
-  nanobind::class_<DataSlide>(m, "DataSlide_")
+  nanobind::class_<DataSlide>(m, "DataSlide_", 
+      nanobind::intrusive_ptr<DataSlide>(
+        [](DataSlide *slide, PyObject *po) noexcept { slide->set_self_py(po); }
+      ),
+      nanobind::type_slots(wrapper_slots)
+    )
     .def(nanobind::init<>())
     .def(nanobind::init<ExperimentParams&>())
     .def(nanobind::init<const DataSlide&>())
@@ -63,52 +86,38 @@ NB_MODULE(dataframe_bindings, m) {
       new (t) DataSlide(std::move(byte_vec));
     })
     .def_rw("params", &DataSlide::params)
-    .def_rw("data", &DataSlide::data)
-    .def("add_param", ds_add_param1)
-    .def("add_param", ds_add_param2)
-    .def("_add_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape, std::optional<std::vector<double>> std, std::optional<std::vector<size_t>> nsamples) { 
-      if (std && nsamples) {
-        self.add_data(key, values, shape, SamplingData{std.value(), nsamples.value()}); 
-      } else if (std || nsamples) {
-        throw std::runtime_error("Cannot pass only one of std and nsamples.");
-      } else {
-        self.add_data(key, values, shape); 
-      }
-    }, "key"_a, "values"_a, "shape"_a = nanobind::none(), "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
-    .def("_add_data", [](DataSlide& self, const std::string& key, const DataObject& data) {
-      self.add_data(key, data);
-    })
-    .def("_concat_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape, std::optional<std::vector<double>> std, std::optional<std::vector<size_t>> nsamples) { 
-      if (std && nsamples) {
-        self.concat_data(key, values, shape, SamplingData{std.value(), nsamples.value()}); 
-      } else if (std || nsamples) {
-        throw std::runtime_error("Cannot pass only one of std and nsamples.");
-      } else {
-        self.concat_data(key, values, shape); 
-      }
-    }, "key"_a, "values"_a, "shape"_a = nanobind::none(), "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
-    .def("_concat_data", [](DataSlide& self, const std::string& key, const DataObject& data) {
-      self.concat_data(key, data);
-    }, "key"_a, "data"_a)
+    //.def_rw("data", &DataSlide::data)
+    .def("add_param", [](DataSlide& self, const std::string& key, const Parameter& param) { self.add_param(key, param); })
+    .def("add_param", [](DataSlide& self, const ExperimentParams& params) { self.add_param(params); })
+    .def("_add_data", [](DataSlide& self, const std::string& key, ndarray<double> values, std::optional<ndarray<double>> errors_opt, std::optional<ndarray<size_t>> nsamples_opt) { 
+      self.add_data(key, {values, errors_opt, nsamples_opt});
+    }, "key"_a, "values"_a, "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
+    //.def("_add_data", [](DataSlide& self, const std::string& key, const DataObject& data) {
+    //  self.add_data(key, data);
+    //})
+    //.def("_concat_data", [](DataSlide& self, const std::string& key, const std::vector<double>& values, std::optional<std::vector<size_t>> shape, std::optional<std::vector<double>> std, std::optional<std::vector<size_t>> nsamples) { 
+    //  if (std && nsamples) {
+    //    self.concat_data(key, values, shape, SamplingData{std.value(), nsamples.value()}); 
+    //  } else if (std || nsamples) {
+    //    throw std::runtime_error("Cannot pass only one of std and nsamples.");
+    //  } else {
+    //    self.concat_data(key, values, shape); 
+    //  }
+    //}, "key"_a, "values"_a, "shape"_a = nanobind::none(), "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
+    //.def("_concat_data", [](DataSlide& self, const std::string& key, const DataObject& data) {
+    //  self.concat_data(key, data);
+    //}, "key"_a, "data"_a)
     .def("get_data", [](const DataSlide& self, const std::string& key) {
-      auto data = self.get_data(key);
-      auto shape = self.get_shape(key);
-      return to_nbarray(std::move(ndarray<double>{shape, data}));
+      return self.get_data(key);
     })
     .def("get_std", [](const DataSlide& self, const std::string& key) {
-      auto data = self.get_std(key);
-      auto shape = self.get_shape(key);
-      return to_nbarray(std::move(ndarray<double>{shape, data}));
+      return self.get_std(key);
     })
     .def("get_standard_error", [](const DataSlide& self, const std::string& key) {
-      auto data = self.get_standard_error(key);
-      auto shape = self.get_shape(key);
-      return to_nbarray(std::move(ndarray<double>{shape, data}));
+      return self.get_standard_error(key);
     })
     .def("get_num_samples", [](const DataSlide& self, const std::string& key) {
-      auto data = self.get_num_samples(key);
-      auto shape = self.get_shape(key);
-      return to_nbarray(std::move(ndarray<size_t>{shape, data}));
+      return self.get_num_samples(key);
     })
     .def("remove", &DataSlide::remove_param)
     .def("_inject_buffer", [](DataSlide& slide, const nanobind::bytes& bytes) {
@@ -125,7 +134,7 @@ NB_MODULE(dataframe_bindings, m) {
         throw nanobind::key_error(e.what());
       }
     })
-    .def("__setitem__", ds_add_param2)
+    .def("__setitem__", [](DataSlide& self, const std::string& key, const Parameter& param) { self.add_param(key, param); })
     .def("__str__", &DataSlide::describe)
     .def("__getstate__", [](const DataSlide& slide){ return convert_bytes(slide.to_bytes()); })
     .def("__setstate__", [](DataSlide& slide, const nanobind::bytes& bytes){ new (&slide) DataSlide(convert_bytes(bytes)); })
@@ -133,29 +142,19 @@ NB_MODULE(dataframe_bindings, m) {
     .def("congruent", &DataSlide::congruent)
     .def("combine", &DataSlide::combine, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL);
 
-  void (DataFrame::*df_add_param1)(const ExperimentParams&) = &DataFrame::add_param;
-  void (DataFrame::*df_add_param2)(const std::string&, const Parameter&) = &DataFrame::add_param;
-  void (DataFrame::*df_add_metadata1)(const ExperimentParams&) = &DataFrame::add_metadata;
-  void (DataFrame::*df_add_metadata2)(const std::string&, const Parameter&) = &DataFrame::add_metadata;
-
   auto _query = [](DataFrame& df, const std::vector<std::string>& keys, const ExperimentParams& constraints, bool unique, DataFrame::QueryType query_type) {
     std::vector<query_t> results = df.query(keys, constraints, unique, query_type);
 
-    size_t num_queries = results.size();
-
-    std::vector<py_query_t> py_results(num_queries);
-    for (uint32_t i = 0; i < num_queries; i++) {
-      py_results[i] = std::visit(query_t_to_py(), std::move(results[i]));
+    if (results.size() == 1) {
+      return py_query_result{results[0]};
     }
 
-    if (num_queries == 1) {
-      return py_query_result{py_results[0]};
-    }
-
-    return py_query_result{py_results};
+    return py_query_result{results};
   };
 
-  nanobind::class_<DataFrame>(m, "DataFrame")
+  nanobind::class_<DataFrame>(m, "DataFrame",
+      nanobind::intrusive_ptr<DataFrame>(
+      [](DataFrame *frame, PyObject *po) noexcept { frame->set_self_py(po); }))
     .def(nanobind::init<>())
     .def(nanobind::init<const std::vector<DataSlide>&>())
     .def(nanobind::init<const ExperimentParams&, const std::vector<DataSlide>&>())
@@ -167,14 +166,14 @@ NB_MODULE(dataframe_bindings, m) {
     })
     .def_rw("params", &DataFrame::params)
     .def_rw("metadata", &DataFrame::metadata)
-    .def_rw("slides", &DataFrame::slides)
+    //.def_rw("slides", &DataFrame::slides)
     .def_rw("atol", &DataFrame::atol)
     .def_rw("rtol", &DataFrame::rtol)
     .def("add_slide", &DataFrame::add_slide)
-    .def("add_param", df_add_param1)
-    .def("add_param", df_add_param2)
-    .def("add_metadata", df_add_metadata1)
-    .def("add_metadata", df_add_metadata2)
+    .def("add_param", [](DataFrame& self, const std::string& key, const Parameter& param) { self.add_param(key, param); })
+    .def("add_param", [](DataFrame& self, const ExperimentParams& params) { self.add_param(params); })
+    .def("add_metadata", [](DataFrame& self, const std::string& key, const Parameter& param) { self.add_metadata(key, param); })
+    .def("add_metadata", [](DataFrame& self, const ExperimentParams& params) { self.add_metadata(params); })
     .def("remove_param", &DataFrame::remove_param)
     .def("remove_metadata", &DataFrame::remove_metadata)
     .def("__contains__", &DataFrame::contains)
@@ -187,7 +186,8 @@ NB_MODULE(dataframe_bindings, m) {
         throw nanobind::key_error(fmt::format("Could not find key {} in params or metadata.", key).c_str());
       }
     })
-    .def("__setitem__", df_add_param2)
+    .def("__len__", [](const DataFrame& self) { return self.slides.size(); })
+    .def("__setitem__", [](DataFrame& self, const std::string& key, const Parameter& param) { self.add_param(key, param); })
     .def("__str__", &DataFrame::to_json)
     .def("__add__", &DataFrame::combine)
     .def("__getstate__", [](const DataFrame& frame){ return convert_bytes(frame.to_bytes()); })

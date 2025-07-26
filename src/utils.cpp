@@ -26,19 +26,18 @@ std::tuple<double, double, size_t> dataframe::utils::sample_statistics(const std
   return {mean, stddev, nsamples};
 }
 
-DataObject dataframe::utils::samples_to_dataobject(const ndarray<std::vector<double>>& data) {
-  const auto& [shape, values] = data;
+DataObject dataframe::utils::samples_to_dataobject(const std::vector<std::vector<double>>& data, const std::vector<size_t>& shape) {
+  size_t data_size = dataframe::utils::shape_size(shape);
 
-  size_t data_size = shape_size(shape);
   std::vector<double> mean(data_size);
-  std::vector<double> stddev(data_size);
+  std::vector<double> error(data_size);
   std::vector<size_t> nsamples(data_size);
 
   for (size_t i = 0; i < data_size; i++) {
-    std::tie(mean[i], stddev[i], nsamples[i]) = dataframe::utils::sample_statistics(values[i]);
+    std::tie(mean[i], error[i], nsamples[i]) = dataframe::utils::sample_statistics(data[i]);
   }
 
-  return DataObject{shape, mean, SamplingData{stddev, nsamples}};
+  return {dataframe::utils::to_ndarray(mean, shape), dataframe::utils::to_ndarray(error, shape), dataframe::utils::to_ndarray(nsamples, shape)};
 }
 
 ExperimentParams dataframe::utils::load_params(const std::string& filename) {

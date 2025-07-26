@@ -33,41 +33,44 @@ import line_profiler
 profiler = line_profiler.LineProfiler()
 class DataSlide(DataSlide_):
     @profiler
-    def add_data(self, key, values=None, shape=None, error=None, nsamples=None):
+    def add_data(self, key, values=None, error=None, nsamples=None):
         if isinstance(key, dict):
             for key,v in key.items():
                 self.add_data(key, v)
-        elif isinstance(values, DataObject):
-            self._add_data(key, v)
         else:
             if isinstance(values, list):
                 values = np.array(values)
+            values = values.copy()
 
-            dim = len(values.shape)
-            if dim != 1:
-                if shape is None:
-                    shape = values.shape
-                values = values.reshape(-1)
+            if isinstance(error, list):
+                error = np.array(error)
+            elif error is None:
+                error = np.zeros_like(values, dtype=float)
 
-            self._add_data(key, values, shape, error, nsamples)
+            if isinstance(nsamples, list):
+                nsamples = np.array(samples)
+            elif nsamples is None:
+                nsamples = np.ones_like(values, dtype=int)
 
-    def concat_data(self, key, values=None, shape=None, error=None, nsamples=None):
-        if isinstance(key, dict):
-            for key,v in key.items():
-                self.concat_data(key, v)
-        elif isinstance(values, DataObject):
-            self._concat_data(key, v)
-        else:
-            if isinstance(values, list):
-                values = np.array(values)
+            self._add_data(key, values, error, nsamples)
 
-            dim = len(values.shape)
-            if dim != 1:
-                if shape is None:
-                    shape = values.shape
-                values = values.reshape(-1)
+    #def concat_data(self, key, values=None, shape=None, error=None, nsamples=None):
+    #    if isinstance(key, dict):
+    #        for key,v in key.items():
+    #            self.concat_data(key, v)
+    #    elif isinstance(values, DataObject):
+    #        self._concat_data(key, v)
+    #    else:
+    #        if isinstance(values, list):
+    #            values = np.array(values)
 
-            self._concat_data(key, values, shape, error, nsamples)
+    #        dim = len(values.shape)
+    #        if dim != 1:
+    #            if shape is None:
+    #                shape = values.shape
+    #            values = values.reshape(-1)
+
+    #        self._concat_data(key, values, shape, error, nsamples)
 
 class Config(ABC):
     def __init__(self, params):

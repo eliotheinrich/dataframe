@@ -24,8 +24,8 @@ class TestSampler {
         m[1][i] = p*std::pow(i, 2)*t;
       }
 
-      std::vector<size_t> shape = {2, num_samples};
-      utils::emplace(samples, "avg", utils::samples_to_dataobject(make_pair(shape, m)));
+      std::vector<size_t> shape = {2, static_cast<size_t>(num_samples)};
+      utils::emplace(samples, "avg", utils::samples_to_dataobject(m, shape));
       utils::emplace(samples, "t", double(t));
     }
 };
