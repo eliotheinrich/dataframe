@@ -62,7 +62,7 @@ namespace dataframe {
         }
       }
 
-      void add_data(const std::string& key, std::vector<size_t>&& shape, std::vector<double>&& values, std::optional<std::vector<double>>&& error, std::optional<std::vector<size_t>>&& nsamples) {
+      void add_data(const std::string& key, std::vector<size_t>&& shape, std::vector<double>&& values, std::optional<std::vector<double>>&& error=std::nullopt, std::optional<std::vector<size_t>>&& nsamples=std::nullopt) {
         add_data(key, std::make_tuple(std::move(shape), std::move(values), std::move(error), std::move(nsamples)));
       }
 
@@ -197,7 +197,6 @@ namespace dataframe {
       const std::vector<double>* get_std(const std::string& key) const {
         if (data.contains(key)) {
           const auto& [shape, values, error, nsamples] = data.at(key);
-          size_t N = values.size();
           if (error) {
             return &error.value();
           } else {
@@ -211,7 +210,6 @@ namespace dataframe {
       const std::vector<size_t>* get_num_samples(const std::string& key) const {
         if (data.contains(key)) {
           const auto& [shape, values, error, nsamples] = data.at(key);
-          size_t N = values.size();
           if (nsamples) {
             return &nsamples.value();
           } else {

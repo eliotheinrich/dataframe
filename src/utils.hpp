@@ -10,6 +10,7 @@
 #include <numeric>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 namespace dataframe {
 

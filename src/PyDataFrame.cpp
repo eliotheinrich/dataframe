@@ -46,7 +46,7 @@ NB_MODULE(dataframe_bindings, m) {
       new (t) DataSlide(std::move(byte_vec));
     })
     .def_rw("params", &DataSlide::params)
-    //.def_rw("data", &DataSlide::data)
+    .def_rw("data", &DataSlide::data)
     .def("add_param", [](DataSlide& self, const std::string& key, const Parameter& param) { self.add_param(key, param); })
     .def("add_param", [](DataSlide& self, const ExperimentParams& params) { self.add_param(params); })
     .def("_add_data", [](DataSlide& self, const std::string& key, ndarray<double> values, std::optional<ndarray<double>> error_opt, std::optional<ndarray<size_t>> nsamples_opt) { 
@@ -145,7 +145,7 @@ NB_MODULE(dataframe_bindings, m) {
     })
     .def_rw("params", &DataFrame::params)
     .def_rw("metadata", &DataFrame::metadata)
-    //.def_rw("slides", &DataFrame::slides)
+    .def_rw("slides", &DataFrame::slides)
     .def_rw("atol", &DataFrame::atol)
     .def_rw("rtol", &DataFrame::rtol)
     .def("add_slide", &DataFrame::add_slide)

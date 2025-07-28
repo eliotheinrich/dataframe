@@ -39,7 +39,7 @@ class DataSlide(DataSlide_):
             if isinstance(values, list):
                 values = np.array(values)
             elif isinstance(values, tuple):
-                self.add_data(key, *values[1:])
+                self.add_data(key, np.array(values[1]).reshape(values[0]), values[2], values[3])
                 return
             values = values.copy()
 
