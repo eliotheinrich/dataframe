@@ -30,6 +30,24 @@ namespace dataframe {
 
       DataSlide(const std::vector<byte_t>& bytes);
 
+      std::vector<std::string> data_keys() const {
+        std::vector<std::string> keys(data.size());
+        size_t i = 0;
+        for (auto const& [key, _] : data) {
+          keys[i++] = key;
+        }
+        return keys;
+      }
+
+      std::vector<std::string> param_keys() const {
+        std::vector<std::string> keys(params.size());
+        size_t i = 0;
+        for (auto const& [key, _] : params) {
+          keys[i++] = key;
+        }
+        return keys;
+      }
+
       static DataSlide copy_params(const DataSlide& other) {
         DataSlide slide;
         for (auto const& [key, val]: other.params) {

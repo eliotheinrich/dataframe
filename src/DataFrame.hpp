@@ -71,6 +71,24 @@ namespace dataframe {
         return DataFrame(data);
       }
 
+      std::vector<std::string> param_keys() const {
+        std::vector<std::string> keys(params.size());
+        size_t i = 0;
+        for (const auto& [key, _] : params) {
+          keys[i++] = key;
+        }
+
+        return keys;
+      }
+
+      std::vector<std::string> slide_param_keys(size_t k) const {
+        return slides[k].param_keys();
+      }
+
+      std::vector<std::string> slide_data_keys(size_t k) const {
+        return slides[k].data_keys();
+      }
+
       void add_slide(const DataSlide& ds) {
         slides.push_back(ds);
       }

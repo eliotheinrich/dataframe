@@ -45,8 +45,8 @@ NB_MODULE(dataframe_bindings, m) {
       auto byte_vec = convert_bytes(bytes);
       new (t) DataSlide(std::move(byte_vec));
     })
-    .def_rw("params", &DataSlide::params)
-    .def_rw("data", &DataSlide::data)
+    .def("param_keys", &DataSlide::param_keys)
+    .def("data_keys", &DataSlide::data_keys)
     .def("add_param", [](DataSlide& self, const std::string& key, const Parameter& param) { self.add_param(key, param); })
     .def("add_param", [](DataSlide& self, const ExperimentParams& params) { self.add_param(params); })
     .def("_add_data", [](DataSlide& self, const std::string& key, ndarray<double> values, std::optional<ndarray<double>> error_opt, std::optional<ndarray<size_t>> nsamples_opt) { 
@@ -117,7 +117,15 @@ NB_MODULE(dataframe_bindings, m) {
     .def("congruent", &DataSlide::congruent)
     .def("combine", &DataSlide::combine, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL);
 
-  auto _query = [](DataFrame& df, const std::vector<std::string>& keys, const ExperimentParams& constraints, bool unique, DataFrame::QueryType query_type) {
+  auto _query = [](DataFrame& df, std::variant<std::string, std::vector<std::string>> keys_arg, const ExperimentParams& constraints, bool unique, DataFrame::QueryType query_type) {
+    std::vector<std::string> keys;
+    if (keys_arg.index() == 0) {
+      std::string key = std::get<std::string>(keys_arg);
+      keys = std::vector<std::string>{key};
+    } else {
+      keys = std::get<std::vector<std::string>>(keys_arg);
+    }
+
     std::vector<query_t> results = df.query(keys, constraints, unique, query_type);
     size_t num_queries = results.size();
 
@@ -143,11 +151,11 @@ NB_MODULE(dataframe_bindings, m) {
       auto byte_vec = convert_bytes(bytes);
       new (t) DataFrame(std::move(byte_vec));
     })
-    .def_rw("params", &DataFrame::params)
-    .def_rw("metadata", &DataFrame::metadata)
-    .def_rw("slides", &DataFrame::slides)
     .def_rw("atol", &DataFrame::atol)
     .def_rw("rtol", &DataFrame::rtol)
+    .def("param_keys", &DataFrame::param_keys)
+    .def("slide_param_keys", &DataFrame::slide_param_keys)
+    .def("slide_data_keys", &DataFrame::slide_data_keys)
     .def("add_slide", &DataFrame::add_slide)
     .def("add_param", [](DataFrame& self, const std::string& key, const Parameter& param) { self.add_param(key, param); })
     .def("add_param", [](DataFrame& self, const ExperimentParams& params) { self.add_param(params); })
