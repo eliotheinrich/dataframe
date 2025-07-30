@@ -58,6 +58,9 @@ class DataSlide(DataSlide_):
         else:
             if isinstance(values, list):
                 values = np.array(values)
+            elif isinstance(values, tuple):
+                self.concat_data(key, np.array(values[1]).reshape(values[0]), values[2], values[3])
+                return
             values = values.copy()
 
             if shape is None:
