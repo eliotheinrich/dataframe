@@ -367,9 +367,4 @@ def load_data(filename: str) -> DataFrame:
     else:
         with open(filename, 'rb') as f:
             s = bytes(f.read())
-            frame = DataFrame(s)
-            if "num_runs" in frame.params:
-                num_runs = frame.params["num_runs"]
-                frame.remove("num_runs")
-                frame.metadata = {**frame.metadata, "num_runs": num_runs}
-            return frame
+            return DataFrame(s)
