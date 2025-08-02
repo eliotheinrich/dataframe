@@ -9,6 +9,9 @@ using namespace dataframe::utils;
 using py_query_t = std::variant<Parameter, std::vector<Parameter>, ndarray<double>, ndarray<size_t>>;
 using py_query_result = std::variant<py_query_t, std::vector<py_query_t>>;
 
+template <typename T>
+using OneOrMore = std::variant<T, std::vector<T>>;
+
 struct query_t_to_py {
   py_query_t operator()(const Parameter& p) { return p; }
   py_query_t operator()(const std::vector<Parameter>& p) { return p; }
@@ -117,7 +120,7 @@ NB_MODULE(dataframe_bindings, m) {
     .def("congruent", &DataSlide::congruent)
     .def("combine", &DataSlide::combine, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL);
 
-  auto _query = [](DataFrame& df, std::variant<std::string, std::vector<std::string>> keys_arg, const ExperimentParams& constraints, bool unique, DataFrame::QueryType query_type) {
+  auto _query = [](DataFrame& df, OneOrMore<std::string> keys_arg, const ExperimentParams& constraints, bool unique, DataFrame::QueryType query_type) {
     std::vector<std::string> keys;
     if (keys_arg.index() == 0) {
       std::string key = std::get<std::string>(keys_arg);
@@ -183,13 +186,20 @@ NB_MODULE(dataframe_bindings, m) {
     .def("write", &DataFrame::write)
     .def("promote_params", &DataFrame::promote_params)
     .def("reduce", &DataFrame::reduce)
-    .def("query", [&_query](DataFrame& df, const std::vector<std::string>& keys, const ExperimentParams& constraints, bool unique) {
+    .def("filter", [](DataFrame& self, OneOrMore<ExperimentParams> constraints, bool invert) {
+      if (constraints.index() == 0) {
+        return self.filter({std::get<ExperimentParams>(constraints)}, invert);
+      } else {
+        return self.filter(std::get<std::vector<ExperimentParams>>(constraints), invert);
+      }
+    }, "constraints"_a, "invert"_a = false)
+    .def("query", [&_query](DataFrame& df, OneOrMore<std::string> keys, const ExperimentParams& constraints, bool unique) {
       return _query(df, keys, constraints, unique, DataFrame::QueryType::Mean);
     }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::copy)
-    .def("query_std", [&_query](DataFrame& df, const std::vector<std::string>& keys, const ExperimentParams& constraints, bool unique) {
+    .def("query_std", [&_query](DataFrame& df, OneOrMore<std::string> keys, const ExperimentParams& constraints, bool unique) {
       return _query(df, keys, constraints, unique, DataFrame::QueryType::StandardDeviation);
     }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move)
-    .def("query_nsamples", [&_query](DataFrame& df, const std::vector<std::string>& keys, const ExperimentParams& constraints, bool unique) {
+    .def("query_nsamples", [&_query](DataFrame& df, OneOrMore<std::string> keys, const ExperimentParams& constraints, bool unique) {
       return _query(df, keys, constraints, unique, DataFrame::QueryType::NumSamples);
     }, "keys"_a, "constraints"_a = ExperimentParams(), "unique"_a = false, nanobind::rv_policy::move);
 
