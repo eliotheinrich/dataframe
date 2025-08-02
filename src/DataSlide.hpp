@@ -80,6 +80,10 @@ namespace dataframe {
         }
       }
 
+      void add_data(const std::string& key, const std::vector<size_t>& shape, const std::vector<double>& values, std::optional<std::vector<double>> error=std::nullopt, std::optional<std::vector<size_t>> nsamples=std::nullopt) {
+        add_data(key, std::make_tuple(shape, values, error, nsamples));
+      }
+
       void add_data(const std::string& key, std::vector<size_t>&& shape, std::vector<double>&& values, std::optional<std::vector<double>>&& error=std::nullopt, std::optional<std::vector<size_t>>&& nsamples=std::nullopt) {
         add_data(key, std::make_tuple(std::move(shape), std::move(values), std::move(error), std::move(nsamples)));
       }
