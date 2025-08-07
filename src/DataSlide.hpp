@@ -88,15 +88,15 @@ namespace dataframe {
         add_data(key, std::make_tuple(std::move(shape), std::move(values), std::move(error), std::move(nsamples)));
       }
 
-      void add_data(const std::string& key, DataObject&& object) {
+      void add_data(const std::string& key, const DataObject& object) {
         if (params.contains(key)) {
           throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));
         }
 
         if (data.contains(key)) {
-          combine_values(key, std::move(object));
+          combine_values(key, object);
         } else {
-          data[key] = std::move(object);
+          data[key] = object;
         }
       }
 
@@ -104,20 +104,15 @@ namespace dataframe {
         concat_data(key, std::make_tuple(std::move(shape), std::move(values), std::move(error), std::move(nsamples)));
       }
 
-      void concat_data(const std::string& key, DataObject&& object) {
+      void concat_data(const std::string& key, const DataObject& object) {
         if (params.contains(key)) {
           throw std::runtime_error(fmt::format("Tried to add data with key {}, but this slide already contains a parameter with that key.", key));
         }
 
         const auto& [shape, values, error_opt, nsamples_opt] = object;
         size_t data_size = dataframe::utils::shape_size(shape);
-        size_t num_new_samples = values.size() / data_size;
 
         if (data.contains(key)) {
-          if (num_new_samples * data_size != values.size()) {
-            throw std::runtime_error("Passed data of invalid shape to concat_data.");
-          }
-
           auto& [existing_shape, existing_values, existing_error_opt, existing_nsamples_opt] = data.at(key);
 
           std::vector<size_t> real_existing_shape;
@@ -137,7 +132,7 @@ namespace dataframe {
           existing_values.insert(existing_values.end(), values.begin(), values.end());
 
           std::vector<size_t> new_shape = shape;
-          new_shape.insert(new_shape.begin(), num_new_samples + num_existing_samples);
+          new_shape.insert(new_shape.begin(), num_existing_samples + 1);
           existing_shape = new_shape;
 
           // Append to sampling data (if it exists)
@@ -148,8 +143,8 @@ namespace dataframe {
           }
         } else {
           std::vector<size_t> new_shape = shape;
-          new_shape.insert(new_shape.begin(), num_new_samples);
-          add_data(key, std::make_tuple(std::move(new_shape), std::move(values), std::move(error_opt), std::move(nsamples_opt)));
+          new_shape.insert(new_shape.begin(), 1);
+          add_data(key, std::make_tuple(new_shape, values, error_opt, nsamples_opt));
         }
       }
 
@@ -193,7 +188,7 @@ namespace dataframe {
         nsamples1_opt = std::move(new_nsamples);
       }
 
-      void combine(const DataSlide &other, double atol=DF_ATOL, double rtol=DF_RTOL) {
+      void combine_slide(const DataSlide &other, double atol=DF_ATOL, double rtol=DF_RTOL) {
         utils::param_eq equality_comparator(atol, rtol);
         auto key = first_incongruent_key(other, equality_comparator);
 
@@ -204,6 +199,20 @@ namespace dataframe {
         // Slides are now guaranteed to be congruent
         for (auto const& [key, val] : other.data) {
           combine_values(key, val);
+        }
+      }
+
+      void concat_slide(const DataSlide &other, double atol=DF_ATOL, double rtol=DF_RTOL) {
+        utils::param_eq equality_comparator(atol, rtol);
+        auto key = first_incongruent_key(other, equality_comparator);
+
+        if (key != std::nullopt) {
+          throw std::runtime_error(fmt::format("DataSlides not congruent at key \"{}\"", key.value()));
+        }
+
+        // Slides are now guaranteed to be congruent
+        for (auto const& [key, val] : other.data) {
+          concat_data(key, val);
         }
       }
 

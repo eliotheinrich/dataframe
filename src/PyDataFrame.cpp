@@ -48,6 +48,8 @@ NB_MODULE(dataframe_bindings, m) {
       auto byte_vec = convert_bytes(bytes);
       new (t) DataSlide(std::move(byte_vec));
     })
+    .def_ro("data", &DataSlide::data)
+    .def_ro("params", &DataSlide::params)
     .def("param_keys", &DataSlide::param_keys)
     .def("data_keys", &DataSlide::data_keys)
     .def("add_param", [](DataSlide& self, const std::string& key, const Parameter& param) { self.add_param(key, param); })
@@ -70,8 +72,9 @@ NB_MODULE(dataframe_bindings, m) {
 
       self.add_data(key, std::move(shape), std::move(values_copy), std::move(error), std::move(nsamples));
     }, "key"_a, "values"_a, "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
-    .def("_concat_data", [](DataSlide& self, const std::string& key, ndarray<double> values, std::vector<size_t> shape, std::optional<ndarray<double>> error_opt, std::optional<ndarray<size_t>> nsamples_opt) { 
+    .def("_concat_data", [](DataSlide& self, const std::string& key, ndarray<double> values, std::optional<ndarray<double>> error_opt, std::optional<ndarray<size_t>> nsamples_opt) { 
       size_t N = values.size();
+      std::vector<size_t> shape = get_shape(values);
 
       std::vector<double> values_copy(values.data(), values.data() + N);
 
@@ -86,7 +89,7 @@ NB_MODULE(dataframe_bindings, m) {
       }
 
       self.concat_data(key, std::move(shape), std::move(values_copy), std::move(error), std::move(nsamples));
-    }, "key"_a, "values"_a, "shape"_a, "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
+    }, "key"_a, "values"_a, "error"_a = nanobind::none(), "nsamples"_a = nanobind::none())
     // TODO make these python-friendly with ndarrays
     .def("get_data", [](const DataSlide& self, const std::string& key) {
       return self.get_data(key);
@@ -118,7 +121,8 @@ NB_MODULE(dataframe_bindings, m) {
     .def("__setstate__", [](DataSlide& slide, const nanobind::bytes& bytes){ new (&slide) DataSlide(convert_bytes(bytes)); })
     .def("describe", &DataSlide::describe)
     .def("congruent", &DataSlide::congruent)
-    .def("combine", &DataSlide::combine, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL);
+    .def("combine_slide", &DataSlide::combine_slide, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL)
+    .def("concat_slide", &DataSlide::concat_slide, "other"_a, "atol"_a = DF_ATOL, "rtol"_a = DF_RTOL);
 
   auto _query = [](DataFrame& df, OneOrMore<std::string> keys_arg, const ExperimentParams& constraints, bool unique, DataFrame::QueryType query_type) {
     std::vector<std::string> keys;
@@ -156,6 +160,8 @@ NB_MODULE(dataframe_bindings, m) {
     })
     .def_rw("atol", &DataFrame::atol)
     .def_rw("rtol", &DataFrame::rtol)
+    .def_ro("params", &DataFrame::params)
+    .def_ro("metadata", &DataFrame::metadata)
     .def("param_keys", &DataFrame::param_keys)
     .def("slide_param_keys", &DataFrame::slide_param_keys)
     .def("slide_data_keys", &DataFrame::slide_data_keys)
@@ -176,12 +182,12 @@ NB_MODULE(dataframe_bindings, m) {
         throw nanobind::key_error(fmt::format("Could not find key {} in params or metadata.", key).c_str());
       }
     })
-    .def("__len__", [](const DataFrame& self) { return self.slides.size(); })
     .def("__setitem__", [](DataFrame& self, const std::string& key, const Parameter& param) { self.add_param(key, param); })
     .def("__str__", &DataFrame::to_json)
     .def("__add__", &DataFrame::combine)
     .def("__getstate__", [](const DataFrame& frame){ return convert_bytes(frame.to_bytes()); })
     .def("__setstate__", [](DataFrame& frame, const nanobind::bytes& bytes){ new (&frame) DataFrame(convert_bytes(bytes)); })
+    .def("num_slides", [](const DataFrame& self) { return self.slides.size(); })
     .def("describe", &DataFrame::describe, "num_slides"_a = 0)
     .def("write", &DataFrame::write)
     .def("promote_params", &DataFrame::promote_params)
