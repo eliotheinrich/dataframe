@@ -365,7 +365,7 @@ namespace dataframe {
               continue;
             }
 
-            slide.combine(slides[j]);
+            slide.combine_slide(slides[j]);
             reduced.insert(j);
           } 
           new_slides.push_back(std::move(slide));

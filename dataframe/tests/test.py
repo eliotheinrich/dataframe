@@ -43,7 +43,7 @@ class TestDataFrame(unittest.TestCase):
         self.slide.add_data("values", values)
 
     def test_access(self):
-        self.assertEqual(len(self.frame), 3)
+        self.assertEqual(self.frame.num_slides(), 3)
         self.assertIn("alpha", self.frame)
         self.assertAlmostEqual(self.frame["alpha"], 1.2)
         self.assertEqual(self.frame["tag"], "exp42")
@@ -77,7 +77,7 @@ class TestDataFrame(unittest.TestCase):
         pickled = pkl.dumps(self.frame)
         unpickled = pkl.loads(pickled)
 
-        self.assertEqual(len(unpickled), len(self.frame))
+        self.assertEqual(unpickled.num_slides(), self.frame.num_slides())
         self.assertEqual(unpickled.params, self.frame.params)
         self.assertEqual(unpickled.metadata, self.frame.metadata)
 
@@ -180,7 +180,21 @@ class SimpleSimulator(Simulator):
 
 class TestSimulator(unittest.TestCase):
     def setUp(self):
-        params = {"p": 0.5, "t": 2.0, "seed": 314, "sampling_timesteps": 100, "equilibration_timesteps": 100, "measurement_freq": 2, "temporal_avg": False}
+        self.equilibration_timesteps = 100
+        self.measurement_freq = 2
+        self.sampling_timesteps = 100
+        self.epochs = 3
+        self.annealing_timesteps = 100
+
+        self.p = 0.5
+        self.t = 2.0
+
+        seed = 314
+        params = {
+            "p": self.p, "t": self.t, "seed": seed,
+            "equilibration_timesteps": self.equilibration_timesteps, "sampling_timesteps": self.sampling_timesteps, "annealing_timesteps": self.annealing_timesteps,
+            "measurement_freq": self.measurement_freq, "temporal_avg": False, "epochs": self.epochs
+        }
 
         self.config = SimulatorConfig(params, SimpleSimulator)
         self.slide = self.config.compute()
@@ -188,7 +202,11 @@ class TestSimulator(unittest.TestCase):
         self.frame1.add_param(params)
         self.frame1.add_slide(self.slide)
 
-        params = {"p": 0.5, "t": 2.0, "seed": 314, "sampling_timesteps": 100, "equilibration_timesteps": 100, "measurement_freq": 2, "temporal_avg": True}
+        params = {
+            "p": self.p, "t": self.t, "seed": seed,
+            "equilibration_timesteps": self.equilibration_timesteps, "sampling_timesteps": self.sampling_timesteps, "annealing_timesteps": self.annealing_timesteps,
+            "measurement_freq": self.measurement_freq, "temporal_avg": True, "epochs": self.epochs
+        }
 
         self.config = SimulatorConfig(params, SimpleSimulator)
         self.slide = self.config.compute()
@@ -215,10 +233,16 @@ class TestSimulator(unittest.TestCase):
         s2_std = self.frame2.query_std(["steps_finished"])
         s2_nsamples = self.frame2.query_nsamples(["steps_finished"])
 
+        num_intervals = self.sampling_timesteps // self.measurement_freq
+
+        self.assertEqual(s1.shape, (1, self.epochs * num_intervals, 3))
+        self.assertEqual(s2.shape, (1, self.epochs, 3))
+
         for i in range(s1.shape[2]):
-            self.assertAlmostEqual(np.mean(s1[0,:,i]), s2[0,i])
-            self.assertAlmostEqual(np.std(s1[0,:,i], ddof=1), s2_std[0,i])
-            self.assertEqual(len(s1[0,:,i]), s2_nsamples[0,i])
+            self.assertAlmostEqual(np.mean(s1[0,:,i]), np.mean(s2[0,:,i]))
+            for epoch in range(self.epochs):
+                self.assertAlmostEqual(np.std(s1[0,epoch*num_intervals:(epoch+1)*num_intervals,i], ddof=1), s2_std[0,epoch,i])
+            self.assertEqual(len(s1[0,:,i]), sum(s2_nsamples[0,:,i]))
 
 
 class TestConfig(Config):

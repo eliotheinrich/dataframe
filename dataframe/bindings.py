@@ -35,44 +35,43 @@ class DataSlide(DataSlide_):
         if isinstance(key, dict):
             for key,v in key.items():
                 self.add_data(key, v)
-        else:
-            if isinstance(values, list):
-                values = np.array(values)
-            elif isinstance(values, tuple):
-                self.add_data(key, np.array(values[1]).reshape(values[0]), values[2], values[3])
-                return
-            values = values.copy()
+            return
 
-            if isinstance(error, list):
-                error = np.array(error)
+        if isinstance(values, list):
+            values = np.array(values)
+        elif isinstance(values, tuple):
+            self.add_data(key, np.array(values[1]).reshape(values[0]), values[2], values[3])
+            return
+        values = values.copy()
 
-            if isinstance(nsamples, list):
-                nsamples = np.array(nsamples)
+        if isinstance(error, list):
+            error = np.array(error)
 
-            self._add_data(key, values, error, nsamples)
+        if isinstance(nsamples, list):
+            nsamples = np.array(nsamples)
 
-    def concat_data(self, key, values=None, shape=None, error=None, nsamples=None):
+        self._add_data(key, values, error, nsamples)
+
+    def concat_data(self, key, values=None, error=None, nsamples=None):
         if isinstance(key, dict):
             for key,v in key.items():
                 self.concat_data(key, v)
-        else:
-            if isinstance(values, list):
-                values = np.array(values)
-            elif isinstance(values, tuple):
-                self.concat_data(key, np.array(values[1]).reshape(values[0]), values[2], values[3])
-                return
-            values = values.copy()
+            return
 
-            if shape is None:
-                shape = values.shape
+        if isinstance(values, list):
+            values = np.array(values)
+        elif isinstance(values, tuple):
+            self.concat_data(key, np.array(values[1]).reshape(values[0]), values[2], values[3])
+            return
+        values = values.copy()
 
-            if isinstance(error, list):
-                error = np.array(error)
+        if isinstance(error, list):
+            error = np.array(error)
 
-            if isinstance(nsamples, list):
-                nsamples = np.array(samples)
+        if isinstance(nsamples, list):
+            nsamples = np.array(nsamples)
 
-            self._concat_data(key, values, shape, error, nsamples)
+        self._concat_data(key, values, error, nsamples)
 
 class Config(ABC):
     def __init__(self, params):
@@ -304,7 +303,7 @@ class ParallelCompute:
             if slides[id] is None:
                 slides[id] = slide
             else:
-                slides[id].combine(slide, self.atol, self.rtol)
+                slides[id].combine_slide(slide, self.atol, self.rtol)
 
         return slides
 
@@ -346,7 +345,7 @@ class ParallelCompute:
                     if slides[id] is None:
                         slides[id] = slide
                     else:
-                        slides[id].combine(slide, self.atol, self.rtol)
+                        slides[id].combine_slide(slide, self.atol, self.rtol)
 
                     if self.verbose:
                         progress.update(1)

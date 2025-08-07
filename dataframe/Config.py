@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from numpy import arange, array
 import time
 
 from .bindings import Config, DataSlide, register_component
@@ -26,6 +25,9 @@ class Simulator(ABC):
         pass
 
     def init(self, serialized_data):
+        pass
+
+    def annealing_callback(self, num_steps, total_num_steps):
         pass
 
     @abstractmethod
@@ -60,6 +62,8 @@ class SimulatorConfig(Config):
         self.sampling_timesteps = params.setdefault("sampling_timesteps", 0)
         self.measurement_freq = params.setdefault("measurement_freq", 1)
         self.temporal_avg = params.setdefault("temporal_avg", False)
+        self.epochs = params.setdefault("epochs", 1)
+        self.annealing_timesteps = params.setdefault("annealing_timesteps", 0)
 
         self.simulator = None
 
@@ -103,17 +107,30 @@ class SimulatorConfig(Config):
         _, dt = time_func(self.simulator.equilibration_timesteps, self.equilibration_timesteps)
         steps_time += dt
 
-        for i in range(num_intervals):
-            _, dt = time_func(self.simulator.timesteps, num_timesteps)
+        for j in range(self.epochs):
+            self.simulator.annealing_callback(j, self.epochs)
+            _, dt = time_func(self.simulator.timesteps, self.annealing_timesteps)
             steps_time += dt
 
-            sample, dt = time_func(self.simulator.take_samples)
-            sampling_time += dt
+            epoch_slide = DataSlide()
+
+            for i in range(num_intervals):
+                _, dt = time_func(self.simulator.timesteps, num_timesteps)
+                steps_time += dt
+
+                sample, dt = time_func(self.simulator.take_samples)
+                sampling_time += dt
+
+                if self.temporal_avg:
+                    epoch_slide.add_data(sample)
+                else:
+                    slide.concat_data(sample)
 
             if self.temporal_avg:
-                slide.add_data(sample)
-            else:
-                slide.concat_data(sample)
+                for key,val in epoch_slide.data.items():
+                    slide.concat_data(key, val)
+
+
 
         end = time.time()
         duration = end - start
@@ -124,10 +141,20 @@ class SimulatorConfig(Config):
         return slide
 
 def get_timesteps(dataframe):
-    keys = ["equilibration_timesteps", "sampling_timesteps", "measurement_freq"]
-    equilibration_timesteps, sampling_timesteps, measurement_freq = dataframe.query(keys)
+    import numpy as np
+    keys = ["equilibration_timesteps", "sampling_timesteps", "measurement_freq", "annealing_timesteps", "epochs"]
+    equilibration_timesteps, sampling_timesteps, measurement_freq, annealing_timesteps, epochs = dataframe.query(keys)
+
     num_points = sampling_timesteps // measurement_freq
-    return arange(1, num_points + 1) * measurement_freq + equilibration_timesteps
+    timesteps = np.array([])
+    current_time = equilibration_timesteps
+
+    for epoch in range(epochs):
+        current_time += annealing_timesteps
+        timesteps = np.concatenate((timesteps, np.arange(1, num_points + 1) * measurement_freq + current_time))
+        current_time += sampling_timesteps 
+
+    return np.array(timesteps)
 
 
 class FuncConfig(Config):
