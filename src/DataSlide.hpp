@@ -110,7 +110,6 @@ namespace dataframe {
         }
 
         const auto& [shape, values, error_opt, nsamples_opt] = object;
-        size_t data_size = dataframe::utils::shape_size(shape);
 
         if (data.contains(key)) {
           auto& [existing_shape, existing_values, existing_error_opt, existing_nsamples_opt] = data.at(key);
