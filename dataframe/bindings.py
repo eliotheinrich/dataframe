@@ -73,6 +73,9 @@ class DataSlide(DataSlide_):
 
         self._concat_data(key, values, error, nsamples)
 
+class MissingInitError(RuntimeError):
+    pass
+
 class Config(ABC):
     def __init__(self, params):
         if not isinstance(params, dict):
@@ -81,6 +84,12 @@ class Config(ABC):
         self.num_threads = params.setdefault("num_threads", 1)
 
     def __getstate__(self):
+        if not hasattr(self, "params"):
+            raise MissingInitError(
+                "Config.__init__() was not called. "
+                "Make sure to call super().__init__(params) in the Config implementation's __init__()."
+            )
+
         return self.params, 
 
     def __setstate__(self, args):
