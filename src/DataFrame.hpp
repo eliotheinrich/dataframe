@@ -7,6 +7,7 @@
 #include <set>
 #include <fstream>
 #include <numeric>
+#include <unordered_map>
 
 namespace dataframe {
 
@@ -216,7 +217,7 @@ namespace dataframe {
       DataFrame filter(const std::vector<ExperimentParams>& constraints, bool invert = false) {
         std::set<uint32_t> inds;
         for (auto const &constraint : constraints) {
-          auto c_inds = compatible_inds(constraint);
+          auto c_inds = congruent_inds(constraint);
           std::set<uint32_t> ind_union;
 
           std::set_union(
@@ -268,7 +269,7 @@ namespace dataframe {
         }
 
         // Determine indices of slides which respect the given constraints
-        auto inds = compatible_inds(constraints);
+        auto inds = congruent_inds(constraints);
 
         // Constraints yield no valid slides, so return nothing
         if (inds.empty()) {
@@ -348,28 +349,95 @@ namespace dataframe {
         return result;
       }
 
-      void reduce() {
-        std::vector<DataSlide> new_slides;
+      struct params_hash {
+        size_t operator()(const Parameter& p) const {
+          size_t h = 0;
+          std::hash<std::string> str_hash;
+          std::hash<int> int_hash;
+          std::hash<double> f_hash;
 
-        std::set<uint32_t> reduced;
-        for (uint32_t i = 0; i < slides.size(); i++) {
-          if (reduced.contains(i)) {
-            continue;
+          if (p.index() == 0) {
+            h = str_hash(std::get<std::string>(p));
+          } else if (p.index() == 1) {
+            h = int_hash(std::get<int>(p));
+          } else {
+            // Quantize double to tolerate small differences in hashing
+            double d = std::get<double>(p);
+            long long q = static_cast<long long>(d / 1e-9); 
+            h = std::hash<long long>{}(q);
           }
 
-          DataSlide slide = std::move(slides[i]);
+          h ^= std::hash<size_t>{}(p.index() + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2));
+          return h;
+        }
+      };
 
-          auto inds = compatible_inds(slide.params);
-          for (auto const j : inds) {
-            if (j == i) {
-              continue;
+      struct MapHash {
+        size_t operator()(const std::map<std::string, Parameter>& m) const noexcept {
+          size_t h = 0;
+          std::hash<std::string> str_hash;
+          params_hash val_hash;
+
+          for (auto const& kv : m) {
+            size_t kh = str_hash(kv.first);
+            size_t vh = val_hash(kv.second);
+
+            // combine key and value
+            size_t comb = kh ^ (vh + 0x9e3779b97f4a7c15ULL + (kh << 6) + (kh >> 2));
+            h ^= comb + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+          }
+          return h;
+        }
+      };
+
+      struct MapEqual {
+        bool operator()(const ExperimentParams& params1, const ExperimentParams& params2) const noexcept {
+          if (params1.size() != params2.size()) {
+            return false;
+          }
+
+          utils::param_eq equality_comparator;
+          for (const auto& [key, val] : params1) {
+            if (!params2.contains(key)) {
+              return false;
             }
 
-            slide.combine_slide(slides[j]);
-            reduced.insert(j);
-          } 
+            if (!equality_comparator(params1.at(key), params2.at(key))) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+      };
+
+
+      using ParamsPartition = std::unordered_map<ExperimentParams, std::vector<uint32_t>, MapHash, MapEqual>;
+
+      void reduce() {
+        ParamsPartition partition;
+        std::vector<ExperimentParams> order;
+
+        for (uint32_t i = 0; i < slides.size(); i++) {
+          const auto& p = slides[i].params;
+          if (partition.contains(p)) {
+            partition[p].push_back(i);
+          } else {
+            partition[p] = {i};
+            order.push_back(p);
+          }
+        }
+
+        std::vector<DataSlide> new_slides;
+        for (const auto& p : order) {
+          const auto& inds = partition.at(p);
+          DataSlide slide = std::move(slides[inds[0]]);
+          for (size_t j = 1; j < inds.size(); j++) {
+            slide.combine_slide(slides[inds[j]]);
+          }
           new_slides.push_back(std::move(slide));
         }
+
 
         slides = std::move(new_slides);
         promote_params();
@@ -514,7 +582,7 @@ namespace dataframe {
         }
       }
 
-      std::vector<uint32_t> compatible_inds(const ExperimentParams& constraints) {
+      std::vector<uint32_t> congruent_inds(const ExperimentParams& constraints, std::optional<std::set<uint32_t>> include_opt=std::nullopt) {
         // Check if any keys correspond to mismatched Frame-level parameters, in which case return nothing
         utils::param_eq equality_comparator(atol, rtol);
         for (auto const &[key, val] : constraints) {
@@ -523,7 +591,7 @@ namespace dataframe {
           }
         }
 
-        // Determine which constraints are relevant, i.e. correspond to existing Slide-level parameters
+        // Determine which constraints are relevant, i.e. do not correspond to frame-level parameters
         ExperimentParams relevant_constraints;
         for (auto const &[key, val] : constraints) {
           if (!params.contains(key)) {
@@ -532,18 +600,24 @@ namespace dataframe {
         }
 
         std::set<uint32_t> inds;
-        for (uint32_t i = 0; i < slides.size(); i++) {
-          inds.insert(i);
+        if (include_opt) {
+          inds = include_opt.value();
+        } else {
+          for (uint32_t i = 0; i < slides.size(); i++) {
+            inds.insert(i);
+          }
         }
 
         for (const auto& [key, val] : relevant_constraints) {
           std::vector<size_t> to_remove;
           for (const auto i : inds) {
             if (slides[i].params.contains(key)) {
+              // If slide contains the key, check for equality and remove if not
               if (!equality_comparator(slides[i].params.at(key), val)) {
                 to_remove.push_back(i);
               }
-            } else {
+            } else { 
+              // If the slide does not contains the key, remove it
               to_remove.push_back(i);
             }
           }
