@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.26)
 
-project(dataframe LANGUAGES CXX)
+project(dataframe VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -10,17 +10,10 @@ endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_PREFIX_PATH $ENV{CMAKE_PREFIX_PATH})
-string(REPLACE ":" ";" CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Fetching externals
-find_package(fmt)
-add_compile_definitions(-DFMT_HEADER_ONLY=On)
-
-foreach(PATH IN LISTS CMAKE_PREFIX_PATH)
-    include_directories("${PATH}/include")
-endforeach()
+find_package(fmt REQUIRED)
 
 include(FetchContent)
 
@@ -33,7 +26,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(glaze)
 
 include_directories(
-    src
+    ${PROJECT_SOURCE_DIR}/src
     ${glaze_SOURCE_DIR}/include
 )
 
@@ -48,6 +41,7 @@ set(SRC_FILES
 )
 
 add_library(dataframe ${SRC_FILES}) 
+target_link_libraries(dataframe PUBLIC fmt::fmt)
 
 if (DEFINED DF_BUILDING_PY_BINDINGS)
     find_package(Python 3.10 
@@ -75,7 +69,46 @@ if (DEFINED DF_BUILDING_PY_BINDINGS)
         TARGETS dataframe_bindings
         LIBRARY DESTINATION dataframe
     )
-elseif (DEFINED DF_BUILDING_BINARIES)
-    add_executable(test src/test.cpp)
-    target_link_libraries(test PRIVATE dataframe)
+
+    target_link_libraries(dataframe_bindings PUBLIC fmt::fmt)
+else()
+    include(CMakePackageConfigHelpers)
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/dataframeConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY AnyNewerVersion
+    )
+
+    configure_package_config_file(
+        "${CMAKE_CURRENT_LIST_DIR}/cmake/dataframeConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/dataframeConfig.cmake"
+        INSTALL_DESTINATION lib/cmake/dataframe
+    )
+
+    install(TARGETS dataframe
+            EXPORT dataframeTargets
+            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION lib
+            RUNTIME DESTINATION bin
+    )
+
+    install(EXPORT dataframeTargets
+        FILE dataframeTargets.cmake
+        NAMESPACE dataframe::
+        DESTINATION lib/cmake/dataframe
+    )
+
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/dataframeConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/dataframeConfigVersion.cmake"
+        DESTINATION lib/cmake/dataframe
+    )
+
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/
+        DESTINATION include/dataframe
+        FILES_MATCHING 
+        PATTERN "*.h"
+        PATTERN "*.hpp"
+    )
 endif()
