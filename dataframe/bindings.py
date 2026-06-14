@@ -206,6 +206,8 @@ class ParallelCompute:
         self.atol = float(metadata.setdefault("atol", ATOL))
         self.rtol = float(metadata.setdefault("rtol", RTOL))
         self.parallelization_type = int(metadata.setdefault("parallelization_type", self.POOL))
+        if self.parallelization_type not in [self.SERIAL, self.POOL]:
+            raise ValueError(f"Provided parallelization_type is not valid. Must be {self.SERIAL} for serial execution or {self.POOL} for thread pooling.")
         self.average_congruent_runs = bool(metadata.setdefault("average_congruent_runs", True))
         self.batch_size = int(metadata.setdefault("batch_size", 1024))
         self.verbose = bool(metadata.setdefault("verbose", True))
@@ -225,7 +227,7 @@ class ParallelCompute:
         total_configs = []
         j = 0
         for i, config in enumerate(self.configs):
-            config.clone()
+            #config.clone()
 
             for _ in range(self.num_runs):
                 id = i if self.average() else j

@@ -130,8 +130,6 @@ class SimulatorConfig(Config):
                 for key,val in epoch_slide.data.items():
                     slide.concat_data(key, val)
 
-
-
         end = time.time()
         duration = end - start
         slide.add_data("time", [duration])
